@@ -44,7 +44,7 @@ class WPNC_Telegram {
 		if ( $code < 200 || $code >= 300 ) {
 			return new WP_Error(
 				'wpnc_telegram_http_error',
-				sprintf( __( 'Telegram returned HTTP %d.', 'wp-news-collector' ), $code )
+				sprintf( wpnc__( 'Telegram returned HTTP %d.', 'تلگرام کد HTTP %d برگرداند.' ), $code )
 			);
 		}
 

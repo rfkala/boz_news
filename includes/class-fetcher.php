@@ -144,7 +144,7 @@ class WPNC_Fetcher {
 		);
 
 		if ( ! $this->acquire_lock( $manual ) ) {
-			$message = __( 'A fetch job is already running.', 'wp-news-collector' );
+			$message = wpnc__( 'A fetch job is already running.', 'یک دریافت در حال اجراست.' );
 			$this->logger->log( WPNC_Logger::LEVEL_WARNING, $message );
 			$summary['errors']++;
 			$summary['messages'][] = $message;
@@ -156,7 +156,7 @@ class WPNC_Fetcher {
 			$summary['sources_total'] = count( $sources );
 
 			if ( empty( $sources ) ) {
-				$message = __( 'No RSS feeds are configured.', 'wp-news-collector' );
+				$message = wpnc__( 'No RSS feeds are configured.', 'هیچ فید RSS تنظیم نشده است.' );
 				$this->logger->log( WPNC_Logger::LEVEL_WARNING, $message );
 				$summary['messages'][] = $message;
 				return $summary;
@@ -172,7 +172,7 @@ class WPNC_Fetcher {
 
 			$this->logger->log(
 				WPNC_Logger::LEVEL_INFO,
-				__( 'Fetch completed.', 'wp-news-collector' ),
+				wpnc__( 'Fetch completed.', 'دریافت کامل شد.' ),
 				$summary
 			);
 		} finally {
@@ -208,7 +208,7 @@ class WPNC_Fetcher {
 				'published' => 0,
 				'skipped'   => 0,
 				'errors'    => 1,
-				'messages'  => array( __( 'Source not found.', 'wp-news-collector' ) ),
+				'messages'  => array( wpnc__( 'Source not found.', 'منبع یافت نشد.' ) ),
 			);
 		}
 
@@ -255,7 +255,7 @@ class WPNC_Fetcher {
 		if ( empty( $source['valid'] ) ) {
 			$message = sprintf(
 				/* translators: %s: feed URL */
-				__( 'Skipped unsafe feed URL: %s', 'wp-news-collector' ),
+				wpnc__( 'Skipped unsafe feed URL: %s', 'آدرس ناامن فید نادیده گرفته شد: %s' ),
 				$source['url'] ?? ''
 			);
 			$this->logger->log( WPNC_Logger::LEVEL_ERROR, $message, array(), $source_key );
@@ -269,7 +269,7 @@ class WPNC_Fetcher {
 			$summary['skipped']++;
 			$summary['messages'][] = sprintf(
 				/* translators: %s: feed URL */
-				__( 'Source is disabled: %s', 'wp-news-collector' ),
+				wpnc__( 'Source is disabled: %s', 'این منبع غیرفعال است: %s' ),
 				$source['url']
 			);
 			return;
@@ -280,7 +280,7 @@ class WPNC_Fetcher {
 			$summary['skipped']++;
 			$summary['messages'][] = sprintf(
 				/* translators: 1: feed URL, 2: human readable duration */
-				__( 'Source paused after repeated failures, retrying in %2$s: %1$s', 'wp-news-collector' ),
+				wpnc__( 'Source paused after repeated failures, retrying in %2$s: %1$s', 'این منبع پس از خطاهای پیاپی موقتاً متوقف شد، تلاش بعدی تا %2$s: %1$s' ),
 				$source['url'],
 				human_time_diff( WPNC_Time::timestamp(), WPNC_Time::timestamp() + $cooldown )
 			);
@@ -291,7 +291,7 @@ class WPNC_Fetcher {
 		if ( is_wp_error( $result ) ) {
 			$message = sprintf(
 				/* translators: 1: feed URL, 2: error message */
-				__( 'Feed fetch failed for %1$s: %2$s', 'wp-news-collector' ),
+				wpnc__( 'Feed fetch failed for %1$s: %2$s', 'دریافت فید %1$s ناموفق بود: %2$s' ),
 				$source['url'],
 				$result->get_error_message()
 			);
@@ -356,7 +356,7 @@ class WPNC_Fetcher {
 			if ( is_wp_error( $rewrite ) ) {
 				$this->logger->log(
 					WPNC_Logger::LEVEL_WARNING,
-					__( 'AI rewrite failed; original item was kept.', 'wp-news-collector' ),
+					wpnc__( 'AI rewrite failed; original item was kept.', 'بازنویسی هوش مصنوعی ناموفق بود؛ نسخه اصلی حفظ شد.' ),
 					array(
 						'error' => $rewrite->get_error_message(),
 						'url'   => $item['main_link'],
@@ -373,7 +373,7 @@ class WPNC_Fetcher {
 			if ( is_wp_error( $post_id ) ) {
 				$this->logger->log(
 					WPNC_Logger::LEVEL_ERROR,
-					__( 'Auto-publish failed.', 'wp-news-collector' ),
+					wpnc__( 'Auto-publish failed.', 'انتشار خودکار ناموفق بود.' ),
 					array(
 						'error' => $post_id->get_error_message(),
 						'url'   => $item['main_link'],
@@ -390,7 +390,7 @@ class WPNC_Fetcher {
 		if ( ! $inserted ) {
 			$this->logger->log(
 				WPNC_Logger::LEVEL_ERROR,
-				__( 'Failed to insert queue item.', 'wp-news-collector' ),
+				wpnc__( 'Failed to insert queue item.', 'افزودن آیتم به صف ناموفق بود.' ),
 				array( 'url' => $item['main_link'] ),
 				$item['source_key']
 			);

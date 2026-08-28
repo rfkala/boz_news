@@ -81,14 +81,14 @@ class WPNC_Ajax {
 		$item = $this->queue->get( $id );
 
 		if ( ! $item ) {
-			$this->fail( __( 'Item not found.', 'wp-news-collector' ), 'wpnc_not_found', array(), 404 );
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
 		}
 
 		// Without this, a double click or a second moderator publishes the
 		// same story twice.
 		if ( ! $this->queue->is_actionable( $item ) ) {
 			$this->fail(
-				__( 'This item was already processed.', 'wp-news-collector' ),
+				wpnc__( 'This item was already processed.', 'این آیتم قبلاً پردازش شده است.' ),
 				'wpnc_already_processed',
 				array( 'status' => (string) $item->status ),
 				409
@@ -104,7 +104,7 @@ class WPNC_Ajax {
 		$this->queue->mark_approved( $id, $post_id );
 		wp_send_json_success(
 			array(
-				'message' => __( 'Item approved and published successfully.', 'wp-news-collector' ),
+				'message' => wpnc__( 'Item approved and published successfully.', 'آیتم تأیید و با موفقیت منتشر شد.' ),
 				'post_id' => $post_id,
 			)
 		);
@@ -120,14 +120,14 @@ class WPNC_Ajax {
 		$item = $this->queue->get( $id );
 
 		if ( ! $item ) {
-			$this->fail( __( 'Item not found.', 'wp-news-collector' ), 'wpnc_not_found', array(), 404 );
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
 		}
 
 		// Rejecting an already approved row used to flip its status while the
 		// published post stayed live, which left the two out of sync.
 		if ( ! $this->queue->is_actionable( $item ) ) {
 			$this->fail(
-				__( 'This item was already processed.', 'wp-news-collector' ),
+				wpnc__( 'This item was already processed.', 'این آیتم قبلاً پردازش شده است.' ),
 				'wpnc_already_processed',
 				array( 'status' => (string) $item->status ),
 				409
@@ -136,7 +136,7 @@ class WPNC_Ajax {
 
 		$this->queue->update_status( $id, 'rejected' );
 
-		wp_send_json_success( array( 'message' => __( 'Item rejected successfully.', 'wp-news-collector' ) ) );
+		wp_send_json_success( array( 'message' => wpnc__( 'Item rejected successfully.', 'آیتم رد شد.' ) ) );
 	}
 
 	/**
@@ -152,7 +152,7 @@ class WPNC_Ajax {
 
 		if ( empty( $title ) ) {
 			$this->fail(
-				__( 'Title is required.', 'wp-news-collector' ),
+				wpnc__( 'Title is required.', 'عنوان الزامی است.' ),
 				'wpnc_title_required',
 				array( 'field' => 'title' ),
 				422
@@ -168,7 +168,7 @@ class WPNC_Ajax {
 			)
 		);
 
-		wp_send_json_success( array( 'message' => __( 'Item updated successfully.', 'wp-news-collector' ) ) );
+		wp_send_json_success( array( 'message' => wpnc__( 'Item updated successfully.', 'تغییرات ذخیره شد.' ) ) );
 	}
 
 	/**
@@ -204,7 +204,7 @@ class WPNC_Ajax {
 			array(
 				'message' => sprintf(
 					/* translators: 1: success count, 2: error count, 3: skipped count */
-					__( '%1$d items approved. %2$d failed. %3$d skipped.', 'wp-news-collector' ),
+					wpnc__( '%1$d items approved. %2$d failed. %3$d skipped.', '%1$d آیتم تأیید شد. %2$d ناموفق. %3$d رد شده.' ),
 					$success_count,
 					$error_count,
 					$skipped_count
@@ -241,7 +241,7 @@ class WPNC_Ajax {
 			array(
 				'message'  => sprintf(
 					/* translators: 1: rejected count, 2: skipped count */
-					__( '%1$d items rejected. %2$d skipped.', 'wp-news-collector' ),
+					wpnc__( '%1$d items rejected. %2$d skipped.', '%1$d آیتم رد شد. %2$d نادیده گرفته شد.' ),
 					$success_count,
 					$skipped_count
 				),
@@ -280,7 +280,7 @@ class WPNC_Ajax {
 		$sources = $fetcher->get_sources();
 
 		if ( empty( $sources ) ) {
-			$this->fail( __( 'No RSS sources configured.', 'wp-news-collector' ), 'wpnc_no_sources' );
+			$this->fail( wpnc__( 'No RSS sources configured.', 'هیچ منبع RSS تنظیم نشده است.' ), 'wpnc_no_sources' );
 		}
 
 		// Take the run-level lock here, not per source, so a manual run cannot
@@ -288,7 +288,7 @@ class WPNC_Ajax {
 		// the transient TTL covers a browser that walks away mid-run.
 		if ( ! $fetcher->acquire_lock( true ) ) {
 			$this->fail(
-				__( 'A fetch job is already running. Wait for it to finish, or clear the lock from Logs & Tools.', 'wp-news-collector' ),
+				wpnc__( 'A fetch job is already running. Wait for it to finish, or clear the lock from Logs & Tools.', 'یک دریافت در حال اجراست. تا پایان آن صبر کنید یا از تب لاگ و ابزارها قفل را پاک کنید.' ),
 				'wpnc_locked',
 				array( 'locked' => true ),
 				409
@@ -337,11 +337,11 @@ class WPNC_Ajax {
 
 		$this->logger->log(
 			WPNC_Logger::LEVEL_WARNING,
-			__( 'Fetch lock cleared by an administrator.', 'wp-news-collector' ),
+			wpnc__( 'Fetch lock cleared by an administrator.', 'قفل دریافت توسط مدیر پاک شد.' ),
 			is_array( $lock ) ? $lock : array()
 		);
 
-		wp_send_json_success( array( 'message' => __( 'Fetch lock cleared.', 'wp-news-collector' ) ) );
+		wp_send_json_success( array( 'message' => wpnc__( 'Fetch lock cleared.', 'قفل دریافت پاک شد.' ) ) );
 	}
 
 	/**
@@ -367,7 +367,7 @@ class WPNC_Ajax {
 
 			$this->logger->log(
 				WPNC_Logger::LEVEL_INFO,
-				__( 'Manual fetch completed.', 'wp-news-collector' ),
+				wpnc__( 'Manual fetch completed.', 'دریافت دستی کامل شد.' ),
 				$safe
 			);
 		}
@@ -454,7 +454,7 @@ class WPNC_Ajax {
 		check_ajax_referer( 'wpnc_admin_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			$this->fail( __( 'Unauthorized access.', 'wp-news-collector' ), 'wpnc_forbidden', array(), 403 );
+			$this->fail( wpnc__( 'Unauthorized access.', 'دسترسی غیرمجاز.' ), 'wpnc_forbidden', array(), 403 );
 		}
 	}
 
@@ -466,7 +466,7 @@ class WPNC_Ajax {
 	private function get_posted_id() {
 		$id = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
 		if ( ! $id ) {
-			$this->fail( __( 'Invalid ID provided.', 'wp-news-collector' ), 'wpnc_invalid_id', array(), 422 );
+			$this->fail( wpnc__( 'Invalid ID provided.', 'شناسه نامعتبر است.' ), 'wpnc_invalid_id', array(), 422 );
 		}
 
 		return $id;
@@ -482,7 +482,7 @@ class WPNC_Ajax {
 		$ids        = array_filter( array_map( 'absint', $posted_ids ) );
 
 		if ( empty( $ids ) ) {
-			$this->fail( __( 'No valid IDs provided.', 'wp-news-collector' ), 'wpnc_invalid_ids', array(), 422 );
+			$this->fail( wpnc__( 'No valid IDs provided.', 'هیچ شناسه معتبری ارسال نشد.' ), 'wpnc_invalid_ids', array(), 422 );
 		}
 
 		return $ids;

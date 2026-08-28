@@ -117,7 +117,7 @@ class WPNC_Feed_Reader {
 	 */
 	public function fetch( $source, $max_items = 20 ) {
 		if ( empty( $source['valid'] ) || ! $this->is_safe_url( $source['url'] ?? '' ) ) {
-			return new WP_Error( 'wpnc_invalid_feed_url', __( 'Invalid or unsafe feed URL.', 'wp-news-collector' ) );
+			return new WP_Error( 'wpnc_invalid_feed_url', wpnc__( 'Invalid or unsafe feed URL.', 'آدرس فید نامعتبر یا ناامن است.' ) );
 		}
 
 		require_once ABSPATH . WPINC . '/feed.php';

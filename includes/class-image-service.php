@@ -133,7 +133,7 @@ class WPNC_Image_Service {
 	 */
 	public function sideload_featured_image( $image_url, $post_id, $title ) {
 		if ( ! $this->feed_reader->is_safe_url( $image_url ) ) {
-			return new WP_Error( 'wpnc_invalid_image_url', __( 'Invalid image URL.', 'wp-news-collector' ) );
+			return new WP_Error( 'wpnc_invalid_image_url', wpnc__( 'Invalid image URL.', 'آدرس تصویر نامعتبر است.' ) );
 		}
 
 		require_once ABSPATH . 'wp-admin/includes/media.php';

@@ -19,7 +19,7 @@ class WPNC_AI_Rewriter {
 	public function rewrite( $title, $description ) {
 		$api_key = trim( (string) get_option( 'wpnc_openai_api_key', '' ) );
 		if ( empty( $api_key ) ) {
-			return new WP_Error( 'wpnc_openai_missing_key', __( 'OpenAI API key is missing.', 'wp-news-collector' ) );
+			return new WP_Error( 'wpnc_openai_missing_key', wpnc__( 'OpenAI API key is missing.', 'کلید API اوپن‌ای‌آی وارد نشده است.' ) );
 		}
 
 		$target_language    = sanitize_text_field( get_option( 'wpnc_target_language', '' ) );
@@ -63,7 +63,7 @@ class WPNC_AI_Rewriter {
 		if ( 200 !== $code ) {
 			return new WP_Error(
 				'wpnc_openai_http_error',
-				sprintf( __( 'OpenAI returned HTTP %d.', 'wp-news-collector' ), $code )
+				sprintf( wpnc__( 'OpenAI returned HTTP %d.', 'اوپن‌ای‌آی کد HTTP %d برگرداند.' ), $code )
 			);
 		}
 
@@ -72,7 +72,7 @@ class WPNC_AI_Rewriter {
 		$parsed = json_decode( trim( (string) $json ), true );
 
 		if ( ! is_array( $parsed ) || empty( $parsed['title'] ) || empty( $parsed['description'] ) ) {
-			return new WP_Error( 'wpnc_openai_invalid_json', __( 'OpenAI did not return a valid rewrite payload.', 'wp-news-collector' ) );
+			return new WP_Error( 'wpnc_openai_invalid_json', wpnc__( 'OpenAI did not return a valid rewrite payload.', 'پاسخ اوپن‌ای‌آی قابل استفاده نبود.' ) );
 		}
 
 		return array(

@@ -56,7 +56,7 @@ class WPNC_Publisher {
 		$pub_date    = WPNC_Time::to_utc( $item['pub_date'] ?? '' );
 
 		if ( empty( $title ) || empty( $main_link ) ) {
-			return new WP_Error( 'wpnc_publish_missing_data', __( 'Cannot publish an item without title and source URL.', 'wp-news-collector' ) );
+			return new WP_Error( 'wpnc_publish_missing_data', wpnc__( 'Cannot publish an item without title and source URL.', 'انتشار بدون عنوان و آدرس منبع ممکن نیست.' ) );
 		}
 
 		$content = $description . "\n\n" . sprintf(
@@ -108,7 +108,7 @@ class WPNC_Publisher {
 				add_post_meta( $post_id, '_wpnc_source_image', $image_url, true );
 				$this->logger->log(
 					WPNC_Logger::LEVEL_WARNING,
-					__( 'Image sideload failed.', 'wp-news-collector' ),
+					wpnc__( 'Image sideload failed.', 'بارگذاری تصویر ناموفق بود.' ),
 					array(
 						'post_id' => $post_id,
 						'error'   => $attachment_id->get_error_message(),
@@ -123,7 +123,7 @@ class WPNC_Publisher {
 		if ( is_wp_error( $telegram_result ) ) {
 			$this->logger->log(
 				WPNC_Logger::LEVEL_WARNING,
-				__( 'Telegram notification failed.', 'wp-news-collector' ),
+				wpnc__( 'Telegram notification failed.', 'ارسال اعلان تلگرام ناموفق بود.' ),
 				array(
 					'post_id' => $post_id,
 					'error'   => $telegram_result->get_error_message(),
