@@ -53,13 +53,23 @@ class WPNC_Logger {
 
 		$limit = max( 1, min( 200, absint( $limit ) ) );
 
-		return $wpdb->get_results(
+		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT id, level, source, message, context, created_at FROM {$this->table_name()} ORDER BY id DESC LIMIT %d",
 				$limit
 			),
 			ARRAY_A
 		);
+
+		if ( ! is_array( $rows ) ) {
+			return array();
+		}
+
+		foreach ( $rows as $index => $row ) {
+			$rows[ $index ]['created_at_display'] = WPNC_Time::for_display( $row['created_at'] );
+		}
+
+		return $rows;
 	}
 
 	/**

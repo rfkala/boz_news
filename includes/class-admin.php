@@ -18,6 +18,7 @@ class WPNC_Admin {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_head', array( $this, 'menu_highlight_css' ) );
+		add_action( 'admin_notices', array( $this, 'render_health_notice' ) );
 	}
 
 	public function add_admin_menu() {
@@ -71,18 +72,22 @@ class WPNC_Admin {
 	}
 
 	public function register_settings() {
-		register_setting( 'wpnc_settings_group', 'wpnc_admin_lang', 'sanitize_key' );
+		register_setting( 'wpnc_settings_group', 'wpnc_admin_lang', array( 'WPNC_Settings', 'sanitize_language' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_rss_links', array( $this, 'sanitize_rss_links' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_interval', array( 'WPNC_Settings', 'sanitize_interval' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_target_post_type', array( 'WPNC_Settings', 'sanitize_post_type' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_default_category', 'absint' );
+		register_setting( 'wpnc_settings_group', 'wpnc_default_category', array( 'WPNC_Settings', 'sanitize_category' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_post_author', array( 'WPNC_Settings', 'sanitize_post_author' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_post_status', array( 'WPNC_Settings', 'sanitize_post_status' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_publish', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_default_image', 'esc_url_raw' );
+		register_setting( 'wpnc_settings_group', 'wpnc_default_image', array( 'WPNC_Settings', 'sanitize_image_url' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_extract_full_text', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_include_words', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_exclude_words', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_max_items_per_feed', array( 'WPNC_Settings', 'sanitize_max_items' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_request_timeout', array( 'WPNC_Settings', 'sanitize_timeout' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_queue_retention_days', array( 'WPNC_Settings', 'sanitize_retention' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_log_retention_days', array( 'WPNC_Settings', 'sanitize_retention' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_openai_api_key', array( $this, 'sanitize_openai_key' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_openai_model', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_rewrite', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
@@ -93,7 +98,11 @@ class WPNC_Admin {
 
 	public function render_admin_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
+			wp_die(
+				esc_html( wpnc__( 'You do not have permission to open Boz News.', 'شما اجازه دسترسی به بُز نیوز را ندارید.' ) ),
+				esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ),
+				array( 'response' => 403 )
+			);
 		}
 
 		$is_rtl     = ( 'en' !== get_option( 'wpnc_admin_lang', 'fa' ) );
@@ -136,7 +145,55 @@ class WPNC_Admin {
 		<?php
 	}
 
+	/**
+	 * Surface a failed table creation. dbDelta cannot report one, so without
+	 * this the plugin looks fine and then throws DB errors on every request.
+	 */
+	public function render_health_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$missing = (string) get_option( WPNC_DB::HEALTH_OPTION, '' );
+		if ( '' === $missing ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
+			esc_html( wpnc__( 'Boz News:', 'بُز نیوز:' ) ),
+			esc_html(
+				sprintf(
+					/* translators: %s: comma separated table names */
+					wpnc__(
+						'could not create its database tables (%s). Deactivate and reactivate the plugin, or check the database user permissions.',
+						'نتوانست جدول‌های پایگاه داده خود را بسازد (%s). افزونه را غیرفعال و دوباره فعال کنید یا دسترسی کاربر پایگاه داده را بررسی کنید.'
+					),
+					$missing
+				)
+			)
+		);
+	}
+
+	/**
+	 * Render queued settings notices, including a save confirmation.
+	 */
+	private function render_settings_notices() {
+		if ( isset( $_GET['settings-updated'] ) && empty( get_settings_errors( WPNC_Settings::NOTICE_SLUG ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			WPNC_Settings::notify(
+				'wpnc_saved',
+				'Settings saved.',
+				'تنظیمات ذخیره شد.',
+				'success'
+			);
+		}
+
+		settings_errors( WPNC_Settings::NOTICE_SLUG );
+	}
+
 	private function render_settings_tab() {
+		$this->render_settings_notices();
+
 		$interval     = get_option( 'wpnc_interval', 'hourly' );
 		$target_pt    = WPNC_Settings::get_target_post_type();
 		$default_cat  = absint( get_option( 'wpnc_default_category', 0 ) );
@@ -300,7 +357,10 @@ class WPNC_Admin {
 	}
 
 	private function render_logs_tab() {
-		$last_run     = get_option( 'wpnc_last_run', wpnc__( 'Never', 'هرگز' ) );
+		$last_run_raw = (string) get_option( 'wpnc_last_run', '' );
+		$last_run     = '' === $last_run_raw
+			? wpnc__( 'Never', 'هرگز' )
+			: WPNC_Time::for_display( $last_run_raw );
 		$last_count   = absint( get_option( 'wpnc_last_count', 0 ) );
 		$last_summary = get_option( 'wpnc_last_summary', array() );
 		?>
@@ -373,12 +433,56 @@ class WPNC_Admin {
 		$reader  = new WPNC_Feed_Reader();
 		$sources = $reader->parse_sources( $value );
 		$lines   = array();
+		$dropped = array();
+		$unsafe  = array();
 
 		foreach ( $sources as $source ) {
 			$line = WPNC_Feed_Reader::to_line( $source );
-			if ( '' !== $line ) {
-				$lines[] = $line;
+
+			if ( '' === $line ) {
+				// esc_url_raw could make nothing of it, so it cannot be kept.
+				$dropped[] = isset( $source['raw_url'] ) ? $source['raw_url'] : '';
+				continue;
 			}
+
+			if ( empty( $source['valid'] ) ) {
+				// Kept on purpose: the admin needs to see and fix the line
+				// rather than have it vanish out of the textarea.
+				$unsafe[] = $source['url'];
+			}
+
+			$lines[] = $line;
+		}
+
+		if ( ! empty( $dropped ) ) {
+			WPNC_Settings::notify(
+				'wpnc_sources_dropped',
+				sprintf(
+					/* translators: %s: comma separated list of rejected lines */
+					__( 'These source lines were not valid URLs and were removed: %s', 'wp-news-collector' ),
+					implode( ', ', array_map( 'sanitize_text_field', $dropped ) )
+				),
+				sprintf(
+					'این خطوط منبع آدرس معتبری نبودند و حذف شدند: %s',
+					implode( '، ', array_map( 'sanitize_text_field', $dropped ) )
+				)
+			);
+		}
+
+		if ( ! empty( $unsafe ) ) {
+			WPNC_Settings::notify(
+				'wpnc_sources_unsafe',
+				sprintf(
+					/* translators: %s: comma separated list of unsafe URLs */
+					__( 'These sources point at a private or unreachable host and will be skipped: %s', 'wp-news-collector' ),
+					implode( ', ', $unsafe )
+				),
+				sprintf(
+					'این منابع به میزبان خصوصی یا در دسترس نیستند و نادیده گرفته می‌شوند: %s',
+					implode( '، ', $unsafe )
+				),
+				'warning'
+			);
 		}
 
 		return implode( "\n", $lines );

@@ -34,6 +34,173 @@ function wpnc_e( $en, $fa = '' ) {
 class WPNC_Settings {
 
 	/**
+	 * Slug every settings notice is registered under.
+	 */
+	const NOTICE_SLUG = 'wpnc_settings';
+
+	/**
+	 * Register a bilingual settings notice.
+	 *
+	 * Before 1.3.0 nothing in this plugin called add_settings_error, so every
+	 * rejected or clamped value was applied in silence.
+	 *
+	 * @param string $code Machine code.
+	 * @param string $en   English message.
+	 * @param string $fa   Persian message.
+	 * @param string $type error|warning|success|info.
+	 */
+	public static function notify( $code, $en, $fa = '', $type = 'error' ) {
+		add_settings_error( self::NOTICE_SLUG, $code, wpnc__( $en, $fa ), $type );
+	}
+
+	/**
+	 * Allowed admin interface languages.
+	 *
+	 * @return array
+	 */
+	public static function languages() {
+		return array( 'fa', 'en' );
+	}
+
+	/**
+	 * Sanitize the admin language.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_language( $value ) {
+		$value = sanitize_key( $value );
+
+		if ( in_array( $value, self::languages(), true ) ) {
+			return $value;
+		}
+
+		self::notify(
+			'wpnc_bad_lang',
+			'Unknown interface language; kept Persian.',
+			'زبان رابط ناشناخته بود؛ فارسی نگه داشته شد.',
+			'warning'
+		);
+
+		return 'fa';
+	}
+
+	/**
+	 * Allowed post statuses for imported items.
+	 *
+	 * @return array
+	 */
+	public static function post_statuses() {
+		return array( 'publish', 'draft', 'pending', 'private' );
+	}
+
+	/**
+	 * Sanitize the post status setting.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_post_status( $value ) {
+		$value = sanitize_key( $value );
+
+		return in_array( $value, self::post_statuses(), true ) ? $value : 'publish';
+	}
+
+	/**
+	 * Sanitize the post author setting.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return int
+	 */
+	public static function sanitize_post_author( $value ) {
+		$value = absint( $value );
+
+		if ( $value && ! get_userdata( $value ) ) {
+			self::notify(
+				'wpnc_bad_author',
+				'That author no longer exists; cleared the setting.',
+				'آن نویسنده دیگر وجود ندارد؛ تنظیم پاک شد.',
+				'warning'
+			);
+
+			return 0;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Sanitize the default category, checking that it still exists.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return int
+	 */
+	public static function sanitize_category( $value ) {
+		$value = absint( $value );
+
+		if ( $value && ! term_exists( $value, 'category' ) ) {
+			self::notify(
+				'wpnc_bad_category',
+				'That category no longer exists; cleared the default category.',
+				'آن دسته‌بندی دیگر وجود ندارد؛ دسته‌بندی پیش‌فرض پاک شد.',
+				'warning'
+			);
+
+			return 0;
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Sanitize the fallback image URL.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_image_url( $value ) {
+		$value = trim( (string) $value );
+		if ( '' === $value ) {
+			return '';
+		}
+
+		$url = esc_url_raw( $value );
+		if ( '' === $url ) {
+			self::notify(
+				'wpnc_bad_image',
+				'The fallback image URL was not a valid URL and was discarded.',
+				'آدرس تصویر پیش‌فرض معتبر نبود و ذخیره نشد.'
+			);
+
+			return '';
+		}
+
+		return $url;
+	}
+
+	/**
+	 * Sanitize retention in days.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return int
+	 */
+	public static function sanitize_retention( $value ) {
+		$value   = absint( $value );
+		$clamped = max( 1, min( 365, $value ) );
+
+		if ( $value !== $clamped ) {
+			self::notify(
+				'wpnc_retention_clamped',
+				'Retention must be between 1 and 365 days; the value was adjusted.',
+				'بازه نگهداری باید بین ۱ تا ۳۶۵ روز باشد؛ مقدار اصلاح شد.',
+				'warning'
+			);
+		}
+
+		return $clamped;
+	}
+
+	/**
 	 * Allowed cron intervals.
 	 *
 	 * @return array
@@ -51,7 +218,18 @@ class WPNC_Settings {
 	public static function sanitize_interval( $value ) {
 		$value = sanitize_key( $value );
 
-		return in_array( $value, self::intervals(), true ) ? $value : 'hourly';
+		if ( in_array( $value, self::intervals(), true ) ) {
+			return $value;
+		}
+
+		self::notify(
+			'wpnc_bad_interval',
+			'Unknown update interval; fell back to hourly.',
+			'بازه بروزرسانی نامعتبر بود؛ به «۱ ساعت» بازگردانده شد.',
+			'warning'
+		);
+
+		return 'hourly';
 	}
 
 	/**
@@ -73,7 +251,18 @@ class WPNC_Settings {
 		$value   = sanitize_key( $value );
 		$allowed = array( 'post', 'wpnc_news' );
 
-		return in_array( $value, $allowed, true ) ? $value : 'post';
+		if ( in_array( $value, $allowed, true ) ) {
+			return $value;
+		}
+
+		self::notify(
+			'wpnc_bad_post_type',
+			'Unknown target post type; fell back to Standard Post.',
+			'نوع پست هدف نامعتبر بود؛ به «پست معمولی» بازگردانده شد.',
+			'warning'
+		);
+
+		return 'post';
 	}
 
 	/**
@@ -93,7 +282,19 @@ class WPNC_Settings {
 	 * @return int
 	 */
 	public static function sanitize_max_items( $value ) {
-		return max( 1, min( 100, absint( $value ) ) );
+		$value   = absint( $value );
+		$clamped = max( 1, min( 100, $value ) );
+
+		if ( $value !== $clamped ) {
+			self::notify(
+				'wpnc_max_items_clamped',
+				'Items per feed must be between 1 and 100; the value was adjusted.',
+				'حداکثر آیتم هر فید باید بین ۱ تا ۱۰۰ باشد؛ مقدار اصلاح شد.',
+				'warning'
+			);
+		}
+
+		return $clamped;
 	}
 
 	/**
@@ -108,7 +309,19 @@ class WPNC_Settings {
 	 * @return int
 	 */
 	public static function sanitize_timeout( $value ) {
-		return max( 3, min( 30, absint( $value ) ) );
+		$value   = absint( $value );
+		$clamped = max( 3, min( 30, $value ) );
+
+		if ( $value !== $clamped ) {
+			self::notify(
+				'wpnc_timeout_clamped',
+				'HTTP timeout must be between 3 and 30 seconds; the value was adjusted.',
+				'زمان‌انتظار HTTP باید بین ۳ تا ۳۰ ثانیه باشد؛ مقدار اصلاح شد.',
+				'warning'
+			);
+		}
+
+		return $clamped;
 	}
 
 	/**

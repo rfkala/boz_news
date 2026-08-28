@@ -47,3 +47,8 @@
     cursor: not-allowed;
     opacity: 0.7;
 }
+.wpnc-load-more-message {
+    margin-top: 12px;
+    font-size: 0.95em;
+    color: #666;
+}

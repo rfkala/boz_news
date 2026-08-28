@@ -409,3 +409,248 @@
 .wpnc-rtl .wpnc-queue-toolbar {
     flex-direction: row-reverse;
 }
+
+/* ============================================================
+   Shared states: loading, empty, error, flash
+   ============================================================ */
+
+.wpnc-state {
+    margin: 16px 0;
+    padding: 20px;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    background: #fff;
+    text-align: center;
+}
+
+.wpnc-state-title {
+    margin: 0 0 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.wpnc-state-hint {
+    margin: 0 auto;
+    max-width: 46em;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #646970;
+}
+
+.wpnc-state-error {
+    border-color: #d63638;
+    border-left-width: 4px;
+    background: #fcf0f1;
+    text-align: start;
+}
+
+.wpnc-state-error .wpnc-state-title {
+    color: #8a1f21;
+}
+
+.wpnc-state-error .button {
+    margin-top: 10px;
+}
+
+.wpnc-state-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #646970;
+}
+
+.wpnc-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #c3c4c7;
+    border-top-color: #2271b1;
+    border-radius: 50%;
+    animation: wpnc-spin .7s linear infinite;
+}
+
+@keyframes wpnc-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wpnc-spinner {
+        animation-duration: 2.4s;
+    }
+    .wpnc-card {
+        transition: none;
+    }
+}
+
+.wpnc-flash {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    border-inline-start: 4px solid #2271b1;
+    background: #f0f6fc;
+    font-size: 13px;
+}
+
+.wpnc-flash-ok {
+    border-inline-start-color: #00a32a;
+    background: #edfaef;
+}
+
+.wpnc-flash-warn {
+    border-inline-start-color: #dba617;
+    background: #fcf9e8;
+}
+
+.wpnc-flash-error {
+    border-inline-start-color: #d63638;
+    background: #fcf0f1;
+}
+
+.wpnc-inline-error {
+    margin-top: 10px;
+    padding: 8px 12px;
+    border-inline-start: 4px solid #d63638;
+    background: #fcf0f1;
+    font-size: 13px;
+    color: #8a1f21;
+}
+
+/* ============================================================
+   Modal fields and badges
+   ============================================================ */
+
+.wpnc-field {
+    margin: 0 0 14px;
+}
+
+.wpnc-field label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.wpnc-modal-actions {
+    margin: 18px 0 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.wpnc-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f0f0f1;
+    color: #50575e;
+}
+
+.wpnc-badge-approved {
+    background: #edfaef;
+    color: #00611c;
+}
+
+.wpnc-badge-rejected {
+    background: #f0f0f1;
+    color: #50575e;
+}
+
+.wpnc-card-busy {
+    opacity: .5;
+    pointer-events: none;
+}
+
+/* Wide tables scroll inside their own box instead of the page. */
+.wpnc-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================================
+   Small screens
+
+   There was no media query at all in this file; the grid collapsed by
+   luck, and the modal and toolbars were never checked.
+   ============================================================ */
+
+@media screen and (max-width: 782px) {
+    .wpnc-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .wpnc-queue-toolbar,
+    .wpnc-bulk-actions,
+    .wpnc-fetch-actions,
+    .wpnc-modal-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .wpnc-queue-toolbar input[type="search"],
+    .wpnc-queue-toolbar select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    /* WordPress already enlarges .button on mobile; make ours full width so
+       they are not half-width stragglers next to it. */
+    .wpnc-bulk-actions .button,
+    .wpnc-fetch-actions .button,
+    .wpnc-modal-actions .button,
+    .wpnc-actions .button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .wpnc-actions {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .wpnc-modal {
+        align-items: flex-start;
+        padding: 0;
+    }
+
+    .wpnc-modal-content {
+        width: 100%;
+        max-width: 100%;
+        min-height: 100%;
+        border-radius: 0;
+        padding: 18px 16px 32px;
+    }
+
+    .wpnc-pagination {
+        justify-content: space-between;
+    }
+
+    .wpnc-summary-grid,
+    #wpnc-stats-summary {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .wpnc-card img,
+    .wpnc-no-img {
+        height: 140px;
+    }
+}
+
+/* Empty states read as neutral, not as a failure. */
+.wpnc-state-empty {
+    border-style: dashed;
+    background: #fafafa;
+}
+
+/* The stats container is a grid, so a state block placed in it would become
+   one narrow cell. */
+#wpnc-stats-summary .wpnc-state,
+#wpnc-stats-summary .wpnc-state-hint {
+    grid-column: 1 / -1;
+}

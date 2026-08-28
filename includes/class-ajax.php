@@ -81,24 +81,24 @@ class WPNC_Ajax {
 		$item = $this->queue->get( $id );
 
 		if ( ! $item ) {
-			wp_send_json_error( array( 'message' => __( 'Item not found.', 'wp-news-collector' ) ) );
+			$this->fail( __( 'Item not found.', 'wp-news-collector' ), 'wpnc_not_found', array(), 404 );
 		}
 
 		// Without this, a double click or a second moderator publishes the
 		// same story twice.
 		if ( ! $this->queue->is_actionable( $item ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'This item was already processed.', 'wp-news-collector' ),
-					'status'  => (string) $item->status,
-				)
+			$this->fail(
+				__( 'This item was already processed.', 'wp-news-collector' ),
+				'wpnc_already_processed',
+				array( 'status' => (string) $item->status ),
+				409
 			);
 		}
 
 		$post_id = $this->publisher->publish( $item );
 		if ( is_wp_error( $post_id ) ) {
 			$this->queue->mark_error( $id, $post_id->get_error_message() );
-			wp_send_json_error( $post_id->get_error_message() );
+			$this->fail( $post_id->get_error_message(), 'wpnc_publish_failed' );
 		}
 
 		$this->queue->mark_approved( $id, $post_id );
@@ -120,17 +120,17 @@ class WPNC_Ajax {
 		$item = $this->queue->get( $id );
 
 		if ( ! $item ) {
-			wp_send_json_error( array( 'message' => __( 'Item not found.', 'wp-news-collector' ) ) );
+			$this->fail( __( 'Item not found.', 'wp-news-collector' ), 'wpnc_not_found', array(), 404 );
 		}
 
 		// Rejecting an already approved row used to flip its status while the
 		// published post stayed live, which left the two out of sync.
 		if ( ! $this->queue->is_actionable( $item ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'This item was already processed.', 'wp-news-collector' ),
-					'status'  => (string) $item->status,
-				)
+			$this->fail(
+				__( 'This item was already processed.', 'wp-news-collector' ),
+				'wpnc_already_processed',
+				array( 'status' => (string) $item->status ),
+				409
 			);
 		}
 
@@ -151,7 +151,12 @@ class WPNC_Ajax {
 		$tags        = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
 
 		if ( empty( $title ) ) {
-			wp_send_json_error( __( 'Title is required.', 'wp-news-collector' ) );
+			$this->fail(
+				__( 'Title is required.', 'wp-news-collector' ),
+				'wpnc_title_required',
+				array( 'field' => 'title' ),
+				422
+			);
 		}
 
 		$this->queue->update_item(
@@ -275,18 +280,18 @@ class WPNC_Ajax {
 		$sources = $fetcher->get_sources();
 
 		if ( empty( $sources ) ) {
-			wp_send_json_error( array( 'message' => __( 'No RSS sources configured.', 'wp-news-collector' ) ) );
+			$this->fail( __( 'No RSS sources configured.', 'wp-news-collector' ), 'wpnc_no_sources' );
 		}
 
 		// Take the run-level lock here, not per source, so a manual run cannot
 		// interleave with the scheduled one. fetch_finalize releases it, and
 		// the transient TTL covers a browser that walks away mid-run.
 		if ( ! $fetcher->acquire_lock( true ) ) {
-			wp_send_json_error(
-				array(
-					'message' => __( 'A fetch job is already running. Wait for it to finish, or clear the lock from Logs & Tools.', 'wp-news-collector' ),
-					'locked'  => true,
-				)
+			$this->fail(
+				__( 'A fetch job is already running. Wait for it to finish, or clear the lock from Logs & Tools.', 'wp-news-collector' ),
+				'wpnc_locked',
+				array( 'locked' => true ),
+				409
 			);
 		}
 
@@ -399,7 +404,12 @@ class WPNC_Ajax {
 		$query = new WP_Query( $args );
 
 		if ( ! $query->have_posts() ) {
-			wp_send_json_error( __( 'No more posts available.', 'wp-news-collector' ) );
+			wp_send_json_error(
+				array(
+					'message' => __( 'No more posts available.', 'wp-news-collector' ),
+					'code'    => 'wpnc_no_more_posts',
+				)
+			);
 		}
 
 		ob_start();
@@ -413,13 +423,38 @@ class WPNC_Ajax {
 	}
 
 	/**
+	 * Send a failure response.
+	 *
+	 * Every error this plugin returns is { message, code, ...extra }. The
+	 * admin JS used to carry a messageFromResponse() shim purely because half
+	 * these calls sent a bare string and half sent an array.
+	 *
+	 * @param string $message Human readable message.
+	 * @param string $code    Machine readable code.
+	 * @param array  $extra   Extra payload.
+	 * @param int    $status  HTTP status.
+	 */
+	private function fail( $message, $code = 'wpnc_error', $extra = array(), $status = 200 ) {
+		wp_send_json_error(
+			array_merge(
+				array(
+					'message' => $message,
+					'code'    => $code,
+				),
+				$extra
+			),
+			$status
+		);
+	}
+
+	/**
 	 * Check admin AJAX nonce and capability.
 	 */
 	private function check_admin_request() {
 		check_ajax_referer( 'wpnc_admin_nonce', 'nonce' );
 
 		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( __( 'Unauthorized access.', 'wp-news-collector' ), 403 );
+			$this->fail( __( 'Unauthorized access.', 'wp-news-collector' ), 'wpnc_forbidden', array(), 403 );
 		}
 	}
 
@@ -431,7 +466,7 @@ class WPNC_Ajax {
 	private function get_posted_id() {
 		$id = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
 		if ( ! $id ) {
-			wp_send_json_error( __( 'Invalid ID provided.', 'wp-news-collector' ) );
+			$this->fail( __( 'Invalid ID provided.', 'wp-news-collector' ), 'wpnc_invalid_id', array(), 422 );
 		}
 
 		return $id;
@@ -447,7 +482,7 @@ class WPNC_Ajax {
 		$ids        = array_filter( array_map( 'absint', $posted_ids ) );
 
 		if ( empty( $ids ) ) {
-			wp_send_json_error( __( 'No valid IDs provided.', 'wp-news-collector' ) );
+			$this->fail( __( 'No valid IDs provided.', 'wp-news-collector' ), 'wpnc_invalid_ids', array(), 422 );
 		}
 
 		return $ids;
