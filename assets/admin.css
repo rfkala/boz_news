@@ -1,0 +1,411 @@
+/* ============================================================
+   Page Title
+   ============================================================ */
+
+.wpnc-page-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 23px;
+    font-weight: 700;
+    color: #1d2327;
+    margin-bottom: 10px;
+}
+
+.wpnc-title-crown {
+    font-size: 26px;
+    line-height: 1;
+    color: #c9a227;
+    text-shadow: 0 1px 3px rgba(201,162,39,.35);
+}
+
+/* ============================================================
+   Grid & Cards
+   ============================================================ */
+
+.wpnc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+    margin-top: 20px;
+}
+
+.wpnc-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: box-shadow .18s ease, transform .18s ease;
+    overflow: hidden;
+}
+
+.wpnc-card:hover {
+    box-shadow: 0 4px 14px rgba(0,0,0,.12);
+    transform: translateY(-2px);
+}
+
+.wpnc-card-header {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 10;
+    background: rgba(255,255,255,0.9);
+    padding: 4px 6px;
+    border-radius: 4px;
+    backdrop-filter: blur(2px);
+}
+
+.wpnc-card img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    border-bottom: 1px solid #dcdcde;
+    display: block;
+}
+
+.wpnc-no-img {
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #f6f7f7 0%, #e8eaec 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #a7aaad;
+    font-size: 13px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.wpnc-card-content {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+.wpnc-card-content h4 {
+    margin: 0 0 8px 0;
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.wpnc-source {
+    color: #50575e;
+    font-size: 11.5px;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.wpnc-date {
+    color: #8c8f94;
+    font-size: 11px;
+    margin: 0 0 10px 0;
+}
+
+.wpnc-tags {
+    font-size: 11.5px;
+    margin: 0 0 8px 0;
+    color: #2271b1;
+}
+
+.wpnc-error-message {
+    font-size: 11.5px;
+    margin: 0 0 8px 0;
+    color: #b32d2e;
+    background: #fef7f7;
+    padding: 4px 6px;
+    border-radius: 3px;
+    border-left: 3px solid #b32d2e;
+}
+
+.wpnc-actions {
+    margin-top: auto;
+    display: flex;
+    gap: 6px;
+    padding-top: 10px;
+    border-top: 1px solid #f0f0f1;
+    flex-wrap: wrap;
+}
+
+/* ============================================================
+   Toolbar & Bulk Actions
+   ============================================================ */
+
+.wpnc-queue-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin: 20px 0 10px;
+    flex-wrap: wrap;
+}
+
+.wpnc-queue-toolbar input[type="search"] {
+    min-width: 240px;
+}
+
+.wpnc-bulk-actions {
+    margin-bottom: 14px;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border: 1px solid #dcdcde;
+    border-radius: 5px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ============================================================
+   Pagination
+   ============================================================ */
+
+.wpnc-pagination {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-top: 20px;
+}
+
+/* ============================================================
+   Modal
+   ============================================================ */
+
+.wpnc-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wpnc-modal-content {
+    background: #fff;
+    padding: 24px;
+    width: 540px;
+    max-width: 92%;
+    box-shadow: 0 8px 24px rgba(0,0,0,.2);
+    border-radius: 6px;
+}
+
+/* ============================================================
+   Tools Panel
+   ============================================================ */
+
+.wpnc-tools-panel {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 18px 20px;
+    margin-top: 20px;
+}
+
+.wpnc-fetch-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.wpnc-inline-status {
+    flex: 1;
+}
+
+/* ============================================================
+   Progress Bar
+   ============================================================ */
+
+.wpnc-progress-wrap {
+    margin: 10px 0 14px;
+}
+
+.wpnc-progress-bar {
+    height: 10px;
+    background: #e9ecef;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+
+.wpnc-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #2271b1, #72aee6);
+    border-radius: 6px;
+    transition: width .3s ease;
+}
+
+.wpnc-progress-text {
+    font-size: 12px;
+    color: #50575e;
+    display: block;
+}
+
+/* ============================================================
+   Status Indicators
+   ============================================================ */
+
+.wpnc-status-ok {
+    color: #1a7f37;
+    font-weight: 500;
+}
+
+.wpnc-status-warn {
+    color: #996800;
+    font-weight: 500;
+}
+
+.wpnc-status-error {
+    color: #b32d2e;
+    font-weight: 500;
+}
+
+.wpnc-fetch-messages {
+    margin: 8px 0 0 0;
+    padding: 0 0 0 18px;
+    font-size: 12px;
+    color: #50575e;
+}
+
+.wpnc-fetch-messages li {
+    margin-bottom: 3px;
+}
+
+/* ============================================================
+   Summary & Stats Grid
+   ============================================================ */
+
+.wpnc-summary-grid,
+#wpnc-stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    max-width: 920px;
+    margin-top: 10px;
+}
+
+.wpnc-summary-grid div,
+.wpnc-stat {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 12px 14px;
+    text-align: center;
+    transition: box-shadow .15s;
+}
+
+.wpnc-summary-grid div:hover,
+.wpnc-stat:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+.wpnc-summary-grid strong,
+.wpnc-stat strong {
+    display: block;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1d2327;
+}
+
+.wpnc-summary-grid span,
+.wpnc-stat span {
+    color: #646970;
+    font-size: 11.5px;
+    text-transform: capitalize;
+    display: block;
+    margin-top: 3px;
+}
+
+/* Color-coded stat cells */
+.wpnc-stat-success strong { color: #1a7f37; }
+.wpnc-stat-warning strong { color: #996800; }
+.wpnc-stat-error strong   { color: #b32d2e; }
+
+.wpnc-stat-success { border-color: #a8d5b5; background: #f3faf5; }
+.wpnc-stat-warning { border-color: #f2cf7a; background: #fdfbef; }
+.wpnc-stat-error   { border-color: #f4a9a8; background: #fef7f7; }
+
+/* ============================================================
+   Log Level Badges
+   ============================================================ */
+
+.wpnc-log-level {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: #e9ecef;
+    color: #3c434a;
+}
+
+.wpnc-log-error   { background: #fef7f7; color: #b32d2e; }
+.wpnc-log-warning { background: #fdfbef; color: #996800; }
+.wpnc-log-info    { background: #f0f6fc; color: #2271b1; }
+
+/* ============================================================
+   Logs Table
+   ============================================================ */
+
+.wpnc-logs-table td {
+    vertical-align: top;
+    font-size: 12.5px;
+}
+
+.wpnc-logs-table th {
+    font-size: 12.5px;
+}
+
+/* ============================================================
+   RTL Support (.wpnc-rtl applied to .wrap when lang=fa)
+   ============================================================ */
+
+.wpnc-rtl {
+    direction: rtl;
+}
+
+.wpnc-rtl .form-table th {
+    text-align: right;
+}
+
+.wpnc-rtl .form-table td {
+    text-align: right;
+}
+
+.wpnc-rtl .wpnc-card-header {
+    left: auto;
+    right: 8px;
+}
+
+.wpnc-rtl .wpnc-error-message {
+    border-left: none;
+    border-right: 3px solid #b32d2e;
+}
+
+.wpnc-rtl .wpnc-fetch-messages {
+    padding-left: 0;
+    padding-right: 18px;
+}
+
+.wpnc-rtl .wpnc-actions {
+    flex-direction: row-reverse;
+}
+
+.wpnc-rtl .wpnc-bulk-actions {
+    flex-direction: row-reverse;
+}
+
+.wpnc-rtl .wpnc-queue-toolbar {
+    flex-direction: row-reverse;
+}

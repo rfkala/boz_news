@@ -1,0 +1,18 @@
+{
+  "0 debug pnpm:scope": {
+    "selected": 1
+  },
+  "1 info pnpm:global": "Removed all cached metadata files",
+  "2 error pnpm": {
+    "errno": -4058,
+    "code": "ENOENT",
+    "syscall": "scandir",
+    "path": "C:\\Users\\Arash\\.pnpm-store\\v3\\files",
+    "err": {
+      "name": "Error",
+      "message": "ENOENT: no such file or directory, scandir 'C:\\Users\\Arash\\.pnpm-store\\v3\\files'",
+      "code": "ENOENT",
+      "stack": "Error: ENOENT: no such file or directory, scandir 'C:\\Users\\Arash\\.pnpm-store\\v3\\files'\n    at async Object.readdir (node:internal/fs/promises:948:18)\n    at async prune (C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:68288:21)\n    at async Object.default_1 [as default] (C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:122843:7)\n    at async C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:125614:20\n    at async run (C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:125589:34)\n    at async runPnpm (C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:125799:5)\n    at async C:\\Users\\Arash\\.node\\corepack\\pnpm\\6.11.0\\dist\\pnpm.cjs:125791:7"
+    }
+  }
+}
