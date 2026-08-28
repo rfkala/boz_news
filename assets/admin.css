@@ -654,3 +654,40 @@
 #wpnc-stats-summary .wpnc-state-hint {
     grid-column: 1 / -1;
 }
+
+/* ============================================================
+   Warnings and source health
+   ============================================================ */
+
+.wpnc-warning-text {
+    color: #8a6d1f;
+}
+
+.wpnc-health-table td {
+    vertical-align: middle;
+}
+
+.wpnc-health-url {
+    word-break: break-all;
+    max-width: 32em;
+}
+
+.wpnc-badge.wpnc-health-ok {
+    background: #edfaef;
+    color: #00611c;
+}
+
+.wpnc-badge.wpnc-health-warn {
+    background: #fcf9e8;
+    color: #8a6d1f;
+}
+
+.wpnc-badge.wpnc-health-bad {
+    background: #fcf0f1;
+    color: #8a1f21;
+}
+
+.wpnc-badge.wpnc-health-off {
+    background: #f0f0f1;
+    color: #50575e;
+}

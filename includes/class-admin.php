@@ -202,7 +202,12 @@ class WPNC_Admin {
 		$max_items    = absint( get_option( 'wpnc_max_items_per_feed', 20 ) );
 		$timeout      = absint( get_option( 'wpnc_request_timeout', 8 ) );
 		$openai_model = get_option( 'wpnc_openai_model', 'gpt-4o-mini' );
-		$admin_lang   = get_option( 'wpnc_admin_lang', 'fa' );
+		$admin_lang      = get_option( 'wpnc_admin_lang', 'fa' );
+		$post_status     = WPNC_Settings::sanitize_post_status( get_option( 'wpnc_post_status', 'publish' ) );
+		$post_author     = absint( get_option( 'wpnc_post_author', 0 ) );
+		$auto_publish    = absint( get_option( 'wpnc_auto_publish', 0 ) );
+		$queue_retention = absint( get_option( 'wpnc_queue_retention_days', WPNC_Settings::DEFAULT_QUEUE_RETENTION ) );
+		$log_retention   = absint( get_option( 'wpnc_log_retention_days', WPNC_Settings::DEFAULT_LOG_RETENTION ) );
 		?>
 		<form method="post" action="options.php">
 			<?php settings_fields( 'wpnc_settings_group' ); ?>
@@ -221,7 +226,13 @@ class WPNC_Admin {
 					<th scope="row"><label for="wpnc_rss_links"><?php wpnc_e( 'RSS/Atom Sources', 'منابع RSS/Atom' ); ?></label></th>
 					<td>
 						<textarea id="wpnc_rss_links" name="wpnc_rss_links" rows="10" class="large-text code" dir="ltr"><?php echo esc_textarea( get_option( 'wpnc_rss_links', '' ) ); ?></textarea>
-						<p class="description"><?php wpnc_e( 'One source per line. Formats: URL, URL|category_id, or URL|category_id|source_key. Lines starting with # are ignored.', 'هر منبع در یک خط. فرمت‌ها: URL یا URL|category_id یا URL|category_id|source_key. خطوط شروع‌شده با # نادیده گرفته می‌شوند.' ); ?></p>
+						<p class="description">
+							<?php wpnc_e( 'One source per line. Formats: URL, URL|category_id, or URL|category_id|source_key.', 'هر منبع در یک خط. فرمت‌ها: URL یا URL|category_id یا URL|category_id|source_key.' ); ?>
+							<br>
+							<?php wpnc_e( 'Start a line with # to comment it out, or with ! to keep the source but pause it.', 'برای غیرفعال کردن کامل خط، آن را با # شروع کنید؛ برای نگه داشتن منبع ولی توقف موقت آن، با ! شروع کنید.' ); ?>
+							<br>
+							<?php wpnc_e( 'A source that keeps failing is paused automatically and resumes on its own once it responds.', 'منبعی که پیاپی خطا بدهد به‌طور خودکار موقتاً متوقف می‌شود و به‌محض پاسخ‌دهی دوباره فعال می‌شود.' ); ?>
+						</p>
 					</td>
 				</tr>
 				<tr>
@@ -234,6 +245,7 @@ class WPNC_Admin {
 							<option value="twicedaily" <?php selected( $interval, 'twicedaily' ); ?>><?php wpnc_e( '12 Hours', '۱۲ ساعت' ); ?></option>
 							<option value="daily"      <?php selected( $interval, 'daily' ); ?>><?php wpnc_e( 'Daily', 'روزانه' ); ?></option>
 						</select>
+						<p class="description"><?php echo esc_html( $this->cron_status_text() ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -272,16 +284,50 @@ class WPNC_Admin {
 					</td>
 				</tr>
 				<tr>
+					<th scope="row"><label for="wpnc_post_status"><?php wpnc_e( 'New Post Status', 'وضعیت پست جدید' ); ?></label></th>
+					<td>
+						<select id="wpnc_post_status" name="wpnc_post_status">
+							<option value="publish" <?php selected( $post_status, 'publish' ); ?>><?php wpnc_e( 'Published', 'منتشرشده' ); ?></option>
+							<option value="draft"   <?php selected( $post_status, 'draft' ); ?>><?php wpnc_e( 'Draft', 'پیش‌نویس' ); ?></option>
+							<option value="pending" <?php selected( $post_status, 'pending' ); ?>><?php wpnc_e( 'Pending Review', 'در انتظار بازبینی' ); ?></option>
+							<option value="private" <?php selected( $post_status, 'private' ); ?>><?php wpnc_e( 'Private', 'خصوصی' ); ?></option>
+						</select>
+						<p class="description"><?php wpnc_e( 'Approved items are created with this status. Choose Draft to review each item in the post editor before it goes live.', 'آیتم‌های تأییدشده با این وضعیت ساخته می‌شوند. برای بازبینی هر خبر در ویرایشگر پیش از انتشار، «پیش‌نویس» را انتخاب کنید.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_post_author"><?php wpnc_e( 'Post Author', 'نویسنده پست' ); ?></label></th>
+					<td>
+						<?php
+						wp_dropdown_users(
+							array(
+								'id'               => 'wpnc_post_author',
+								'name'             => 'wpnc_post_author',
+								'selected'         => $post_author,
+								'show_option_none' => wpnc__( 'First administrator', 'اولین مدیر' ),
+								'option_none_value' => 0,
+								'capability'       => array( 'edit_posts' ),
+							)
+						);
+						?>
+						<p class="description"><?php wpnc_e( 'Scheduled imports have no logged-in user, so they are attributed to this author.', 'دریافت زمان‌بندی‌شده کاربر واردشده ندارد، پس پست‌ها به نام این نویسنده ثبت می‌شوند.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
 					<th scope="row"><?php wpnc_e( 'Publishing', 'انتشار' ); ?></th>
 					<td>
 						<label>
-							<input type="checkbox" name="wpnc_auto_publish" value="1" <?php checked( get_option( 'wpnc_auto_publish', 0 ), 1 ); ?> />
+							<input type="checkbox" id="wpnc_auto_publish" name="wpnc_auto_publish" value="1" <?php checked( $auto_publish, 1 ); ?> />
 							<?php wpnc_e( 'Publish directly without moderation queue', 'انتشار مستقیم بدون صف تأیید' ); ?>
-						</label><br>
+						</label>
+						<p class="description wpnc-warning-text">
+							<?php wpnc_e( 'With this on, every matching item goes straight to your site on the next scheduled run, with no review and no undo. The queue tabs will stay empty.', 'با فعال بودن این گزینه، هر خبر منطبق در اجرای زمان‌بندی بعدی مستقیماً روی سایت منتشر می‌شود؛ بدون بازبینی و بدون امکان بازگشت. صف تأیید خالی می‌ماند.' ); ?>
+						</p>
 						<label>
 							<input type="checkbox" name="wpnc_extract_full_text" value="1" <?php checked( get_option( 'wpnc_extract_full_text', 0 ), 1 ); ?> />
 							<?php wpnc_e( 'Attempt full-text extraction from article pages', 'استخراج متن کامل از صفحه مقاله' ); ?>
-						</label><br>
+						</label>
+						<p class="description"><?php wpnc_e( 'Fetches each article page and keeps its paragraphs as plain text. Images and links inside the article are not preserved.', 'صفحه هر مقاله را دریافت و پاراگراف‌هایش را به‌صورت متن ساده نگه می‌دارد. تصاویر و لینک‌های داخل مقاله حفظ نمی‌شوند.' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -290,11 +336,32 @@ class WPNC_Admin {
 				</tr>
 				<tr>
 					<th scope="row"><label for="wpnc_include_words"><?php wpnc_e( 'Must Include Words', 'باید شامل کلمات' ); ?></label></th>
-					<td><input id="wpnc_include_words" type="text" name="wpnc_include_words" value="<?php echo esc_attr( get_option( 'wpnc_include_words', '' ) ); ?>" class="large-text" dir="auto" /></td>
+					<td>
+						<input id="wpnc_include_words" type="text" name="wpnc_include_words" value="<?php echo esc_attr( get_option( 'wpnc_include_words', '' ) ); ?>" class="large-text" dir="auto" />
+						<p class="description"><?php wpnc_e( 'Comma separated. An item is kept if the title or description contains any one of these. Leave empty to keep everything.', 'با کاما جدا کنید. خبری نگه داشته می‌شود که عنوان یا توضیحاتش دست‌کم یکی از این کلمات را داشته باشد. برای نگه داشتن همه، خالی بگذارید.' ); ?></p>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="wpnc_exclude_words"><?php wpnc_e( 'Exclude Words', 'کلمات مستثنا' ); ?></label></th>
-					<td><input id="wpnc_exclude_words" type="text" name="wpnc_exclude_words" value="<?php echo esc_attr( get_option( 'wpnc_exclude_words', '' ) ); ?>" class="large-text" dir="auto" /></td>
+					<td>
+						<input id="wpnc_exclude_words" type="text" name="wpnc_exclude_words" value="<?php echo esc_attr( get_option( 'wpnc_exclude_words', '' ) ); ?>" class="large-text" dir="auto" />
+						<p class="description"><?php wpnc_e( 'Comma separated. Any match drops the item, and this wins over the include list. Matching is case-insensitive and matches inside words.', 'با کاما جدا کنید. هر تطابق باعث حذف خبر می‌شود و بر فهرست بالا اولویت دارد. تطابق به حروف کوچک و بزرگ حساس نیست و داخل کلمات هم بررسی می‌شود.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_queue_retention_days"><?php wpnc_e( 'Keep Processed Items', 'نگهداری آیتم‌های پردازش‌شده' ); ?></label></th>
+					<td>
+						<input id="wpnc_queue_retention_days" type="number" min="1" max="365" name="wpnc_queue_retention_days" value="<?php echo esc_attr( $queue_retention ); ?>" />
+						<?php wpnc_e( 'days', 'روز' ); ?>
+						<p class="description wpnc-warning-text"><?php wpnc_e( 'Approved and rejected queue rows are permanently deleted after this many days. Published posts are never touched.', 'ردیف‌های تأییدشده و ردشده صف پس از این تعداد روز برای همیشه حذف می‌شوند. پست‌های منتشرشده دست نمی‌خورند.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_log_retention_days"><?php wpnc_e( 'Keep Logs', 'نگهداری لاگ‌ها' ); ?></label></th>
+					<td>
+						<input id="wpnc_log_retention_days" type="number" min="1" max="365" name="wpnc_log_retention_days" value="<?php echo esc_attr( $log_retention ); ?>" />
+						<?php wpnc_e( 'days', 'روز' ); ?>
+					</td>
 				</tr>
 			</table>
 
@@ -312,7 +379,10 @@ class WPNC_Admin {
 				</tr>
 				<tr>
 					<th scope="row"><label for="wpnc_openai_model"><?php wpnc_e( 'OpenAI Model', 'مدل OpenAI' ); ?></label></th>
-					<td><input id="wpnc_openai_model" type="text" name="wpnc_openai_model" value="<?php echo esc_attr( $openai_model ); ?>" class="regular-text" dir="ltr" /></td>
+					<td>
+						<input id="wpnc_openai_model" type="text" name="wpnc_openai_model" value="<?php echo esc_attr( $openai_model ); ?>" class="regular-text" dir="ltr" />
+						<p class="description"><?php wpnc_e( 'A model name that does not exist makes every rewrite fail silently; the original text is kept and the reason is recorded in the logs.', 'نام مدل نادرست باعث می‌شود هر بازنویسی بی‌صدا شکست بخورد؛ متن اصلی حفظ می‌شود و دلیل در لاگ‌ها ثبت می‌گردد.' ); ?></p>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><?php wpnc_e( 'AI Options', 'تنظیمات AI' ); ?></th>
@@ -343,13 +413,53 @@ class WPNC_Admin {
 				</tr>
 				<tr>
 					<th scope="row"><label for="wpnc_telegram_chat_id"><?php wpnc_e( 'Telegram Chat ID', 'Chat ID تلگرام' ); ?></label></th>
-					<td><input id="wpnc_telegram_chat_id" type="text" name="wpnc_telegram_chat_id" value="<?php echo esc_attr( get_option( 'wpnc_telegram_chat_id', '' ) ); ?>" class="regular-text" dir="ltr" /></td>
+					<td>
+						<input id="wpnc_telegram_chat_id" type="text" name="wpnc_telegram_chat_id" value="<?php echo esc_attr( get_option( 'wpnc_telegram_chat_id', '' ) ); ?>" class="regular-text" dir="ltr" />
+						<p class="description"><?php wpnc_e( 'Numeric id for a chat, or @channelname for a public channel. Both token and chat id must be set or nothing is sent.', 'شناسه عددی چت، یا @نام‌کانال برای کانال عمومی. تا هر دو مقدار توکن و شناسه پر نشوند چیزی ارسال نمی‌شود.' ); ?></p>
+					</td>
 				</tr>
 			</table>
 
 			<?php submit_button( wpnc__( 'Save Settings', 'ذخیره تنظیمات' ) ); ?>
 		</form>
 		<?php
+	}
+
+	/**
+	 * One line describing whether scheduling actually works and when it next
+	 * runs. 'When does it fetch again?' had no answer anywhere in the UI.
+	 *
+	 * @return string
+	 */
+	private function cron_status_text() {
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			return wpnc__(
+				'WP-Cron is disabled on this site (DISABLE_WP_CRON), so scheduled fetches only run if a real cron job calls wp-cron.php. Use Fetch Now meanwhile.',
+				'WP-Cron در این سایت غیرفعال است (DISABLE_WP_CRON)، پس دریافت زمان‌بندی‌شده فقط زمانی اجرا می‌شود که یک کران واقعی wp-cron.php را صدا بزند. تا آن زمان از «دریافت فوری» استفاده کنید.'
+			);
+		}
+
+		$next = wp_next_scheduled( 'wpnc_fetch_news_event' );
+		if ( ! $next ) {
+			return wpnc__(
+				'No fetch is scheduled yet. It is registered on the next page load.',
+				'هنوز دریافتی زمان‌بندی نشده است. در بارگذاری بعدی صفحه ثبت می‌شود.'
+			);
+		}
+
+		if ( $next <= time() ) {
+			return wpnc__(
+				'The next fetch is due and will run on the next visit to the site.',
+				'زمان دریافت بعدی رسیده و با اولین بازدید از سایت اجرا می‌شود.'
+			);
+		}
+
+		return sprintf(
+			/* translators: 1: human readable duration, 2: local date and time */
+			wpnc__( 'Next scheduled fetch in %1$s (%2$s).', 'دریافت زمان‌بندی‌شده بعدی تا %1$s دیگر (%2$s).' ),
+			human_time_diff( time(), $next ),
+			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next )
+		);
 	}
 
 	private function render_moderation_tab() {
@@ -421,11 +531,103 @@ class WPNC_Admin {
 			<?php endif; ?>
 		</div>
 		<hr>
+		<h3><?php wpnc_e( 'Source Health', 'وضعیت منابع' ); ?></h3>
+		<?php $this->render_source_health(); ?>
+		<hr>
 		<h3><?php wpnc_e( 'Queue Statistics', 'آمار صف' ); ?></h3>
 		<div id="wpnc-stats-summary"></div>
 		<hr>
 		<h3><?php wpnc_e( 'Recent Logs', 'لاگ‌های اخیر' ); ?></h3>
 		<div id="wpnc-logs-app"></div>
+		<?php
+	}
+
+	/**
+	 * Per-source state: enabled, last result, and whether a backoff is active.
+	 */
+	private function render_source_health() {
+		$fetcher = new WPNC_Fetcher();
+		$sources = $fetcher->get_sources();
+
+		if ( empty( $sources ) ) {
+			printf(
+				'<div class="wpnc-state wpnc-state-empty"><p class="wpnc-state-title">%s</p><p class="wpnc-state-hint">%s</p></div>',
+				esc_html( wpnc__( 'No sources configured yet.', 'هنوز منبعی تنظیم نشده است.' ) ),
+				esc_html( wpnc__( 'Add one RSS or Atom URL per line under Settings.', 'در تب تنظیمات، هر آدرس RSS یا Atom را در یک خط اضافه کنید.' ) )
+			);
+			return;
+		}
+
+		$health = $fetcher->get_source_health();
+		?>
+		<div class="wpnc-table-scroll">
+			<table class="widefat striped wpnc-health-table">
+				<thead>
+					<tr>
+						<th><?php wpnc_e( 'Source', 'منبع' ); ?></th>
+						<th><?php wpnc_e( 'State', 'وضعیت' ); ?></th>
+						<th><?php wpnc_e( 'Last Success', 'آخرین موفقیت' ); ?></th>
+						<th><?php wpnc_e( 'Last Result', 'آخرین نتیجه' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $sources as $source ) : ?>
+					<?php
+					$id      = $source['id'];
+					$record  = isset( $health[ $id ] ) && is_array( $health[ $id ] ) ? $health[ $id ] : array();
+					$fails   = absint( isset( $record['fails'] ) ? $record['fails'] : 0 );
+					$last_ok = absint( isset( $record['last_ok'] ) ? $record['last_ok'] : 0 );
+					$cooling = $fetcher->cooldown_remaining( $id );
+
+					if ( empty( $source['valid'] ) ) {
+						$state = wpnc__( 'Unsafe URL', 'آدرس ناامن' );
+						$class = 'wpnc-health-bad';
+					} elseif ( empty( $source['enabled'] ) ) {
+						$state = wpnc__( 'Paused by you', 'متوقف‌شده توسط شما' );
+						$class = 'wpnc-health-off';
+					} elseif ( $cooling > 0 ) {
+						$state = sprintf(
+							/* translators: %s: human readable duration */
+							wpnc__( 'Backing off, retry in %s', 'توقف موقت، تلاش بعدی تا %s دیگر' ),
+							human_time_diff( time(), time() + $cooling )
+						);
+						$class = 'wpnc-health-bad';
+					} elseif ( $fails > 0 ) {
+						$state = sprintf(
+							/* translators: %d: consecutive failure count */
+							wpnc__( 'Failing (%d in a row)', 'خطا (%d بار پیاپی)' ),
+							$fails
+						);
+						$class = 'wpnc-health-warn';
+					} elseif ( $last_ok ) {
+						$state = wpnc__( 'OK', 'سالم' );
+						$class = 'wpnc-health-ok';
+					} else {
+						$state = wpnc__( 'Not fetched yet', 'هنوز دریافت نشده' );
+						$class = 'wpnc-health-off';
+					}
+
+					$result = '';
+					if ( ! empty( $record['last_error'] ) ) {
+						$result = (string) $record['last_error'];
+					} elseif ( $last_ok ) {
+						$result = sprintf(
+							/* translators: %d: item count */
+							wpnc__( '%d items', '%d آیتم' ),
+							absint( isset( $record['last_items'] ) ? $record['last_items'] : 0 )
+						);
+					}
+					?>
+					<tr>
+						<td dir="ltr" class="wpnc-health-url"><?php echo esc_html( $source['source_key'] ? $source['source_key'] . ' — ' . $source['url'] : $source['url'] ); ?></td>
+						<td><span class="wpnc-badge <?php echo esc_attr( $class ); ?>"><?php echo esc_html( $state ); ?></span></td>
+						<td><?php echo esc_html( $last_ok ? WPNC_Time::for_display( gmdate( 'Y-m-d H:i:s', $last_ok ) ) : '—' ); ?></td>
+						<td dir="auto"><?php echo esc_html( $result ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+		</div>
 		<?php
 	}
 

@@ -303,6 +303,34 @@ class WPNC_Settings {
 	const DEFAULT_TIMEOUT = 8;
 
 	/**
+	 * Days a processed queue row is kept before it is deleted.
+	 */
+	const DEFAULT_QUEUE_RETENTION = 14;
+
+	/**
+	 * Days a log row is kept before it is deleted.
+	 */
+	const DEFAULT_LOG_RETENTION = 30;
+
+	/**
+	 * Configured queue retention in days.
+	 *
+	 * @return int
+	 */
+	public static function get_queue_retention() {
+		return max( 1, min( 365, absint( get_option( 'wpnc_queue_retention_days', self::DEFAULT_QUEUE_RETENTION ) ) ) );
+	}
+
+	/**
+	 * Configured log retention in days.
+	 *
+	 * @return int
+	 */
+	public static function get_log_retention() {
+		return max( 1, min( 365, absint( get_option( 'wpnc_log_retention_days', self::DEFAULT_LOG_RETENTION ) ) ) );
+	}
+
+	/**
 	 * Cap HTTP timeout.
 	 *
 	 * @param mixed $value Raw value.

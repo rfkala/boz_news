@@ -236,10 +236,35 @@ class WPNC_Fetcher {
 
 	/**
 	 * Cleanup processed queue rows and old logs.
+	 *
+	 * This permanently deletes rows, so it reports what it removed instead of
+	 * discarding the count the way it used to.
 	 */
 	public function cleanup_queue() {
-		$this->queue->cleanup( 14 );
-		$this->logger->cleanup( 30 );
+		$queue_days = WPNC_Settings::get_queue_retention();
+		$log_days   = WPNC_Settings::get_log_retention();
+
+		$queue_rows = $this->queue->cleanup( $queue_days );
+		$log_rows   = $this->logger->cleanup( $log_days );
+
+		if ( $queue_rows ) {
+			$this->logger->log(
+				WPNC_Logger::LEVEL_INFO,
+				sprintf(
+					/* translators: 1: row count, 2: retention days */
+					wpnc__(
+						'Retention removed %1$d processed queue rows older than %2$d days.',
+						'پاکسازی خودکار %1$d ردیف پردازش‌شده قدیمی‌تر از %2$d روز را حذف کرد.'
+					),
+					(int) $queue_rows,
+					$queue_days
+				),
+				array(
+					'queue_rows' => (int) $queue_rows,
+					'log_rows'   => (int) $log_rows,
+				)
+			);
+		}
 	}
 
 	/**
