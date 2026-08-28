@@ -1,0 +1,19 @@
+# Build and tooling artifacts that do not belong in a WordPress plugin
+.next/
+node_modules/
+vendor/
+*.log
+lintout.json
+uv.txt
+
+# Packaged releases
+*.zip
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local agent state
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

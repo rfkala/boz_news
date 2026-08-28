@@ -1,9 +1,9 @@
-=== WP News Collector ===
+=== Boz News ===
 Contributors: jules
 Tags: rss, atom, news, aggregator, ai, moderation
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -12,7 +12,7 @@ Fetch, moderate, rewrite, and publish news from RSS/Atom feeds with logging and 
 
 == Description ==
 
-WP News Collector fetches RSS/Atom sources, filters items, stores them in a moderation queue, and publishes approved news as standard posts or a dedicated News custom post type.
+Boz News fetches RSS/Atom sources, filters items, stores them in a moderation queue, and publishes approved news as standard posts or a dedicated News custom post type.
 
 Key features:
 
@@ -31,9 +31,9 @@ Key features:
 
 1. Upload the `wp-news-collector` directory to `/wp-content/plugins/`.
 2. Activate the plugin from the WordPress Plugins screen.
-3. Go to News Collector > Settings.
+3. Go to Boz News > Settings.
 4. Add one RSS/Atom source per line.
-5. Use Logs & Tools > Run fetch now to test the feeds and inspect errors.
+5. Use Boz News > Logs & Tools > Fetch Now to test the feeds and inspect errors.
 
 == Source Formats ==
 
@@ -57,7 +57,7 @@ Leave Source Rules empty unless a feed/article page needs custom extraction.
 
 = Why did my feed not import anything? =
 
-Open News Collector > Logs & Tools and run a manual fetch. The logs show invalid URLs, RSS errors, duplicate skips, OpenAI failures, image sideload failures, and publish errors.
+Open Boz News > Logs & Tools and run a manual fetch. The logs show invalid URLs, RSS errors, duplicate skips, OpenAI failures, image sideload failures, and publish errors.
 
 = Are API keys displayed in the admin? =
 
