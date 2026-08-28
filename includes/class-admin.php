@@ -19,6 +19,7 @@ class WPNC_Admin {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_head', array( $this, 'menu_highlight_css' ) );
 		add_action( 'admin_notices', array( $this, 'render_health_notice' ) );
+		add_action( 'admin_post_wpnc_export_queue', array( $this, 'export_queue' ) );
 	}
 
 	public function add_admin_menu() {
@@ -463,7 +464,92 @@ class WPNC_Admin {
 	}
 
 	private function render_moderation_tab() {
-		echo '<div id="wpnc-moderation-app"></div>';
+		$export_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'action' => 'wpnc_export_queue',
+					'status' => 'pending',
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'wpnc_export_queue',
+			'wpnc_nonce'
+		);
+		?>
+		<p class="wpnc-tab-toolbar">
+			<a class="button" id="wpnc-export-queue" href="<?php echo esc_url( $export_url ); ?>">
+				<?php wpnc_e( 'Export this view (CSV)', 'خروجی این نما (CSV)' ); ?>
+			</a>
+		</p>
+		<div id="wpnc-moderation-app"></div>
+		<?php
+	}
+
+	/**
+	 * Stream the current queue view as CSV.
+	 *
+	 * The queue had no export at all, so the only way data left this plugin
+	 * was the retention job deleting it.
+	 */
+	public function export_queue() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die(
+				esc_html( wpnc__( 'You do not have permission to export the queue.', 'شما اجازه گرفتن خروجی از صف را ندارید.' ) ),
+				esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ),
+				array( 'response' => 403 )
+			);
+		}
+
+		check_admin_referer( 'wpnc_export_queue', 'wpnc_nonce' );
+
+		$status = isset( $_GET['status'] ) ? sanitize_key( wp_unslash( $_GET['status'] ) ) : 'pending';
+		$search = isset( $_GET['search'] ) ? sanitize_text_field( wp_unslash( $_GET['search'] ) ) : '';
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header(
+			'Content-Disposition: attachment; filename=boz-news-' . $status . '-' .
+			gmdate( 'Ymd-His' ) . '.csv'
+		);
+
+		$out = fopen( 'php://output', 'w' );
+
+		// BOM so Excel opens the Persian columns as UTF-8 rather than mojibake.
+		fwrite( $out, chr( 0xEF ) . chr( 0xBB ) . chr( 0xBF ) );
+
+		fputcsv(
+			$out,
+			array( 'id', 'status', 'source_name', 'source_key', 'title', 'main_link', 'image_url', 'tags', 'pub_date_utc', 'post_id', 'error_message' )
+		);
+
+		$queue = new WPNC_Queue_Repository();
+		$queue->each_for_export(
+			array(
+				'status' => $status,
+				'search' => $search,
+			),
+			function ( $row ) use ( $out ) {
+				fputcsv(
+					$out,
+					array(
+						$row['id'],
+						$row['status'],
+						$row['source_name'],
+						$row['source_key'],
+						$row['title'],
+						$row['main_link'],
+						$row['image_url'],
+						$row['tags'],
+						$row['pub_date'],
+						$row['post_id'],
+						$row['error_message'],
+					)
+				);
+			}
+		);
+
+		fclose( $out );
+		exit;
 	}
 
 	private function render_logs_tab() {
@@ -538,6 +624,15 @@ class WPNC_Admin {
 		<div id="wpnc-stats-summary"></div>
 		<hr>
 		<h3><?php wpnc_e( 'Recent Logs', 'لاگ‌های اخیر' ); ?></h3>
+		<p class="wpnc-tab-toolbar">
+			<label for="wpnc-log-level"><?php wpnc_e( 'Level:', 'سطح:' ); ?></label>
+			<select id="wpnc-log-level">
+				<option value=""><?php wpnc_e( 'All', 'همه' ); ?></option>
+				<option value="error"><?php wpnc_e( 'Errors only', 'فقط خطاها' ); ?></option>
+				<option value="warning"><?php wpnc_e( 'Warnings only', 'فقط هشدارها' ); ?></option>
+				<option value="info"><?php wpnc_e( 'Info only', 'فقط اطلاعات' ); ?></option>
+			</select>
+		</p>
 		<div id="wpnc-logs-app"></div>
 		<?php
 	}
@@ -568,10 +663,11 @@ class WPNC_Admin {
 						<th><?php wpnc_e( 'State', 'وضعیت' ); ?></th>
 						<th><?php wpnc_e( 'Last Success', 'آخرین موفقیت' ); ?></th>
 						<th><?php wpnc_e( 'Last Result', 'آخرین نتیجه' ); ?></th>
+						<th><?php wpnc_e( 'Actions', 'عملیات' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
-				<?php foreach ( $sources as $source ) : ?>
+				<?php foreach ( $sources as $index => $source ) : ?>
 					<?php
 					$id      = $source['id'];
 					$record  = isset( $health[ $id ] ) && is_array( $health[ $id ] ) ? $health[ $id ] : array();
@@ -623,6 +719,19 @@ class WPNC_Admin {
 						<td><span class="wpnc-badge <?php echo esc_attr( $class ); ?>"><?php echo esc_html( $state ); ?></span></td>
 						<td><?php echo esc_html( $last_ok ? WPNC_Time::for_display( gmdate( 'Y-m-d H:i:s', $last_ok ) ) : '—' ); ?></td>
 						<td dir="auto"><?php echo esc_html( $result ); ?></td>
+						<td class="wpnc-health-actions"
+							data-index="<?php echo esc_attr( $index ); ?>"
+							data-source-id="<?php echo esc_attr( $id ); ?>"
+							data-enabled="<?php echo esc_attr( empty( $source['enabled'] ) ? '0' : '1' ); ?>">
+							<button type="button" class="button button-small wpnc-test-source"><?php wpnc_e( 'Test', 'تست' ); ?></button>
+							<button type="button" class="button button-small wpnc-toggle-source">
+								<?php echo esc_html( empty( $source['enabled'] ) ? wpnc__( 'Resume', 'فعال‌سازی' ) : wpnc__( 'Pause', 'توقف' ) ); ?>
+							</button>
+							<?php if ( $fails > 0 ) : ?>
+								<button type="button" class="button button-small wpnc-reset-health"><?php wpnc_e( 'Reset', 'پاک کردن خطا' ); ?></button>
+							<?php endif; ?>
+							<span class="wpnc-health-result" dir="auto"></span>
+						</td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>

@@ -282,12 +282,21 @@ jQuery(function($) {
                 .appendTo($bulk);
             $('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-bulk-approve').text(t('approve_selected', 'Approve Selected')).appendTo($bulk);
             $('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-bulk-reject').text(t('reject_selected', 'Reject Selected')).appendTo($bulk);
+            $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($bulk);
+        } else {
+            var $terminalBulk = $('<div>').addClass('wpnc-bulk-actions').appendTo($app);
+            $('<label>')
+                .append($('<input>').attr({ type: 'checkbox', id: 'wpnc-select-all' }))
+                .append(document.createTextNode(' ' + t('select_all', 'Select All')))
+                .appendTo($terminalBulk);
+            $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($terminalBulk);
         }
 
         if (!items.length) {
             renderEmptyQueue($app, emptyHintFor(queueState.status));
             renderPagination($app, data);
             bindQueueEvents();
+            syncExportLink();
             return;
         }
 
@@ -299,6 +308,26 @@ jQuery(function($) {
         renderEditModal($app);
         renderPagination($app, data);
         bindQueueEvents();
+        syncExportLink();
+    }
+
+    /* The export is a normal link so the browser handles the download; keep
+       its query in step with what the user is actually looking at. */
+    function syncExportLink() {
+        var $link = $('#wpnc-export-queue');
+        if (!$link.length) {
+            return;
+        }
+
+        var href = $link.attr('href')
+            .replace(/([?&]status=)[^&]*/, '$1' + encodeURIComponent(queueState.status))
+            .replace(/&search=[^&]*/, '');
+
+        if (queueState.search) {
+            href += '&search=' + encodeURIComponent(queueState.search);
+        }
+
+        $link.attr('href', href);
     }
 
     function renderEmptyQueue($app, hint) {
@@ -309,16 +338,14 @@ jQuery(function($) {
     function renderCard($grid, item, terminal) {
         var $card = $('<div>').addClass('wpnc-card').attr('id', 'wpnc-item-' + item.id).appendTo($grid);
 
-        if (!terminal) {
-            $('<div>').addClass('wpnc-card-header')
-                .append(
-                    $('<input>')
-                        .attr({ type: 'checkbox', 'aria-label': t('select_item', 'Select this item') })
-                        .addClass('wpnc-item-checkbox')
-                        .val(item.id)
-                )
-                .appendTo($card);
-        }
+        $('<div>').addClass('wpnc-card-header')
+            .append(
+                $('<input>')
+                    .attr({ type: 'checkbox', 'aria-label': t('select_item', 'Select this item') })
+                    .addClass('wpnc-item-checkbox')
+                    .val(item.id)
+            )
+            .appendTo($card);
 
         if (item.image_url) {
             $('<img>').attr({ src: item.image_url, alt: '', loading: 'lazy' }).appendTo($card);
@@ -344,6 +371,7 @@ jQuery(function($) {
 
         if (terminal) {
             $('<span>').addClass('wpnc-badge wpnc-badge-' + item.status).text(statusLabel(item.status)).appendTo($actions);
+
             if (item.post_id) {
                 $('<a>')
                     .addClass('button')
@@ -351,12 +379,21 @@ jQuery(function($) {
                     .text(t('view_post', 'View post'))
                     .appendTo($actions);
             }
+
+            if (item.status === 'approved') {
+                $('<button>').attr('type', 'button').addClass('button wpnc-unpublish')
+                    .data('id', item.id).text(t('undo_approve', 'Undo approve')).appendTo($actions);
+            }
+
+            $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete')
+                .data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
             return;
         }
 
         $('<button>').attr('type', 'button').addClass('button button-primary wpnc-approve').data('id', item.id).text(t('approve', 'Approve')).appendTo($actions);
         $('<button>').attr('type', 'button').addClass('button wpnc-edit').data('item', item).text(t('edit', 'Edit')).appendTo($actions);
-        $('<button>').attr('type', 'button').addClass('button wpnc-reject button-link-delete').data('id', item.id).text(t('reject', 'Reject')).appendTo($actions);
+        $('<button>').attr('type', 'button').addClass('button wpnc-reject').data('id', item.id).text(t('reject', 'Reject')).appendTo($actions);
+        $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete').data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
     }
 
     /* ==========================================================
@@ -494,6 +531,27 @@ jQuery(function($) {
                 return;
             }
             actionBulk($(this), 'wpnc_bulk_reject');
+        });
+
+        $('.wpnc-delete').off('click').on('click', function() {
+            if (!window.confirm(t('confirm_delete', 'Permanently delete this item from the queue? Any post it already published stays on the site.'))) {
+                return;
+            }
+            actionOne($(this), 'wpnc_delete_item');
+        });
+
+        $('#wpnc-bulk-delete').off('click').on('click', function() {
+            if (!window.confirm(t('confirm_delete_bulk', 'Permanently delete the selected items from the queue? This cannot be undone.'))) {
+                return;
+            }
+            actionBulk($(this), 'wpnc_bulk_delete');
+        });
+
+        $('.wpnc-unpublish').off('click').on('click', function() {
+            if (!window.confirm(t('confirm_unpublish', 'Move the published post to Trash and return this item to the queue?'))) {
+                return;
+            }
+            actionOne($(this), 'wpnc_unpublish_item');
         });
     }
 
@@ -648,7 +706,7 @@ jQuery(function($) {
 
         renderLoading($logs);
 
-        request('wpnc_get_logs', { limit: 50 })
+        request('wpnc_get_logs', { limit: 50, level: $('#wpnc-log-level').val() || '' })
             .done(function(data) {
                 var logs = (data && data.logs) || [];
                 if (!logs.length) {
@@ -656,7 +714,9 @@ jQuery(function($) {
                     // branch, so an error read as an empty log.
                     renderEmpty($logs,
                         t('no_logs', 'No logs yet.'),
-                        t('empty_logs_hint', 'Run Fetch Now above and the result will appear here.'));
+                        $('#wpnc-log-level').val()
+                            ? t('empty_level_hint', 'Nothing was logged at this level. Choose All to see every entry.')
+                            : t('empty_logs_hint', 'Run Fetch Now above and the result will appear here.'));
                     return;
                 }
                 renderLogs($logs, logs);
@@ -865,6 +925,86 @@ jQuery(function($) {
        Utilities and boot
        ========================================================== */
 
+    /* ==========================================================
+       Source health actions
+       ========================================================== */
+
+    function bindSourceHealth() {
+        var $table = $('.wpnc-health-table');
+        if (!$table.length) {
+            return;
+        }
+
+        function cell($button) {
+            return $button.closest('.wpnc-health-actions');
+        }
+
+        function report($cell, message, type) {
+            $cell.find('.wpnc-health-result')
+                .removeClass('wpnc-health-ok wpnc-health-bad')
+                .addClass(type === 'error' ? 'wpnc-health-bad' : 'wpnc-health-ok')
+                .text(message);
+        }
+
+        $table.on('click', '.wpnc-test-source', function() {
+            var $button = $(this);
+            var $cell = cell($button);
+
+            setBusy($button, true);
+            request('wpnc_test_source', { source_index: $cell.data('index') })
+                .done(function(data) {
+                    var text = data.message;
+                    if (data.titles && data.titles.length) {
+                        text += ' — ' + data.titles[0];
+                    }
+                    report($cell, text, 'ok');
+                })
+                .fail(function(error) {
+                    report($cell, error.message, 'error');
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+
+        $table.on('click', '.wpnc-toggle-source', function() {
+            var $button = $(this);
+            var $cell = cell($button);
+
+            setBusy($button, true);
+            request('wpnc_toggle_source', { source_index: $cell.data('index') })
+                .done(function(data) {
+                    report($cell, data.message, 'ok');
+                    $button.text(data.enabled ? t('pause_source', 'Pause') : t('resume_source', 'Resume'));
+                    $cell.attr('data-enabled', data.enabled ? '1' : '0');
+                })
+                .fail(function(error) {
+                    report($cell, error.message, 'error');
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+
+        $table.on('click', '.wpnc-reset-health', function() {
+            var $button = $(this);
+            var $cell = cell($button);
+
+            setBusy($button, true);
+            request('wpnc_reset_source_health', { source_id: $cell.data('source-id') })
+                .done(function(data) {
+                    report($cell, data.message, 'ok');
+                    $button.remove();
+                })
+                .fail(function(error) {
+                    report($cell, error.message, 'error');
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+    }
+
     function debounce(fn, wait) {
         var timeout;
         return function() {
@@ -883,8 +1023,11 @@ jQuery(function($) {
         }
     });
 
+    $('#wpnc-log-level').on('change', loadLogs);
+
     loadQueue();
     loadStats();
     loadLogs();
     bindFetchTool();
+    bindSourceHealth();
 });

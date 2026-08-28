@@ -691,3 +691,54 @@
     background: #f0f0f1;
     color: #50575e;
 }
+
+/* ============================================================
+   Tab toolbars and per-source actions
+   ============================================================ */
+
+.wpnc-tab-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 14px 0;
+}
+
+.wpnc-health-actions {
+    white-space: nowrap;
+}
+
+.wpnc-health-actions .button {
+    margin-inline-end: 4px;
+}
+
+.wpnc-health-result {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    white-space: normal;
+    max-width: 30em;
+}
+
+.wpnc-health-result.wpnc-health-ok {
+    color: #00611c;
+}
+
+.wpnc-health-result.wpnc-health-bad {
+    color: #8a1f21;
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-tab-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .wpnc-health-actions {
+        white-space: normal;
+    }
+
+    .wpnc-health-actions .button {
+        margin: 0 4px 4px 0;
+    }
+}

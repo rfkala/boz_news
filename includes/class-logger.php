@@ -43,15 +43,44 @@ class WPNC_Logger {
 	}
 
 	/**
-	 * Get recent logs.
+	 * Every level this logger writes.
 	 *
-	 * @param int $limit Number of rows.
 	 * @return array
 	 */
-	public function get_recent( $limit = 50 ) {
+	public static function levels() {
+		return array( self::LEVEL_INFO, self::LEVEL_WARNING, self::LEVEL_ERROR );
+	}
+
+	/**
+	 * Get recent logs, optionally for one level.
+	 *
+	 * The level column has been indexed since 1.1.0 but nothing ever filtered
+	 * on it, which left 50 mixed rows as the only view.
+	 *
+	 * @param int    $limit Number of rows.
+	 * @param string $level Optional level filter.
+	 * @return array
+	 */
+	public function get_recent( $limit = 50, $level = '' ) {
 		global $wpdb;
 
 		$limit = max( 1, min( 200, absint( $limit ) ) );
+		$level = sanitize_key( $level );
+		$table = $this->table_name();
+
+		if ( in_array( $level, self::levels(), true ) ) {
+			$rows = $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"SELECT id, level, source, message, context, created_at FROM $table WHERE level = %s ORDER BY id DESC LIMIT %d",
+					$level,
+					$limit
+				),
+				ARRAY_A
+			);
+
+			return $this->with_display_dates( $rows );
+		}
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
@@ -61,6 +90,16 @@ class WPNC_Logger {
 			ARRAY_A
 		);
 
+		return $this->with_display_dates( $rows );
+	}
+
+	/**
+	 * Add a site-timezone rendering of each stored UTC timestamp.
+	 *
+	 * @param mixed $rows Result rows.
+	 * @return array
+	 */
+	private function with_display_dates( $rows ) {
 		if ( ! is_array( $rows ) ) {
 			return array();
 		}

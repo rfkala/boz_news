@@ -38,6 +38,12 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_edit_item', array( $this, 'edit_item' ) );
 		add_action( 'wp_ajax_wpnc_bulk_approve', array( $this, 'bulk_approve' ) );
 		add_action( 'wp_ajax_wpnc_bulk_reject', array( $this, 'bulk_reject' ) );
+		add_action( 'wp_ajax_wpnc_delete_item', array( $this, 'delete_item' ) );
+		add_action( 'wp_ajax_wpnc_bulk_delete', array( $this, 'bulk_delete' ) );
+		add_action( 'wp_ajax_wpnc_unpublish_item', array( $this, 'unpublish_item' ) );
+		add_action( 'wp_ajax_wpnc_test_source', array( $this, 'test_source' ) );
+		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
+		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
 		add_action( 'wp_ajax_wpnc_get_sources_list', array( $this, 'get_sources_list' ) );
@@ -252,6 +258,225 @@ class WPNC_Ajax {
 	}
 
 	/**
+	 * Permanently delete one queue row.
+	 */
+	public function delete_item() {
+		$this->check_admin_request();
+
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		if ( ! $this->queue->delete( $id ) ) {
+			$this->fail( wpnc__( 'Could not delete this item.', 'حذف این آیتم ممکن نبود.' ), 'wpnc_delete_failed' );
+		}
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_INFO,
+			wpnc__( 'Queue item deleted by an administrator.', 'یک آیتم صف توسط مدیر حذف شد.' ),
+			array(
+				'id'    => $id,
+				'title' => $item->title,
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => wpnc__( 'Item deleted.', 'آیتم حذف شد.' ),
+			)
+		);
+	}
+
+	/**
+	 * Permanently delete several queue rows.
+	 */
+	public function bulk_delete() {
+		$this->check_admin_request();
+
+		$ids     = $this->get_posted_ids();
+		$deleted = $this->queue->delete_many( $ids );
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_INFO,
+			wpnc__( 'Queue items deleted by an administrator.', 'چند آیتم صف توسط مدیر حذف شدند.' ),
+			array( 'count' => $deleted )
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf(
+					/* translators: %d: deleted row count */
+					wpnc__( '%d items deleted.', '%d آیتم حذف شد.' ),
+					$deleted
+				),
+				'deleted' => $deleted,
+			)
+		);
+	}
+
+	/**
+	 * Undo an approval: trash the published post and reopen the queue row.
+	 *
+	 * Approving used to be irreversible, which made a misclick permanent.
+	 * The post is trashed rather than deleted so it stays recoverable in
+	 * WordPress itself.
+	 */
+	public function unpublish_item() {
+		$this->check_admin_request();
+
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		if ( 'approved' !== (string) $item->status ) {
+			$this->fail(
+				wpnc__( 'Only an approved item can be sent back to the queue.', 'فقط آیتم تأییدشده را می‌توان به صف بازگرداند.' ),
+				'wpnc_not_approved',
+				array( 'status' => (string) $item->status ),
+				409
+			);
+		}
+
+		$post_id  = absint( $item->post_id );
+		$trashed  = false;
+		if ( $post_id && get_post( $post_id ) ) {
+			$trashed = (bool) wp_trash_post( $post_id );
+		}
+
+		if ( ! $this->queue->reopen( $id ) ) {
+			$this->fail( wpnc__( 'Could not reopen this item.', 'بازگرداندن این آیتم ممکن نبود.' ), 'wpnc_reopen_failed' );
+		}
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_WARNING,
+			wpnc__( 'Approval undone by an administrator.', 'یک تأیید توسط مدیر لغو شد.' ),
+			array(
+				'id'      => $id,
+				'post_id' => $post_id,
+				'trashed' => $trashed,
+			)
+		);
+
+		wp_send_json_success(
+			array(
+				'message' => $trashed
+					? wpnc__( 'Post moved to Trash and the item is back in the queue.', 'پست به زباله‌دان منتقل شد و آیتم به صف بازگشت.' )
+					: wpnc__( 'The item is back in the queue. No published post was found to trash.', 'آیتم به صف بازگشت. پستی برای انتقال به زباله‌دان یافت نشد.' ),
+				'trashed' => $trashed,
+			)
+		);
+	}
+
+	/**
+	 * Read one source without importing anything, so a URL can be checked
+	 * before it is trusted.
+	 */
+	public function test_source() {
+		$this->check_admin_request();
+
+		$index   = isset( $_POST['source_index'] ) ? absint( wp_unslash( $_POST['source_index'] ) ) : 0;
+		$fetcher = new WPNC_Fetcher();
+		$sources = $fetcher->get_sources();
+
+		if ( ! isset( $sources[ $index ] ) ) {
+			$this->fail( wpnc__( 'Source not found.', 'منبع یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		$source = $sources[ $index ];
+
+		if ( empty( $source['valid'] ) ) {
+			$this->fail(
+				wpnc__( 'This URL points at a private or unreachable host.', 'این آدرس به میزبان خصوصی یا در دسترس نیست اشاره می‌کند.' ),
+				'wpnc_unsafe_url'
+			);
+		}
+
+		$reader = new WPNC_Feed_Reader();
+		$result = $reader->fetch( $source, 5 );
+
+		if ( is_wp_error( $result ) ) {
+			$this->fail( $result->get_error_message(), 'wpnc_feed_error' );
+		}
+
+		$titles = array();
+		foreach ( $result['items'] as $item ) {
+			$titles[] = $item['title'];
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => sprintf(
+					/* translators: 1: feed title, 2: item count */
+					wpnc__( 'Read "%1$s" — %2$d items available.', 'فید «%1$s» خوانده شد — %2$d آیتم موجود است.' ),
+					$result['title'],
+					count( $titles )
+				),
+				'title'   => $result['title'],
+				'titles'  => array_slice( $titles, 0, 5 ),
+			)
+		);
+	}
+
+	/**
+	 * Pause or resume one source by rewriting its settings line.
+	 */
+	public function toggle_source() {
+		$this->check_admin_request();
+
+		$index   = isset( $_POST['source_index'] ) ? absint( wp_unslash( $_POST['source_index'] ) ) : 0;
+		$reader  = new WPNC_Feed_Reader();
+		$sources = $reader->parse_sources( get_option( 'wpnc_rss_links', '' ) );
+
+		if ( ! isset( $sources[ $index ] ) ) {
+			$this->fail( wpnc__( 'Source not found.', 'منبع یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		$sources[ $index ]['enabled'] = empty( $sources[ $index ]['enabled'] );
+
+		$lines = array();
+		foreach ( $sources as $source ) {
+			$line = WPNC_Feed_Reader::to_line( $source );
+			if ( '' !== $line ) {
+				$lines[] = $line;
+			}
+		}
+
+		update_option( 'wpnc_rss_links', implode( "\n", $lines ) );
+
+		wp_send_json_success(
+			array(
+				'message' => $sources[ $index ]['enabled']
+					? wpnc__( 'Source resumed.', 'منبع دوباره فعال شد.' )
+					: wpnc__( 'Source paused.', 'منبع متوقف شد.' ),
+				'enabled' => (bool) $sources[ $index ]['enabled'],
+			)
+		);
+	}
+
+	/**
+	 * Clear the failure history so a source is retried immediately.
+	 */
+	public function reset_source_health() {
+		$this->check_admin_request();
+
+		$source_id = isset( $_POST['source_id'] ) ? sanitize_text_field( wp_unslash( $_POST['source_id'] ) ) : '';
+		$fetcher   = new WPNC_Fetcher();
+		$fetcher->reset_source_health( $source_id );
+
+		wp_send_json_success(
+			array(
+				'message' => wpnc__( 'Failure history cleared; this source will be tried on the next run.', 'تاریخچه خطا پاک شد؛ این منبع در اجرای بعدی دوباره تلاش می‌شود.' ),
+			)
+		);
+	}
+
+	/**
 	 * Get queue stats.
 	 */
 	public function get_stats() {
@@ -267,7 +492,14 @@ class WPNC_Ajax {
 		$this->check_admin_request();
 
 		$limit = isset( $_POST['limit'] ) ? absint( wp_unslash( $_POST['limit'] ) ) : 50;
-		wp_send_json_success( array( 'logs' => $this->logger->get_recent( $limit ) ) );
+		$level = isset( $_POST['level'] ) ? sanitize_key( wp_unslash( $_POST['level'] ) ) : '';
+
+		wp_send_json_success(
+			array(
+				'logs'  => $this->logger->get_recent( $limit, $level ),
+				'level' => $level,
+			)
+		);
 	}
 
 	/**

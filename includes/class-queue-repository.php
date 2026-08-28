@@ -242,6 +242,115 @@ class WPNC_Queue_Repository {
 	}
 
 	/**
+	 * Permanently delete one queue row.
+	 *
+	 * Only the queue row: a post this item already published is deliberately
+	 * left alone, because deleting a moderation record should never remove
+	 * live content from the site.
+	 *
+	 * @param int $id Item ID.
+	 * @return bool
+	 */
+	public function delete( $id ) {
+		global $wpdb;
+
+		return (bool) $wpdb->delete( $this->table_name(), array( 'id' => absint( $id ) ), array( '%d' ) );
+	}
+
+	/**
+	 * Permanently delete several queue rows.
+	 *
+	 * @param array $ids Item IDs.
+	 * @return int Rows deleted.
+	 */
+	public function delete_many( $ids ) {
+		global $wpdb;
+
+		$ids = array_values( array_filter( array_map( 'absint', (array) $ids ) ) );
+		if ( empty( $ids ) ) {
+			return 0;
+		}
+
+		$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		$table        = $this->table_name();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM $table WHERE id IN ( $placeholders )", $ids ) );
+
+		return (int) $deleted;
+	}
+
+	/**
+	 * Return an approved row to the queue so it can be reviewed again.
+	 *
+	 * @param int $id Item ID.
+	 * @return bool
+	 */
+	public function reopen( $id ) {
+		global $wpdb;
+
+		$updated = $wpdb->update(
+			$this->table_name(),
+			array(
+				'status'        => 'pending',
+				'post_id'       => 0,
+				'error_message' => '',
+				'processed_at'  => null,
+				'updated_at'    => WPNC_Time::now(),
+			),
+			array( 'id' => absint( $id ) ),
+			array( '%s', '%d', '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+
+		return false !== $updated;
+	}
+
+	/**
+	 * Rows for a CSV export, in the same order the list shows them.
+	 *
+	 * Reads in chunks so a large queue does not have to fit in memory at once.
+	 *
+	 * @param array    $args     status and search, as in get_items().
+	 * @param callable $callback Receives each row as an array.
+	 */
+	public function each_for_export( $args, $callback ) {
+		global $wpdb;
+
+		$status = $this->normalize_status( isset( $args['status'] ) ? $args['status'] : 'pending' );
+		$search = sanitize_text_field( isset( $args['search'] ) ? $args['search'] : '' );
+		$table  = $this->table_name();
+		$where  = array( 'status = %s' );
+		$params = array( $status );
+
+		if ( '' !== $search ) {
+			$like    = '%' . $wpdb->esc_like( $search ) . '%';
+			$where[] = '(title LIKE %s OR source_name LIKE %s OR main_link LIKE %s)';
+			$params  = array_merge( $params, array( $like, $like, $like ) );
+		}
+
+		$where_sql = implode( ' AND ', $where );
+		$chunk     = 200;
+		$offset    = 0;
+
+		do {
+			$batch = $wpdb->get_results(
+				// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$wpdb->prepare(
+					"SELECT * FROM $table WHERE $where_sql ORDER BY pub_date DESC, id DESC LIMIT %d OFFSET %d",
+					array_merge( $params, array( $chunk, $offset ) )
+				)
+			);
+
+			foreach ( (array) $batch as $row ) {
+				call_user_func( $callback, $this->format_for_response( $row ) );
+			}
+
+			$offset += $chunk;
+		} while ( count( (array) $batch ) === $chunk );
+	}
+
+	/**
 	 * Check duplicate in queue or posts.
 	 *
 	 * @param string $main_link Link.
