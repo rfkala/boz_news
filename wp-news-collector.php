@@ -45,21 +45,6 @@ function wpnc_load_textdomain() {
 add_action( 'plugins_loaded', 'wpnc_load_textdomain' );
 
 /**
- * Register Elementor widget only when Elementor is available.
- *
- * @param object $widgets_manager Elementor widgets manager.
- */
-function wpnc_register_elementor_widget( $widgets_manager ) {
-	if ( ! class_exists( '\Elementor\Widget_Base' ) ) {
-		return;
-	}
-
-	require_once WPNC_PLUGIN_DIR . 'includes/class-elementor-widget.php';
-	$widgets_manager->register( new \WPNC_Elementor_Widget() );
-}
-add_action( 'elementor/widgets/register', 'wpnc_register_elementor_widget' );
-
-/**
  * Register shared frontend assets.
  */
 function wpnc_register_frontend_assets() {
@@ -119,7 +104,6 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'error_reject'     => 'Error rejecting item.',
 				'error_save'       => 'Error saving changes.',
 				'processing'       => 'Processing...',
-				'run_fetch'        => 'Fetch Now',
 				'fetch_done'       => 'Fetch completed.',
 				'search'           => 'Search...',
 				'previous'         => 'Previous',
@@ -154,7 +138,6 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'error_reject'     => 'خطا در رد.',
 				'error_save'       => 'خطا در ذخیره تغییرات.',
 				'processing'       => 'در حال پردازش...',
-				'run_fetch'        => 'دریافت فوری',
 				'fetch_done'       => 'دریافت کامل شد.',
 				'search'           => 'جستجو...',
 				'previous'         => 'قبلی',

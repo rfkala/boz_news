@@ -9,6 +9,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_Admin {
 
+	/**
+	 * Gold crown menu icon, pre-encoded so it is not rebuilt on every request.
+	 */
+	const MENU_ICON = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2M5YTIyNyIgZD0iTTUgMTZsLTItOSA2IDQgMy04IDMgOCA2LTQtMiA5SDV6bTAgMmgxNHYySDV2LTJ6Ii8+PC9zdmc+';
+
 	public function __construct() {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
@@ -16,18 +21,13 @@ class WPNC_Admin {
 	}
 
 	public function add_admin_menu() {
-		// Crown SVG icon — gold fill so it stands out from every other menu item.
-		$crown_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-			. '<path fill="#c9a227" d="M5 16l-2-9 6 4 3-8 3 8 6-4-2 9H5zm0 2h14v2H5v-2z"/>'
-			. '</svg>';
-
 		add_menu_page(
 			wpnc__( 'Boz News', 'بُز نیوز' ),
 			wpnc__( 'Boz News', 'بُز نیوز' ),
 			'manage_options',
 			'boz-news',
 			array( $this, 'render_admin_page' ),
-			'data:image/svg+xml;base64,' . base64_encode( $crown_svg ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode
+			self::MENU_ICON,
 			3  // Position 3 = right after Dashboard, top of sidebar.
 		);
 
@@ -73,7 +73,6 @@ class WPNC_Admin {
 	public function register_settings() {
 		register_setting( 'wpnc_settings_group', 'wpnc_admin_lang', 'sanitize_key' );
 		register_setting( 'wpnc_settings_group', 'wpnc_rss_links', array( $this, 'sanitize_rss_links' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_source_rules', 'sanitize_textarea_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_interval', array( 'WPNC_Settings', 'sanitize_interval' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_target_post_type', array( 'WPNC_Settings', 'sanitize_post_type' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_default_category', 'absint' );
@@ -90,7 +89,6 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_target_language', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_telegram_token', array( $this, 'sanitize_telegram_token' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_telegram_chat_id', 'sanitize_text_field' );
-		register_setting( 'wpnc_settings_group', 'wpnc_admin_notify', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 	}
 
 	public function render_admin_page() {
@@ -170,13 +168,6 @@ class WPNC_Admin {
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="wpnc_source_rules"><?php wpnc_e( 'Source Rules', 'قوانین منبع' ); ?></label></th>
-					<td>
-						<textarea id="wpnc_source_rules" name="wpnc_source_rules" rows="5" class="large-text code" dir="ltr"><?php echo esc_textarea( get_option( 'wpnc_source_rules', '' ) ); ?></textarea>
-						<p class="description"><?php wpnc_e( 'Optional: source_key|content_xpath|image_xpath. Leave empty for automatic extraction.', 'اختیاری: source_key|content_xpath|image_xpath. برای استخراج خودکار خالی بگذارید.' ); ?></p>
-					</td>
-				</tr>
-				<tr>
 					<th scope="row"><label for="wpnc_interval"><?php wpnc_e( 'Update Interval', 'بازه بروزرسانی' ); ?></label></th>
 					<td>
 						<select id="wpnc_interval" name="wpnc_interval">
@@ -234,10 +225,6 @@ class WPNC_Admin {
 							<input type="checkbox" name="wpnc_extract_full_text" value="1" <?php checked( get_option( 'wpnc_extract_full_text', 0 ), 1 ); ?> />
 							<?php wpnc_e( 'Attempt full-text extraction from article pages', 'استخراج متن کامل از صفحه مقاله' ); ?>
 						</label><br>
-						<label>
-							<input type="checkbox" name="wpnc_admin_notify" value="1" <?php checked( get_option( 'wpnc_admin_notify', 0 ), 1 ); ?> />
-							<?php wpnc_e( 'Email admin when new queue items are added', 'ارسال ایمیل به مدیر هنگام افزوده شدن آیتم جدید' ); ?>
-						</label>
 					</td>
 				</tr>
 				<tr>

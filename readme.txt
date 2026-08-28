@@ -17,7 +17,6 @@ Boz News fetches RSS/Atom sources, filters items, stores them in a moderation qu
 Key features:
 
 * RSS/Atom source list with optional category mapping and source keys.
-* Optional source-specific XPath rules for content and image extraction.
 * Moderation queue with AJAX search, pagination, approve, reject, edit, and bulk actions.
 * Manual fetch tool with operational logs and queue statistics.
 * WP-Cron scheduling with a fetch lock to avoid overlapping runs.
@@ -25,7 +24,7 @@ Key features:
 * Optional full-text extraction and image sideloading with request limits.
 * Optional OpenAI rewrite/translation/tag generation.
 * Optional Telegram notification after publishing.
-* Shortcode `[news_bulletin]` and Elementor widget support.
+* Shortcode `[news_bulletin]` for the front end.
 
 == Installation ==
 
@@ -43,15 +42,17 @@ Use one source per line:
 * `https://example.com/feed|5`
 * `https://example.com/feed|5|example_source`
 
-The second value is the WordPress category ID. The third value is an optional source key used by Source Rules.
+The second value is the WordPress category ID. The third value is an optional
+source key, used to label log entries and to keep a source's failure history
+attached to it when its URL changes.
 
-== Source Rules ==
+Prefix a line with `#` to comment it out entirely, or with `!` to keep the
+source but pause it:
 
-Optional source rules use this format:
+* `!https://example.com/feed|5|example_source`
 
-`source_key|content_xpath|image_xpath`
-
-Leave Source Rules empty unless a feed/article page needs custom extraction.
+A source that fails repeatedly is paused automatically with a growing backoff,
+up to a day, and resumes on its own once it responds again.
 
 == Frequently Asked Questions ==
 

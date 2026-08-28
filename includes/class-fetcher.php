@@ -235,27 +235,6 @@ class WPNC_Fetcher {
 	}
 
 	/**
-	 * Backward-compatible publish wrapper.
-	 *
-	 * @return int|WP_Error
-	 */
-	public function publish_post( $title, $description, $main_link, $source_name, $image_url, $pub_date, $category_id = 0, $tags = '', $post_type = 'post' ) {
-		return $this->publisher->publish(
-			array(
-				'title'       => $title,
-				'description' => $description,
-				'main_link'   => $main_link,
-				'source_name' => $source_name,
-				'image_url'   => $image_url,
-				'pub_date'    => $pub_date,
-				'category_id' => $category_id,
-				'tags'        => $tags,
-			),
-			$post_type
-		);
-	}
-
-	/**
 	 * Cleanup processed queue rows and old logs.
 	 */
 	public function cleanup_queue() {
@@ -361,10 +340,10 @@ class WPNC_Fetcher {
 			return 'skipped';
 		}
 
-		$item['image_url'] = $this->image_service->extract_image( $item['raw_item'], $item['main_link'], $item['source_key'] );
+		$item['image_url'] = $this->image_service->extract_image( $item['raw_item'], $item['main_link'] );
 
 		if ( get_option( 'wpnc_extract_full_text', 0 ) ) {
-			$full_text = $this->image_service->extract_full_text( $item['main_link'], $item['source_key'] );
+			$full_text = $this->image_service->extract_full_text( $item['main_link'] );
 			if ( ! empty( $full_text ) ) {
 				$item['description'] = $full_text;
 			}

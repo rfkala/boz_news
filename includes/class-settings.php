@@ -97,6 +97,11 @@ class WPNC_Settings {
 	}
 
 	/**
+	 * Default HTTP timeout in seconds.
+	 */
+	const DEFAULT_TIMEOUT = 8;
+
+	/**
 	 * Cap HTTP timeout.
 	 *
 	 * @param mixed $value Raw value.
@@ -104,6 +109,21 @@ class WPNC_Settings {
 	 */
 	public static function sanitize_timeout( $value ) {
 		return max( 3, min( 30, absint( $value ) ) );
+	}
+
+	/**
+	 * Configured HTTP timeout, optionally with extra headroom.
+	 *
+	 * One clamp for the whole plugin; the three call sites used to disagree
+	 * about both the default and the allowed range.
+	 *
+	 * @param int $extra Seconds to add for slower endpoints such as OpenAI.
+	 * @return int
+	 */
+	public static function get_timeout( $extra = 0 ) {
+		$timeout = self::sanitize_timeout( get_option( 'wpnc_request_timeout', self::DEFAULT_TIMEOUT ) );
+
+		return $timeout + max( 0, absint( $extra ) );
 	}
 
 	/**

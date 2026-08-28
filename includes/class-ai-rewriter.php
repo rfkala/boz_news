@@ -51,7 +51,7 @@ class WPNC_AI_Rewriter {
 						'response_format' => array( 'type' => 'json_object' ),
 					)
 				),
-				'timeout' => max( 10, min( 45, absint( get_option( 'wpnc_request_timeout', 20 ) ) + 15 ) ),
+				'timeout' => WPNC_Settings::get_timeout( 15 ),
 			)
 		);
 

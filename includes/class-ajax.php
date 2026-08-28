@@ -40,7 +40,6 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_bulk_reject', array( $this, 'bulk_reject' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
-		add_action( 'wp_ajax_wpnc_run_fetch', array( $this, 'run_fetch' ) );
 		add_action( 'wp_ajax_wpnc_get_sources_list', array( $this, 'get_sources_list' ) );
 		add_action( 'wp_ajax_wpnc_fetch_one_source', array( $this, 'fetch_one_source' ) );
 		add_action( 'wp_ajax_wpnc_clear_fetch_lock', array( $this, 'clear_fetch_lock' ) );
@@ -264,19 +263,6 @@ class WPNC_Ajax {
 
 		$limit = isset( $_POST['limit'] ) ? absint( wp_unslash( $_POST['limit'] ) ) : 50;
 		wp_send_json_success( array( 'logs' => $this->logger->get_recent( $limit ) ) );
-	}
-
-	/**
-	 * Run fetch manually (single blocking call — kept for backward compat / cron).
-	 */
-	public function run_fetch() {
-		$this->check_admin_request();
-
-		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-		@set_time_limit( 300 );
-
-		$fetcher = new WPNC_Fetcher();
-		wp_send_json_success( $fetcher->fetch_news( true ) );
 	}
 
 	/**

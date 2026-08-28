@@ -10,6 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPNC_Image_Service {
 
 	/**
+	 * Where article body paragraphs usually live.
+	 */
+	const CONTENT_QUERY = '//article//p | //main//p | //div[contains(@class, "content")]//p | //div[contains(@class, "post")]//p';
+
+	/**
 	 * @var WPNC_Feed_Reader
 	 */
 	private $feed_reader;
@@ -24,12 +29,11 @@ class WPNC_Image_Service {
 	/**
 	 * Extract image URL from a feed item or article page.
 	 *
-	 * @param SimplePie_Item $item       Feed item.
-	 * @param string         $main_link  Article URL.
-	 * @param string         $source_key Source key.
+	 * @param SimplePie_Item $item      Feed item.
+	 * @param string         $main_link Article URL.
 	 * @return string
 	 */
-	public function extract_image( $item, $main_link, $source_key = '' ) {
+	public function extract_image( $item, $main_link ) {
 		if ( $item && ( $enclosure = $item->get_enclosure() ) ) {
 			$link = $enclosure->get_link();
 			$type = $enclosure->get_type();
@@ -52,19 +56,7 @@ class WPNC_Image_Service {
 			return '';
 		}
 
-		$xpath       = new DOMXPath( $doc );
-		$source_rule = $this->get_source_rule( $source_key );
-
-		if ( ! empty( $source_rule['image_xpath'] ) ) {
-			$custom = $xpath->query( $source_rule['image_xpath'] );
-			if ( $custom && $custom->length > 0 ) {
-				$url = $this->node_to_url( $custom->item( 0 ) );
-				if ( $this->feed_reader->is_safe_url( $url ) ) {
-					return esc_url_raw( $url );
-				}
-			}
-		}
-
+		$xpath   = new DOMXPath( $doc );
 		$queries = array(
 			'//meta[@property="og:image"]/@content',
 			'//meta[@name="twitter:image"]/@content',
@@ -87,11 +79,10 @@ class WPNC_Image_Service {
 	/**
 	 * Extract article body text.
 	 *
-	 * @param string $url        Article URL.
-	 * @param string $source_key Source key.
+	 * @param string $url Article URL.
 	 * @return string
 	 */
-	public function extract_full_text( $url, $source_key = '' ) {
+	public function extract_full_text( $url ) {
 		if ( ! $this->feed_reader->is_safe_url( $url ) ) {
 			return '';
 		}
@@ -106,13 +97,8 @@ class WPNC_Image_Service {
 			return '';
 		}
 
-		$xpath       = new DOMXPath( $doc );
-		$source_rule = $this->get_source_rule( $source_key );
-		$query       = ! empty( $source_rule['content_xpath'] )
-			? $source_rule['content_xpath']
-			: '//article//p | //main//p | //div[contains(@class, "content")]//p | //div[contains(@class, "post")]//p';
-
-		$paragraphs = $xpath->query( $query );
+		$xpath      = new DOMXPath( $doc );
+		$paragraphs = $xpath->query( self::CONTENT_QUERY );
 		if ( ! $paragraphs || 0 === $paragraphs->length ) {
 			return '';
 		}
@@ -170,7 +156,7 @@ class WPNC_Image_Service {
 	 * @return string
 	 */
 	private function remote_get_body( $url ) {
-		$timeout = max( 3, min( 20, absint( get_option( 'wpnc_request_timeout', 8 ) ) ) );
+		$timeout = WPNC_Settings::get_timeout();
 
 		$response = wp_remote_get(
 			$url,
@@ -233,35 +219,5 @@ class WPNC_Image_Service {
 		}
 
 		return trim( $node->nodeValue );
-	}
-
-	/**
-	 * Get a custom source extraction rule.
-	 *
-	 * @param string $source_key Source key.
-	 * @return array
-	 */
-	private function get_source_rule( $source_key ) {
-		$source_key = sanitize_key( $source_key );
-		if ( empty( $source_key ) ) {
-			return array();
-		}
-
-		$raw   = (string) get_option( 'wpnc_source_rules', '' );
-		$lines = array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $raw ) ) );
-
-		foreach ( $lines as $line ) {
-			$parts = array_map( 'trim', explode( '|', $line ) );
-			if ( sanitize_key( $parts[0] ?? '' ) !== $source_key ) {
-				continue;
-			}
-
-			return array(
-				'content_xpath' => $parts[1] ?? '',
-				'image_xpath'   => $parts[2] ?? '',
-			);
-		}
-
-		return array();
 	}
 }
