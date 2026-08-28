@@ -16,11 +16,14 @@ delete_transient( 'wpnc_fetch_lock' );
 delete_transient( 'wpnc_admin_notify_lock' );
 
 $options = array(
+	// Settings.
+	'wpnc_admin_lang',
 	'wpnc_rss_links',
-	'wpnc_source_rules',
 	'wpnc_interval',
 	'wpnc_target_post_type',
 	'wpnc_default_category',
+	'wpnc_post_author',
+	'wpnc_post_status',
 	'wpnc_auto_publish',
 	'wpnc_default_image',
 	'wpnc_extract_full_text',
@@ -28,21 +31,35 @@ $options = array(
 	'wpnc_exclude_words',
 	'wpnc_max_items_per_feed',
 	'wpnc_request_timeout',
+	'wpnc_queue_retention_days',
+	'wpnc_log_retention_days',
 	'wpnc_openai_api_key',
 	'wpnc_openai_model',
 	'wpnc_auto_rewrite',
 	'wpnc_target_language',
 	'wpnc_telegram_token',
 	'wpnc_telegram_chat_id',
-	'wpnc_admin_notify',
+
+	// Runtime state.
 	'wpnc_last_run',
 	'wpnc_last_count',
 	'wpnc_last_summary',
+	'wpnc_source_health',
 	'wpnc_schema_version',
+	'wpnc_schema_error',
+
+	// Removed in 1.3.0; deleted so upgraded sites do not leave rows behind.
+	'wpnc_admin_notify',
+	'wpnc_source_rules',
 );
 
 foreach ( $options as $option ) {
 	delete_option( $option );
+}
+
+// Post meta written by the publisher.
+foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '_wpnc_source_image', 'wpnc_source_image' ) as $meta_key ) {
+	delete_post_meta_by_key( $meta_key );
 }
 
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_queue" );

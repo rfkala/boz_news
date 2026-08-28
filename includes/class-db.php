@@ -9,7 +9,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.1.0';
+	const SCHEMA_VERSION = '1.2.0';
+
+	/**
+	 * Option that records a failed table creation so the admin can be told.
+	 */
+	const HEALTH_OPTION = 'wpnc_schema_error';
 
 	/**
 	 * Constructor.
@@ -40,7 +45,7 @@ class WPNC_DB {
 	public function deactivate() {
 		wp_clear_scheduled_hook( 'wpnc_fetch_news_event' );
 		wp_clear_scheduled_hook( 'wpnc_cleanup_news_event' );
-		delete_transient( 'wpnc_fetch_lock' );
+		delete_transient( WPNC_Fetcher::LOCK_KEY );
 		flush_rewrite_rules();
 	}
 
@@ -48,15 +53,67 @@ class WPNC_DB {
 	 * Upgrade schema when plugin files change.
 	 */
 	public function maybe_upgrade() {
-		$version = get_option( 'wpnc_schema_version', '0' );
-		if ( version_compare( $version, self::SCHEMA_VERSION, '<' ) ) {
-			$this->create_tables();
-			update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
+		$version = (string) get_option( 'wpnc_schema_version', '0' );
+
+		if ( version_compare( $version, self::SCHEMA_VERSION, '>=' ) ) {
+			return;
 		}
+
+		$this->create_tables();
+
+		// 1.2.0 moved every stored datetime to UTC. Rows written by earlier
+		// versions hold site-local time, so shift them once or retention will
+		// delete them off by the site's GMT offset.
+		if ( '0' !== $version && version_compare( $version, '1.2.0', '<' ) ) {
+			$this->migrate_datetimes_to_utc();
+		}
+
+		update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
+	}
+
+	/**
+	 * Shift legacy local-time columns to UTC.
+	 *
+	 * pub_date is deliberately excluded: it was already written through
+	 * gmdate() before 1.2.0 and is therefore already UTC.
+	 */
+	private function migrate_datetimes_to_utc() {
+		global $wpdb;
+
+		$offset = WPNC_Time::offset_seconds();
+		if ( 0 === $offset ) {
+			return;
+		}
+
+		$queue = $wpdb->prefix . 'news_queue';
+		$logs  = $wpdb->prefix . 'news_collector_logs';
+
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE $queue SET
+					created_at   = DATE_SUB( created_at, INTERVAL %d SECOND ),
+					updated_at   = DATE_SUB( updated_at, INTERVAL %d SECOND ),
+					processed_at = IF( processed_at IS NULL, NULL, DATE_SUB( processed_at, INTERVAL %d SECOND ) )",
+				$offset,
+				$offset,
+				$offset
+			)
+		);
+
+		$wpdb->query(
+			$wpdb->prepare(
+				"UPDATE $logs SET created_at = DATE_SUB( created_at, INTERVAL %d SECOND )",
+				$offset
+			)
+		);
+		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
 
 	/**
 	 * Create or upgrade custom tables.
+	 *
+	 * @return bool True when both tables exist afterwards.
 	 */
 	private function create_tables() {
 		global $wpdb;
@@ -89,7 +146,9 @@ class WPNC_DB {
 			KEY guid (guid(191)),
 			KEY status_pub_date (status, pub_date),
 			KEY post_id (post_id),
-			KEY source_key (source_key)
+			KEY source_key (source_key),
+			KEY status_updated (status, updated_at),
+			KEY title_search (title(64))
 		) $charset_collate;";
 
 		$logs_sql = "CREATE TABLE $logs_table (
@@ -102,12 +161,46 @@ class WPNC_DB {
 			PRIMARY KEY  (id),
 			KEY level (level),
 			KEY source (source),
-			KEY created_at (created_at)
+			KEY created_at (created_at),
+			KEY level_created (level, created_at)
 		) $charset_collate;";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $queue_sql );
 		dbDelta( $logs_sql );
+
+		// dbDelta never reports failure, so verify instead of assuming.
+		$missing = array();
+		foreach ( array( $queue_table, $logs_table ) as $table ) {
+			if ( ! $this->table_exists( $table ) ) {
+				$missing[] = $table;
+			}
+		}
+
+		if ( empty( $missing ) ) {
+			delete_option( self::HEALTH_OPTION );
+			return true;
+		}
+
+		// The log table may be one of the missing ones, so do not log to it.
+		update_option( self::HEALTH_OPTION, implode( ', ', $missing ) );
+
+		return false;
+	}
+
+	/**
+	 * Check whether a table exists.
+	 *
+	 * @param string $table Fully qualified table name.
+	 * @return bool
+	 */
+	private function table_exists( $table ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+
+		return (string) $found === (string) $table;
 	}
 }
 

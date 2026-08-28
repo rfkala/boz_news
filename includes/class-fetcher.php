@@ -10,6 +10,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPNC_Fetcher {
 
 	/**
+	 * Transient that serialises every fetch run, scheduled or manual.
+	 */
+	const LOCK_KEY = 'wpnc_fetch_lock';
+
+	/**
+	 * How long a lock survives without a heartbeat.
+	 */
+	const LOCK_TTL = 15 * MINUTE_IN_SECONDS;
+
+	/**
+	 * Option holding per-source success/failure history.
+	 */
+	const HEALTH_OPTION = 'wpnc_source_health';
+
+	/**
+	 * Consecutive failures before a source starts being skipped.
+	 */
+	const FAIL_THRESHOLD = 3;
+
+	/**
 	 * @var WPNC_Feed_Reader
 	 */
 	private $feed_reader;
@@ -146,9 +166,7 @@ class WPNC_Fetcher {
 				$this->process_source( $source, $summary );
 			}
 
-			$this->send_admin_notification( $summary['queued'] );
-
-			update_option( 'wpnc_last_run', current_time( 'mysql' ) );
+			update_option( 'wpnc_last_run', WPNC_Time::now() );
 			update_option( 'wpnc_last_count', absint( $summary['fetched'] ) );
 			update_option( 'wpnc_last_summary', $summary );
 
@@ -197,6 +215,10 @@ class WPNC_Fetcher {
 		// Give each per-source request up to 2 minutes.
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		@set_time_limit( 120 );
+
+		// The browser drives this one request at a time; keep the run-level
+		// lock from expiring underneath a slow feed.
+		$this->renew_lock();
 
 		$summary = array(
 			'fetched'   => 0,
@@ -249,24 +271,59 @@ class WPNC_Fetcher {
 	 */
 	private function process_source( $source, &$summary ) {
 		$source_key = $source['source_key'] ?: wp_parse_url( $source['url'] ?? '', PHP_URL_HOST );
+		$source_id  = WPNC_Feed_Reader::source_id( $source );
 
 		if ( empty( $source['valid'] ) ) {
-			$message = sprintf( __( 'Skipped unsafe feed URL: %s', 'wp-news-collector' ), $source['url'] ?? '' );
+			$message = sprintf(
+				/* translators: %s: feed URL */
+				__( 'Skipped unsafe feed URL: %s', 'wp-news-collector' ),
+				$source['url'] ?? ''
+			);
 			$this->logger->log( WPNC_Logger::LEVEL_ERROR, $message, array(), $source_key );
+			$this->record_source_failure( $source_id, $source, $message );
 			$summary['errors']++;
 			$summary['messages'][] = $message;
+			return;
+		}
+
+		if ( empty( $source['enabled'] ) ) {
+			$summary['skipped']++;
+			$summary['messages'][] = sprintf(
+				/* translators: %s: feed URL */
+				__( 'Source is disabled: %s', 'wp-news-collector' ),
+				$source['url']
+			);
+			return;
+		}
+
+		$cooldown = $this->cooldown_remaining( $source_id );
+		if ( $cooldown > 0 ) {
+			$summary['skipped']++;
+			$summary['messages'][] = sprintf(
+				/* translators: 1: feed URL, 2: human readable duration */
+				__( 'Source paused after repeated failures, retrying in %2$s: %1$s', 'wp-news-collector' ),
+				$source['url'],
+				human_time_diff( WPNC_Time::timestamp(), WPNC_Time::timestamp() + $cooldown )
+			);
 			return;
 		}
 
 		$result = $this->feed_reader->fetch( $source, get_option( 'wpnc_max_items_per_feed', 20 ) );
 		if ( is_wp_error( $result ) ) {
-			$message = sprintf( __( 'Feed fetch failed for %1$s: %2$s', 'wp-news-collector' ), $source['url'], $result->get_error_message() );
+			$message = sprintf(
+				/* translators: 1: feed URL, 2: error message */
+				__( 'Feed fetch failed for %1$s: %2$s', 'wp-news-collector' ),
+				$source['url'],
+				$result->get_error_message()
+			);
 			$this->logger->log( WPNC_Logger::LEVEL_ERROR, $message, array( 'url' => $source['url'] ), $source_key );
+			$this->record_source_failure( $source_id, $source, $result->get_error_message() );
 			$summary['errors']++;
 			$summary['messages'][] = $message;
 			return;
 		}
 
+		$this->record_source_success( $source_id, $source, count( $result['items'] ) );
 		$summary['sources_ok']++;
 
 		foreach ( $result['items'] as $item ) {
@@ -415,56 +472,175 @@ class WPNC_Fetcher {
 	}
 
 	/**
-	 * Send moderation notification.
+	 * Per-source success/failure history, keyed by stable source id.
 	 *
-	 * @param int $new_items New queued items.
+	 * @return array
 	 */
-	private function send_admin_notification( $new_items ) {
-		if ( $new_items <= 0 || ! get_option( 'wpnc_admin_notify', 0 ) ) {
-			return;
-		}
+	public function get_source_health() {
+		$health = get_option( self::HEALTH_OPTION, array() );
 
-		if ( false !== get_transient( 'wpnc_admin_notify_lock' ) ) {
-			return;
-		}
-
-		wp_mail(
-			get_option( 'admin_email' ),
-			sprintf( __( '[%s] New News Items for Moderation', 'wp-news-collector' ), get_option( 'blogname' ) ),
-			sprintf( __( 'You have %d new news items pending in the Moderation Queue. Please log in to review them.', 'wp-news-collector' ), $new_items )
-		);
-
-		set_transient( 'wpnc_admin_notify_lock', true, DAY_IN_SECONDS );
+		return is_array( $health ) ? $health : array();
 	}
 
 	/**
-	 * Acquire fetch lock.
+	 * Seconds a source must still wait before it is tried again.
 	 *
-	 * @param bool $manual Whether manual.
-	 * @return bool
+	 * Backoff doubles per failure past the threshold and is capped at a day,
+	 * so a permanently dead feed stops being retried on every single run.
+	 *
+	 * @param string $source_id Stable source id.
+	 * @return int Seconds remaining, 0 when the source is due.
 	 */
-	private function acquire_lock( $manual ) {
-		if ( false !== get_transient( 'wpnc_fetch_lock' ) ) {
+	public function cooldown_remaining( $source_id ) {
+		$health = $this->get_source_health();
+		$record = isset( $health[ $source_id ] ) ? $health[ $source_id ] : null;
+
+		if ( ! is_array( $record ) ) {
+			return 0;
+		}
+
+		$fails = absint( isset( $record['fails'] ) ? $record['fails'] : 0 );
+		if ( $fails < self::FAIL_THRESHOLD ) {
+			return 0;
+		}
+
+		$wait = (int) min(
+			DAY_IN_SECONDS,
+			HOUR_IN_SECONDS * pow( 2, $fails - self::FAIL_THRESHOLD )
+		);
+		$due  = absint( isset( $record['last_try'] ) ? $record['last_try'] : 0 ) + $wait;
+
+		return max( 0, $due - WPNC_Time::timestamp() );
+	}
+
+	/**
+	 * Clear the failure history for one source, or for all of them.
+	 *
+	 * @param string $source_id Stable source id, or empty for all.
+	 */
+	public function reset_source_health( $source_id = '' ) {
+		if ( '' === $source_id ) {
+			delete_option( self::HEALTH_OPTION );
+			return;
+		}
+
+		$health = $this->get_source_health();
+		unset( $health[ $source_id ] );
+		update_option( self::HEALTH_OPTION, $health, false );
+	}
+
+	/**
+	 * Record a successful fetch for a source.
+	 *
+	 * @param string $source_id Stable source id.
+	 * @param array  $source    Source definition.
+	 * @param int    $items     Items returned.
+	 */
+	private function record_source_success( $source_id, $source, $items ) {
+		$health = $this->get_source_health();
+		$now    = WPNC_Time::timestamp();
+
+		$health[ $source_id ] = array(
+			'url'        => isset( $source['url'] ) ? $source['url'] : '',
+			'fails'      => 0,
+			'last_error' => '',
+			'last_ok'    => $now,
+			'last_try'   => $now,
+			'last_items' => absint( $items ),
+		);
+
+		update_option( self::HEALTH_OPTION, $health, false );
+	}
+
+	/**
+	 * Record a failed fetch for a source.
+	 *
+	 * @param string $source_id Stable source id.
+	 * @param array  $source    Source definition.
+	 * @param string $error     Error message.
+	 */
+	private function record_source_failure( $source_id, $source, $error ) {
+		$health   = $this->get_source_health();
+		$previous = ( isset( $health[ $source_id ] ) && is_array( $health[ $source_id ] ) ) ? $health[ $source_id ] : array();
+
+		$health[ $source_id ] = array(
+			'url'        => isset( $source['url'] ) ? $source['url'] : '',
+			'fails'      => absint( isset( $previous['fails'] ) ? $previous['fails'] : 0 ) + 1,
+			'last_error' => sanitize_text_field( $error ),
+			'last_ok'    => absint( isset( $previous['last_ok'] ) ? $previous['last_ok'] : 0 ),
+			'last_try'   => WPNC_Time::timestamp(),
+			'last_items' => absint( isset( $previous['last_items'] ) ? $previous['last_items'] : 0 ),
+		);
+
+		update_option( self::HEALTH_OPTION, $health, false );
+	}
+
+	/**
+	 * Acquire the fetch lock.
+	 *
+	 * Both the cron run and the browser-driven per-source run take this, so a
+	 * manual fetch can no longer overlap a scheduled one and import an item
+	 * twice (or pay OpenAI twice for it).
+	 *
+	 * @param bool $manual Whether the run was triggered by hand.
+	 * @return bool True when the lock was taken.
+	 */
+	public function acquire_lock( $manual = false ) {
+		if ( false !== get_transient( self::LOCK_KEY ) ) {
 			return false;
 		}
 
 		set_transient(
-			'wpnc_fetch_lock',
+			self::LOCK_KEY,
 			array(
 				'manual' => (bool) $manual,
-				'time'   => time(),
+				'time'   => WPNC_Time::timestamp(),
 			),
-			15 * MINUTE_IN_SECONDS
+			self::LOCK_TTL
 		);
 
 		return true;
 	}
 
 	/**
-	 * Release fetch lock.
+	 * Extend the current lock, or take it if it expired mid-run.
+	 *
+	 * @return bool True when this run holds the lock afterwards.
 	 */
-	private function release_lock() {
-		delete_transient( 'wpnc_fetch_lock' );
+	public function renew_lock() {
+		$lock = $this->get_lock();
+
+		if ( false === $lock ) {
+			return $this->acquire_lock( true );
+		}
+
+		if ( empty( $lock['manual'] ) ) {
+			// A cron run owns it; do not steal it.
+			return false;
+		}
+
+		$lock['time'] = WPNC_Time::timestamp();
+		set_transient( self::LOCK_KEY, $lock, self::LOCK_TTL );
+
+		return true;
+	}
+
+	/**
+	 * Read the current lock.
+	 *
+	 * @return array|false
+	 */
+	public function get_lock() {
+		$lock = get_transient( self::LOCK_KEY );
+
+		return is_array( $lock ) ? $lock : false;
+	}
+
+	/**
+	 * Release the fetch lock.
+	 */
+	public function release_lock() {
+		delete_transient( self::LOCK_KEY );
 	}
 }
 

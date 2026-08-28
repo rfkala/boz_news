@@ -17,6 +17,10 @@ class WPNC_Feed_Reader {
 	 * - https://example.com/feed|12
 	 * - https://example.com/feed|12|source_key
 	 *
+	 * A line starting with '#' is a comment. A line starting with '!' is a
+	 * source that is kept but skipped, which is how a feed can be paused
+	 * without losing its category and key.
+	 *
 	 * @param string $raw Raw textarea value.
 	 * @return array
 	 */
@@ -29,29 +33,79 @@ class WPNC_Feed_Reader {
 				continue;
 			}
 
-			$parts      = array_map( 'trim', explode( '|', $line ) );
-			$url        = esc_url_raw( $parts[0] ?? '' );
-			$source_key = isset( $parts[2] ) ? sanitize_key( $parts[2] ) : '';
+			$enabled = true;
+			if ( 0 === strpos( $line, '!' ) ) {
+				$enabled = false;
+				$line    = trim( substr( $line, 1 ) );
+			}
 
-			if ( ! $this->is_safe_url( $url ) ) {
-				$sources[] = array(
-					'url'         => $url,
-					'category_id' => absint( $parts[1] ?? 0 ),
-					'source_key'  => $source_key,
-					'valid'       => false,
-				);
+			if ( '' === $line ) {
 				continue;
 			}
 
-			$sources[] = array(
+			$parts      = array_map( 'trim', explode( '|', $line ) );
+			$url        = esc_url_raw( isset( $parts[0] ) ? $parts[0] : '' );
+			$source_key = isset( $parts[2] ) ? sanitize_key( $parts[2] ) : '';
+
+			$source = array(
 				'url'         => $url,
-				'category_id' => absint( $parts[1] ?? 0 ),
+				'raw_url'     => isset( $parts[0] ) ? $parts[0] : '',
+				'category_id' => absint( isset( $parts[1] ) ? $parts[1] : 0 ),
 				'source_key'  => $source_key,
-				'valid'       => true,
+				'enabled'     => $enabled,
+				'valid'       => $this->is_safe_url( $url ),
 			);
+
+			$source['id'] = self::source_id( $source );
+			$sources[]    = $source;
 		}
 
 		return $sources;
+	}
+
+	/**
+	 * Stable identifier for a source, used to key health and per-source state.
+	 *
+	 * Prefers the explicit source key so that editing a URL's query string
+	 * does not silently reset that source's history.
+	 *
+	 * @param array $source Source definition.
+	 * @return string
+	 */
+	public static function source_id( $source ) {
+		$key = sanitize_key( isset( $source['source_key'] ) ? $source['source_key'] : '' );
+		if ( '' !== $key ) {
+			return 'key:' . $key;
+		}
+
+		$url = isset( $source['url'] ) ? (string) $source['url'] : '';
+
+		return 'url:' . md5( $url );
+	}
+
+	/**
+	 * Render a parsed source back to its settings line.
+	 *
+	 * @param array $source Source definition.
+	 * @return string
+	 */
+	public static function to_line( $source ) {
+		$line = esc_url_raw( isset( $source['url'] ) ? $source['url'] : '' );
+		if ( '' === $line ) {
+			return '';
+		}
+
+		$category = absint( isset( $source['category_id'] ) ? $source['category_id'] : 0 );
+		$key      = sanitize_key( isset( $source['source_key'] ) ? $source['source_key'] : '' );
+
+		if ( $category || '' !== $key ) {
+			$line .= '|' . $category;
+		}
+		if ( '' !== $key ) {
+			$line .= '|' . $key;
+		}
+
+		return empty( $source['enabled'] ) ? '!' . $line : $line;
 	}
 
 	/**
@@ -101,7 +155,7 @@ class WPNC_Feed_Reader {
 				'title'        => sanitize_text_field( $feed_item->get_title() ),
 				'description'  => wp_kses_post( $feed_item->get_description() ),
 				'main_link'    => $permalink,
-				'pub_date'     => $feed_item->get_date( 'Y-m-d H:i:s' ) ? $feed_item->get_date( 'Y-m-d H:i:s' ) : current_time( 'mysql' ),
+				'pub_date'     => $feed_item->get_date( 'Y-m-d H:i:s' ) ? $feed_item->get_date( 'Y-m-d H:i:s' ) : WPNC_Time::now(),
 				'image_url'    => '',
 				'tags'         => '',
 			);

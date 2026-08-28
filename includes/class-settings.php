@@ -127,3 +127,95 @@ class WPNC_Settings {
 		return sanitize_text_field( $value );
 	}
 }
+
+/**
+ * Time helpers.
+ *
+ * Every datetime this plugin writes to its own tables is UTC. Local time is
+ * produced only at render time. Mixing the two is what made retention delete
+ * rows off by the site's GMT offset before 1.3.0.
+ */
+class WPNC_Time {
+
+	/**
+	 * Current time as a UTC MySQL datetime.
+	 *
+	 * @return string
+	 */
+	public static function now() {
+		return gmdate( 'Y-m-d H:i:s' );
+	}
+
+	/**
+	 * Current UTC timestamp.
+	 *
+	 * @return int
+	 */
+	public static function timestamp() {
+		return time();
+	}
+
+	/**
+	 * Normalize an arbitrary datetime string to a UTC MySQL datetime.
+	 *
+	 * Falls back to now when the value is unparseable, which keeps rows
+	 * insertable instead of failing on a malformed feed date.
+	 *
+	 * @param string $datetime Datetime string.
+	 * @return string
+	 */
+	public static function to_utc( $datetime ) {
+		$datetime = trim( (string) $datetime );
+		if ( '' === $datetime ) {
+			return self::now();
+		}
+
+		$timestamp = strtotime( $datetime );
+
+		return false === $timestamp ? self::now() : gmdate( 'Y-m-d H:i:s', $timestamp );
+	}
+
+	/**
+	 * UTC MySQL datetime for a point N days in the past.
+	 *
+	 * @param int $days Days back.
+	 * @return string
+	 */
+	public static function days_ago( $days ) {
+		return gmdate( 'Y-m-d H:i:s', time() - ( max( 1, absint( $days ) ) * DAY_IN_SECONDS ) );
+	}
+
+	/**
+	 * Render a stored UTC datetime in the site's timezone for display.
+	 *
+	 * @param string $datetime UTC MySQL datetime.
+	 * @param string $format   Optional date format; site format when empty.
+	 * @return string
+	 */
+	public static function for_display( $datetime, $format = '' ) {
+		$datetime = trim( (string) $datetime );
+		if ( '' === $datetime || '0000-00-00 00:00:00' === $datetime ) {
+			return '';
+		}
+
+		if ( '' === $format ) {
+			$format = get_option( 'date_format', 'Y-m-d' ) . ' ' . get_option( 'time_format', 'H:i' );
+		}
+
+		$timestamp = strtotime( $datetime . ' UTC' );
+		if ( false === $timestamp ) {
+			return $datetime;
+		}
+
+		return wp_date( $format, $timestamp );
+	}
+
+	/**
+	 * Site GMT offset in seconds.
+	 *
+	 * @return int
+	 */
+	public static function offset_seconds() {
+		return (int) round( (float) get_option( 'gmt_offset', 0 ) * HOUR_IN_SECONDS );
+	}
+}

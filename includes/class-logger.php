@@ -34,7 +34,7 @@ class WPNC_Logger {
 				'source'     => sanitize_text_field( $source ),
 				'message'    => sanitize_text_field( $message ),
 				'context'    => wp_json_encode( $context ),
-				'created_at' => current_time( 'mysql' ),
+				'created_at' => WPNC_Time::now(),
 			),
 			array( '%s', '%s', '%s', '%s', '%s' )
 		);
@@ -71,8 +71,7 @@ class WPNC_Logger {
 	public function cleanup( $days = 30 ) {
 		global $wpdb;
 
-		$days       = max( 1, absint( $days ) );
-		$threshold  = gmdate( 'Y-m-d H:i:s', strtotime( '-' . $days . ' days', current_time( 'timestamp', true ) ) );
+		$threshold  = WPNC_Time::days_ago( $days );
 		$table_name = $this->table_name();
 
 		return $wpdb->query( $wpdb->prepare( "DELETE FROM $table_name WHERE created_at < %s", $threshold ) );

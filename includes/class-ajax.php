@@ -82,7 +82,18 @@ class WPNC_Ajax {
 		$item = $this->queue->get( $id );
 
 		if ( ! $item ) {
-			wp_send_json_error( __( 'Item not found.', 'wp-news-collector' ) );
+			wp_send_json_error( array( 'message' => __( 'Item not found.', 'wp-news-collector' ) ) );
+		}
+
+		// Without this, a double click or a second moderator publishes the
+		// same story twice.
+		if ( ! $this->queue->is_actionable( $item ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'This item was already processed.', 'wp-news-collector' ),
+					'status'  => (string) $item->status,
+				)
+			);
 		}
 
 		$post_id = $this->publisher->publish( $item );
@@ -106,7 +117,24 @@ class WPNC_Ajax {
 	public function reject_item() {
 		$this->check_admin_request();
 
-		$id = $this->get_posted_id();
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			wp_send_json_error( array( 'message' => __( 'Item not found.', 'wp-news-collector' ) ) );
+		}
+
+		// Rejecting an already approved row used to flip its status while the
+		// published post stayed live, which left the two out of sync.
+		if ( ! $this->queue->is_actionable( $item ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'This item was already processed.', 'wp-news-collector' ),
+					'status'  => (string) $item->status,
+				)
+			);
+		}
+
 		$this->queue->update_status( $id, 'rejected' );
 
 		wp_send_json_success( array( 'message' => __( 'Item rejected successfully.', 'wp-news-collector' ) ) );
@@ -148,10 +176,12 @@ class WPNC_Ajax {
 		$ids           = $this->get_posted_ids();
 		$success_count = 0;
 		$error_count   = 0;
+		$skipped_count = 0;
 
 		foreach ( $ids as $id ) {
 			$item = $this->queue->get( $id );
-			if ( ! $item || 'pending' !== $item->status ) {
+			if ( ! $this->queue->is_actionable( $item ) ) {
+				$skipped_count++;
 				continue;
 			}
 
@@ -169,11 +199,15 @@ class WPNC_Ajax {
 		wp_send_json_success(
 			array(
 				'message' => sprintf(
-					/* translators: 1: success count, 2: error count */
-					__( '%1$d items approved. %2$d failed.', 'wp-news-collector' ),
+					/* translators: 1: success count, 2: error count, 3: skipped count */
+					__( '%1$d items approved. %2$d failed. %3$d skipped.', 'wp-news-collector' ),
 					$success_count,
-					$error_count
+					$error_count,
+					$skipped_count
 				),
+				'approved' => $success_count,
+				'failed'   => $error_count,
+				'skipped'  => $skipped_count,
 			)
 		);
 	}
@@ -184,12 +218,33 @@ class WPNC_Ajax {
 	public function bulk_reject() {
 		$this->check_admin_request();
 
-		$ids = $this->get_posted_ids();
+		$ids           = $this->get_posted_ids();
+		$success_count = 0;
+		$skipped_count = 0;
+
 		foreach ( $ids as $id ) {
+			$item = $this->queue->get( $id );
+			if ( ! $this->queue->is_actionable( $item ) ) {
+				$skipped_count++;
+				continue;
+			}
+
 			$this->queue->update_status( $id, 'rejected' );
+			$success_count++;
 		}
 
-		wp_send_json_success( array( 'message' => __( 'Selected items rejected successfully.', 'wp-news-collector' ) ) );
+		wp_send_json_success(
+			array(
+				'message'  => sprintf(
+					/* translators: 1: rejected count, 2: skipped count */
+					__( '%1$d items rejected. %2$d skipped.', 'wp-news-collector' ),
+					$success_count,
+					$skipped_count
+				),
+				'rejected' => $success_count,
+				'skipped'  => $skipped_count,
+			)
+		);
 	}
 
 	/**
@@ -237,16 +292,34 @@ class WPNC_Ajax {
 			wp_send_json_error( array( 'message' => __( 'No RSS sources configured.', 'wp-news-collector' ) ) );
 		}
 
-		$list = array();
-		foreach ( $sources as $i => $source ) {
-			$list[] = array(
-				'index' => $i,
-				'url'   => $source['url'] ?? '',
-				'key'   => $source['source_key'] ?? '',
+		// Take the run-level lock here, not per source, so a manual run cannot
+		// interleave with the scheduled one. fetch_finalize releases it, and
+		// the transient TTL covers a browser that walks away mid-run.
+		if ( ! $fetcher->acquire_lock( true ) ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'A fetch job is already running. Wait for it to finish, or clear the lock from Logs & Tools.', 'wp-news-collector' ),
+					'locked'  => true,
+				)
 			);
 		}
 
-		wp_send_json_success( array( 'sources' => $list, 'total' => count( $list ) ) );
+		$list = array();
+		foreach ( $sources as $i => $source ) {
+			$list[] = array(
+				'index'   => $i,
+				'url'     => isset( $source['url'] ) ? $source['url'] : '',
+				'key'     => isset( $source['source_key'] ) ? $source['source_key'] : '',
+				'enabled' => ! empty( $source['enabled'] ),
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'sources' => $list,
+				'total'   => count( $list ),
+			)
+		);
 	}
 
 	/**
@@ -267,7 +340,16 @@ class WPNC_Ajax {
 	public function clear_fetch_lock() {
 		$this->check_admin_request();
 
-		delete_transient( 'wpnc_fetch_lock' );
+		$fetcher = new WPNC_Fetcher();
+		$lock    = $fetcher->get_lock();
+		$fetcher->release_lock();
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_WARNING,
+			__( 'Fetch lock cleared by an administrator.', 'wp-news-collector' ),
+			is_array( $lock ) ? $lock : array()
+		);
+
 		wp_send_json_success( array( 'message' => __( 'Fetch lock cleared.', 'wp-news-collector' ) ) );
 	}
 
@@ -282,7 +364,7 @@ class WPNC_Ajax {
 		$summary = json_decode( $raw, true );
 
 		if ( is_array( $summary ) ) {
-			update_option( 'wpnc_last_run', current_time( 'mysql' ) );
+			update_option( 'wpnc_last_run', WPNC_Time::now() );
 			update_option( 'wpnc_last_count', absint( $summary['fetched'] ?? 0 ) );
 
 			$safe_keys = array( 'sources_total', 'sources_ok', 'fetched', 'queued', 'published', 'skipped', 'errors' );
@@ -298,6 +380,9 @@ class WPNC_Ajax {
 				$safe
 			);
 		}
+
+		$fetcher = new WPNC_Fetcher();
+		$fetcher->release_lock();
 
 		wp_send_json_success();
 	}

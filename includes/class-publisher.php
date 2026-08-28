@@ -53,7 +53,7 @@ class WPNC_Publisher {
 		$description = wp_kses_post( $item['description'] ?? '' );
 		$main_link   = esc_url_raw( $item['main_link'] ?? '' );
 		$source_name = sanitize_text_field( $item['source_name'] ?? '' );
-		$pub_date    = $this->sanitize_datetime( $item['pub_date'] ?? '' );
+		$pub_date    = WPNC_Time::to_utc( $item['pub_date'] ?? '' );
 
 		if ( empty( $title ) || empty( $main_link ) ) {
 			return new WP_Error( 'wpnc_publish_missing_data', __( 'Cannot publish an item without title and source URL.', 'wp-news-collector' ) );
@@ -68,12 +68,12 @@ class WPNC_Publisher {
 
 		$post_id = wp_insert_post(
 			array(
-				'post_title'   => wp_strip_all_tags( $title ),
-				'post_content' => $content,
-				'post_status'  => 'publish',
-				'post_author'  => $this->get_post_author(),
-				'post_date'    => $pub_date,
-				'post_type'    => $post_type,
+				'post_title'    => wp_strip_all_tags( $title ),
+				'post_content'  => $content,
+				'post_status'   => $this->get_post_status(),
+				'post_author'   => $this->get_post_author(),
+				'post_date_gmt' => $pub_date,
+				'post_type'     => $post_type,
 			),
 			true
 		);
@@ -88,7 +88,7 @@ class WPNC_Publisher {
 
 		$tags = sanitize_text_field( $item['tags'] ?? '' );
 		if ( ! empty( $tags ) ) {
-			wp_set_post_tags( $post_id, $tags, true );
+			wp_set_post_tags( $post_id, $tags, false );
 		}
 
 		add_post_meta( $post_id, '_wpnc_source_url', $main_link, true );
@@ -105,7 +105,7 @@ class WPNC_Publisher {
 		if ( $image_url ) {
 			$attachment_id = $this->image_service->sideload_featured_image( $image_url, $post_id, $title );
 			if ( is_wp_error( $attachment_id ) ) {
-				add_post_meta( $post_id, 'wpnc_source_image', $image_url, true );
+				add_post_meta( $post_id, '_wpnc_source_image', $image_url, true );
 				$this->logger->log(
 					WPNC_Logger::LEVEL_WARNING,
 					__( 'Image sideload failed.', 'wp-news-collector' ),
@@ -138,23 +138,43 @@ class WPNC_Publisher {
 	/**
 	 * Get post author.
 	 *
+	 * Cron has no current user, so fall back to the configured author rather
+	 * than silently attributing every scheduled import to user 1.
+	 *
 	 * @return int
 	 */
 	private function get_post_author() {
 		$user_id = get_current_user_id();
+		if ( $user_id ) {
+			return $user_id;
+		}
 
-		return $user_id ? $user_id : 1;
+		$configured = absint( get_option( 'wpnc_post_author', 0 ) );
+		if ( $configured && get_userdata( $configured ) ) {
+			return $configured;
+		}
+
+		$admins = get_users(
+			array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'fields'  => 'ID',
+				'orderby' => 'ID',
+			)
+		);
+
+		return ! empty( $admins ) ? (int) $admins[0] : 1;
 	}
 
 	/**
-	 * Sanitize post date.
+	 * Post status new items are created with.
 	 *
-	 * @param string $datetime Datetime.
 	 * @return string
 	 */
-	private function sanitize_datetime( $datetime ) {
-		$timestamp = strtotime( $datetime );
+	private function get_post_status() {
+		$status  = sanitize_key( get_option( 'wpnc_post_status', 'publish' ) );
+		$allowed = array( 'publish', 'draft', 'pending', 'private' );
 
-		return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : current_time( 'mysql' );
+		return in_array( $status, $allowed, true ) ? $status : 'publish';
 	}
 }

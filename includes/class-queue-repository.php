@@ -102,7 +102,7 @@ class WPNC_Queue_Repository {
 	public function insert( $item ) {
 		global $wpdb;
 
-		$now  = current_time( 'mysql' );
+		$now  = WPNC_Time::now();
 		$data = array(
 			'source_name'   => sanitize_text_field( $item['source_name'] ?? '' ),
 			'feed_url'      => esc_url_raw( $item['feed_url'] ?? '' ),
@@ -112,7 +112,7 @@ class WPNC_Queue_Repository {
 			'description'   => wp_kses_post( $item['description'] ?? '' ),
 			'main_link'     => esc_url_raw( $item['main_link'] ?? '' ),
 			'image_url'     => esc_url_raw( $item['image_url'] ?? '' ),
-			'pub_date'      => $this->sanitize_datetime( $item['pub_date'] ?? '' ),
+			'pub_date'      => WPNC_Time::to_utc( $item['pub_date'] ?? '' ),
 			'status'        => $this->normalize_status( $item['status'] ?? 'pending' ),
 			'category_id'   => absint( $item['category_id'] ?? 0 ),
 			'tags'          => sanitize_text_field( $item['tags'] ?? '' ),
@@ -146,7 +146,7 @@ class WPNC_Queue_Repository {
 				'title'       => sanitize_text_field( $data['title'] ?? '' ),
 				'description' => wp_kses_post( $data['description'] ?? '' ),
 				'tags'        => sanitize_text_field( $data['tags'] ?? '' ),
-				'updated_at'  => current_time( 'mysql' ),
+				'updated_at'  => WPNC_Time::now(),
 			),
 			array( 'id' => absint( $id ) ),
 			array( '%s', '%s', '%s', '%s' ),
@@ -181,8 +181,8 @@ class WPNC_Queue_Repository {
 		$data = array_merge(
 			array(
 				'status'       => $this->normalize_status( $status ),
-				'processed_at' => current_time( 'mysql' ),
-				'updated_at'   => current_time( 'mysql' ),
+				'processed_at' => WPNC_Time::now(),
+				'updated_at'   => WPNC_Time::now(),
 			),
 			$extra
 		);
@@ -216,6 +216,29 @@ class WPNC_Queue_Repository {
 			'error',
 			array( 'error_message' => sanitize_text_field( $message ) )
 		);
+	}
+
+	/**
+	 * Statuses a moderator may still act on.
+	 *
+	 * 'error' is included on purpose: approving an errored row retries the
+	 * publish. 'approved' and 'rejected' are terminal, which is what stops a
+	 * double click from publishing the same story twice.
+	 *
+	 * @return array
+	 */
+	public static function actionable_statuses() {
+		return array( 'pending', 'error' );
+	}
+
+	/**
+	 * Whether a queue row can still be approved or rejected.
+	 *
+	 * @param object|null $item Queue row.
+	 * @return bool
+	 */
+	public function is_actionable( $item ) {
+		return $item && in_array( (string) $item->status, self::actionable_statuses(), true );
 	}
 
 	/**
@@ -285,8 +308,7 @@ class WPNC_Queue_Repository {
 	public function cleanup( $days = 14 ) {
 		global $wpdb;
 
-		$days      = max( 1, absint( $days ) );
-		$threshold = gmdate( 'Y-m-d H:i:s', strtotime( '-' . $days . ' days', current_time( 'timestamp', true ) ) );
+		$threshold = WPNC_Time::days_ago( $days );
 		$table     = $this->table_name();
 
 		return $wpdb->query(
@@ -333,17 +355,5 @@ class WPNC_Queue_Repository {
 		$status = sanitize_key( $status );
 
 		return in_array( $status, array( 'pending', 'approved', 'rejected', 'error' ), true ) ? $status : 'pending';
-	}
-
-	/**
-	 * Sanitize MySQL datetime.
-	 *
-	 * @param string $datetime Datetime.
-	 * @return string
-	 */
-	private function sanitize_datetime( $datetime ) {
-		$timestamp = strtotime( $datetime );
-
-		return $timestamp ? gmdate( 'Y-m-d H:i:s', $timestamp ) : current_time( 'mysql' );
 	}
 }

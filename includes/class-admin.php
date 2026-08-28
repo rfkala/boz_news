@@ -388,17 +388,10 @@ class WPNC_Admin {
 		$lines   = array();
 
 		foreach ( $sources as $source ) {
-			if ( empty( $source['url'] ) ) {
-				continue;
+			$line = WPNC_Feed_Reader::to_line( $source );
+			if ( '' !== $line ) {
+				$lines[] = $line;
 			}
-			$line = esc_url_raw( $source['url'] );
-			if ( ! empty( $source['category_id'] ) ) {
-				$line .= '|' . absint( $source['category_id'] );
-			}
-			if ( ! empty( $source['source_key'] ) ) {
-				$line .= '|' . sanitize_key( $source['source_key'] );
-			}
-			$lines[] = $line;
 		}
 
 		return implode( "\n", $lines );
