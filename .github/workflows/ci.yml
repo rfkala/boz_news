@@ -64,7 +64,23 @@ jobs:
         run: composer install --prefer-dist --no-interaction --no-progress
 
       - name: PHPUnit
-        run: vendor/bin/phpunit
+        shell: bash
+        run: |
+          set -o pipefail
+          vendor/bin/phpunit --testdox | tee phpunit.out
+
+          # PHPUnit 9 exits 0 on an empty suite, so a passing job would
+          # otherwise prove nothing. Require a real count.
+          ran=$(grep -oE 'OK \(([0-9]+) test' phpunit.out | grep -oE '[0-9]+' | head -1)
+          if [ -z "$ran" ]; then
+            echo "::error::PHPUnit printed no 'OK (n tests)' line - the suite did not complete."
+            exit 1
+          fi
+          if [ "$ran" -lt 50 ]; then
+            echo "::error::Only $ran tests ran; expected at least 50. Did a test file stop being collected?"
+            exit 1
+          fi
+          echo "$ran tests ran."
 
   js:
     name: JS and CSS
