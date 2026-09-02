@@ -168,3 +168,4 @@ function esc_html( $text ) {
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';

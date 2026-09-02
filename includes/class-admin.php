@@ -195,14 +195,14 @@ class WPNC_Admin {
 	private function render_settings_tab() {
 		$this->render_settings_notices();
 
-		$interval     = get_option( 'wpnc_interval', 'hourly' );
-		$target_pt    = WPNC_Settings::get_target_post_type();
-		$default_cat  = absint( get_option( 'wpnc_default_category', 0 ) );
-		$has_openai   = '' !== (string) get_option( 'wpnc_openai_api_key', '' );
-		$has_telegram = '' !== (string) get_option( 'wpnc_telegram_token', '' );
-		$max_items    = absint( get_option( 'wpnc_max_items_per_feed', 20 ) );
-		$timeout      = absint( get_option( 'wpnc_request_timeout', 8 ) );
-		$openai_model = get_option( 'wpnc_openai_model', 'gpt-4o-mini' );
+		$interval        = get_option( 'wpnc_interval', 'hourly' );
+		$target_pt       = WPNC_Settings::get_target_post_type();
+		$default_cat     = absint( get_option( 'wpnc_default_category', 0 ) );
+		$has_openai      = '' !== (string) get_option( 'wpnc_openai_api_key', '' );
+		$has_telegram    = '' !== (string) get_option( 'wpnc_telegram_token', '' );
+		$max_items       = absint( get_option( 'wpnc_max_items_per_feed', 20 ) );
+		$timeout         = absint( get_option( 'wpnc_request_timeout', WPNC_Settings::DEFAULT_TIMEOUT ) );
+		$openai_model    = get_option( 'wpnc_openai_model', 'gpt-4o-mini' );
 		$admin_lang      = get_option( 'wpnc_admin_lang', 'fa' );
 		$post_status     = WPNC_Settings::sanitize_post_status( get_option( 'wpnc_post_status', 'publish' ) );
 		$post_author     = absint( get_option( 'wpnc_post_author', 0 ) );
@@ -523,26 +523,30 @@ class WPNC_Admin {
 		);
 
 		$queue = new WPNC_Queue_Repository();
+		$escape = array( 'WPNC_Queue_Repository', 'csv_cell' );
 		$queue->each_for_export(
 			array(
 				'status' => $status,
 				'search' => $search,
 			),
-			function ( $row ) use ( $out ) {
+			function ( $row ) use ( $out, $escape ) {
 				fputcsv(
 					$out,
-					array(
-						$row['id'],
-						$row['status'],
-						$row['source_name'],
-						$row['source_key'],
-						$row['title'],
-						$row['main_link'],
-						$row['image_url'],
-						$row['tags'],
-						$row['pub_date'],
-						$row['post_id'],
-						$row['error_message'],
+					array_map(
+						$escape,
+						array(
+							$row['id'],
+							$row['status'],
+							$row['source_name'],
+							$row['source_key'],
+							$row['title'],
+							$row['main_link'],
+							$row['image_url'],
+							$row['tags'],
+							$row['pub_date'],
+							$row['post_id'],
+							$row['error_message'],
+						)
 					)
 				);
 			}

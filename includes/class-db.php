@@ -17,6 +17,11 @@ class WPNC_DB {
 	const HEALTH_OPTION = 'wpnc_schema_error';
 
 	/**
+	 * Mutex so two concurrent requests cannot both run the upgrade.
+	 */
+	const UPGRADE_LOCK = 'wpnc_upgrading';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -59,16 +64,28 @@ class WPNC_DB {
 			return;
 		}
 
-		$this->create_tables();
-
-		// 1.2.0 moved every stored datetime to UTC. Rows written by earlier
-		// versions hold site-local time, so shift them once or retention will
-		// delete them off by the site's GMT offset.
-		if ( '0' !== $version && version_compare( $version, '1.2.0', '<' ) ) {
-			$this->migrate_datetimes_to_utc();
+		// This hook fires on every request. Without a mutex, two concurrent
+		// hits on an un-migrated site would both run the UTC shift below and
+		// move every timestamp by twice the GMT offset.
+		if ( false !== get_transient( self::UPGRADE_LOCK ) ) {
+			return;
 		}
+		set_transient( self::UPGRADE_LOCK, WPNC_Time::timestamp(), 5 * MINUTE_IN_SECONDS );
 
-		update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
+		try {
+			$this->create_tables();
+
+			// 1.2.0 moved every stored datetime to UTC. Rows written by
+			// earlier versions hold site-local time, so shift them once or
+			// retention will delete them off by the site's GMT offset.
+			if ( '0' !== $version && version_compare( $version, '1.2.0', '<' ) ) {
+				$this->migrate_datetimes_to_utc();
+			}
+
+			update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
+		} finally {
+			delete_transient( self::UPGRADE_LOCK );
+		}
 	}
 
 	/**

@@ -289,18 +289,25 @@ class WPNC_Queue_Repository {
 	public function reopen( $id ) {
 		global $wpdb;
 
-		$updated = $wpdb->update(
-			$this->table_name(),
-			array(
-				'status'        => 'pending',
-				'post_id'       => 0,
-				'error_message' => '',
-				'processed_at'  => null,
-				'updated_at'    => WPNC_Time::now(),
-			),
-			array( 'id' => absint( $id ) ),
-			array( '%s', '%d', '%s', '%s', '%s' ),
-			array( '%d' )
+		$table = $this->table_name();
+
+		// Written as a direct query because $wpdb->update() casts a null
+		// value through its %s format into an empty string, which a datetime
+		// column rejects under strict mode. processed_at has to become a real
+		// SQL NULL or the whole undo fails silently.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE $table SET
+					status = 'pending',
+					post_id = 0,
+					error_message = '',
+					processed_at = NULL,
+					updated_at = %s
+				WHERE id = %d",
+				WPNC_Time::now(),
+				absint( $id )
+			)
 		);
 
 		return false !== $updated;
@@ -348,6 +355,26 @@ class WPNC_Queue_Repository {
 
 			$offset += $chunk;
 		} while ( count( (array) $batch ) === $chunk );
+	}
+
+	/**
+	 * Neutralise a CSV cell that a spreadsheet would treat as a formula.
+	 *
+	 * Feed titles come from other people's servers, and Excel and Sheets both
+	 * execute a cell beginning with = + - or @, so an exported queue is a
+	 * delivery mechanism unless the leading character is defused.
+	 *
+	 * @param mixed $value Cell value.
+	 * @return string
+	 */
+	public static function csv_cell( $value ) {
+		$value = (string) $value;
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		return false !== strpos( "=+-@\t\r", $value[0] ) ? "'" . $value : $value;
 	}
 
 	/**
@@ -436,22 +463,22 @@ class WPNC_Queue_Repository {
 	 */
 	public function format_for_response( $item ) {
 		return array(
-			'id'            => (int) $item->id,
-			'source_name'   => (string) $item->source_name,
-			'feed_url'      => isset( $item->feed_url ) ? (string) $item->feed_url : '',
-			'source_key'    => isset( $item->source_key ) ? (string) $item->source_key : '',
-			'guid'          => isset( $item->guid ) ? (string) $item->guid : '',
-			'title'         => (string) $item->title,
-			'description'   => (string) $item->description,
-			'main_link'     => (string) $item->main_link,
-			'image_url'     => (string) $item->image_url,
+			'id'               => (int) $item->id,
+			'source_name'      => (string) $item->source_name,
+			'feed_url'         => isset( $item->feed_url ) ? (string) $item->feed_url : '',
+			'source_key'       => isset( $item->source_key ) ? (string) $item->source_key : '',
+			'guid'             => isset( $item->guid ) ? (string) $item->guid : '',
+			'title'            => (string) $item->title,
+			'description'      => (string) $item->description,
+			'main_link'        => (string) $item->main_link,
+			'image_url'        => (string) $item->image_url,
 			'pub_date'         => (string) $item->pub_date,
 			'pub_date_display' => WPNC_Time::for_display( $item->pub_date ),
-			'status'        => (string) $item->status,
-			'category_id'   => (int) $item->category_id,
-			'tags'          => (string) $item->tags,
-			'post_id'       => isset( $item->post_id ) ? (int) $item->post_id : 0,
-			'error_message' => isset( $item->error_message ) ? (string) $item->error_message : '',
+			'status'           => (string) $item->status,
+			'category_id'      => (int) $item->category_id,
+			'tags'             => (string) $item->tags,
+			'post_id'          => isset( $item->post_id ) ? (int) $item->post_id : 0,
+			'error_message'    => isset( $item->error_message ) ? (string) $item->error_message : '',
 		);
 	}
 
