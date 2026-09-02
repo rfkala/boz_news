@@ -22,7 +22,10 @@ publishes what an admin approves. Bilingual Persian/English admin panel.
   the privacy policy text. Follows the site locale and is backed by real
   `.po/.mo` files in `languages/`.
 
-After changing any `__()` string: `python tools/make_translations.py`.
+Run `python tools/make_translations.py` before committing whenever
+`wp-news-collector.php` or `includes/` changed at all - the catalogue carries
+`#:` line references, so adding code *above* a `__()` call makes it stale even
+though no string moved. CI fails on a stale catalogue.
 
 ## Checks
 
