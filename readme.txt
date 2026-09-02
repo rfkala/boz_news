@@ -1,29 +1,47 @@
 === Boz News ===
-Contributors: jules
-Tags: rss, atom, news, aggregator, ai, moderation
+Contributors: arash
+Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Fetch, moderate, rewrite, and publish news from RSS/Atom feeds with logging and admin review.
+Fetch, moderate, rewrite, and publish news from RSS/Atom feeds, with a
+bilingual Persian/English admin panel.
 
 == Description ==
 
-Boz News fetches RSS/Atom sources, filters items, stores them in a moderation queue, and publishes approved news as standard posts or a dedicated News custom post type.
+Boz News reads RSS and Atom sources on a schedule, filters the items, holds
+them in a moderation queue, and publishes what you approve as standard posts
+or as a dedicated News custom post type.
+
+The admin panel is bilingual. Switch it between Persian and English in
+Settings; the whole interface, including error messages, follows that choice
+independently of the site language.
 
 Key features:
 
 * RSS/Atom source list with optional category mapping and source keys.
-* Moderation queue with AJAX search, pagination, approve, reject, edit, and bulk actions.
-* Manual fetch tool with operational logs and queue statistics.
-* WP-Cron scheduling with a fetch lock to avoid overlapping runs.
+* Sources can be paused individually without losing their settings, and a
+  feed that keeps failing pauses itself with a growing backoff.
+* Source health panel: last success, last error, and a Test button that reads
+  a feed without importing anything.
+* Moderation queue with search, status filter, pagination, approve, reject,
+  edit, delete, and bulk actions.
+* Undo an approval: the published post goes to Trash and the item returns to
+  the queue.
+* Manual fetch with a per-source progress bar, plus operational logs and queue
+  statistics.
+* WP-Cron scheduling with a lock shared by scheduled and manual runs, so the
+  two can never overlap.
 * Duplicate detection by source URL, GUID, and stored post meta.
-* Optional full-text extraction and image sideloading with request limits.
-* Optional OpenAI rewrite/translation/tag generation.
+* Optional full-text extraction and image sideloading, with request size and
+  timeout limits.
+* Optional OpenAI rewrite, translation, and tag generation.
 * Optional Telegram notification after publishing.
+* CSV export of any queue view.
 * Shortcode `[news_bulletin]` for the front end.
 
 == Installation ==
@@ -32,7 +50,8 @@ Key features:
 2. Activate the plugin from the WordPress Plugins screen.
 3. Go to Boz News > Settings.
 4. Add one RSS/Atom source per line.
-5. Use Boz News > Logs & Tools > Fetch Now to test the feeds and inspect errors.
+5. Go to Boz News > Logs & Tools, press Test on a source to confirm it reads,
+   then press Fetch Now.
 
 == Source Formats ==
 
@@ -46,29 +65,128 @@ The second value is the WordPress category ID. The third value is an optional
 source key, used to label log entries and to keep a source's failure history
 attached to it when its URL changes.
 
-Prefix a line with `#` to comment it out entirely, or with `!` to keep the
-source but pause it:
+Prefix a line with `#` to comment it out, or with `!` to keep the source but
+pause it:
 
 * `!https://example.com/feed|5|example_source`
 
 A source that fails repeatedly is paused automatically with a growing backoff,
-up to a day, and resumes on its own once it responds again.
+up to a day, and resumes on its own once it responds again. You can also pause,
+resume, or clear a source's failure history from the Source Health panel.
+
+== Shortcode ==
+
+`[news_bulletin limit="10" category="world"]`
+
+* `limit` — how many items to show, 1 to 50. Default 10.
+* `category` — a category slug. Leave empty for all categories.
+
+A Load More button appears when more items exist.
+
+== Keyword Filters ==
+
+Both lists are comma separated and matched case-insensitively against the
+title and description together.
+
+* **Must Include Words** — an item is kept if it contains *any one* of these.
+  Leave empty to keep everything.
+* **Exclude Words** — any match drops the item, and this wins over the include
+  list.
+
+Matching is substring based, so `iran` also matches `iranian`. Markup is
+stripped before matching, so a word that only appears inside an HTML attribute
+is not matched.
 
 == Frequently Asked Questions ==
 
 = Why did my feed not import anything? =
 
-Open Boz News > Logs & Tools and run a manual fetch. The logs show invalid URLs, RSS errors, duplicate skips, OpenAI failures, image sideload failures, and publish errors.
+Open Boz News > Logs & Tools. The Source Health panel shows each feed's last
+result, and the Test button reads a feed and reports the real error without
+importing. The log below records invalid URLs, RSS errors, duplicate skips,
+OpenAI failures, image sideload failures, and publish errors.
+
+= When does the next scheduled fetch run? =
+
+The Settings tab shows the next scheduled run under Update Interval. If your
+site defines `DISABLE_WP_CRON`, it says so: scheduled fetches then only happen
+when a real cron job calls `wp-cron.php`.
 
 = Are API keys displayed in the admin? =
 
-No. Saved OpenAI and Telegram secrets are not rendered back into the form. Leave the field blank to keep the saved value or enter `__delete__` to remove it.
+No. Saved OpenAI and Telegram secrets are never rendered back into the form.
+Leave the field blank to keep the saved value, or enter `__delete__` to remove
+it.
+
+= What happens to old queue items? =
+
+Approved and rejected rows are permanently deleted after the retention period
+set in Settings (14 days by default). Published posts are never touched. Use
+the CSV export first if you need a record.
 
 = Does the plugin delete data on uninstall? =
 
-Yes. `uninstall.php` removes plugin options, scheduled events, transients, queue table, and log table.
+Yes. `uninstall.php` removes plugin options, scheduled events, transients, the
+post meta it wrote, the queue table, and the log table.
+
+= What timezone are the stored dates in? =
+
+Everything the plugin stores is UTC. The admin renders it in your site's
+timezone, and the CSV export writes the raw UTC value.
+
+== Development ==
+
+Static checks (no PHP required):
+
+`python tools/verify.py`
+
+Unit tests:
+
+`composer install && vendor/bin/phpunit`
+
+Regenerate translation files after changing any `__()` string:
+
+`python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.3.0 =
+* Fixed: approving or rejecting the same item twice could publish one story
+  twice or leave a published post live while its queue row said "rejected".
+* Fixed: the manual per-source fetch took no lock, so it could interleave with
+  a scheduled run and import an item twice.
+* Fixed: stored datetimes were a mix of local and UTC, so retention deleted
+  rows off by the site's GMT offset. All storage is UTC now, and existing rows
+  are migrated once on upgrade.
+* Fixed: published posts received a UTC timestamp in the local `post_date`
+  column, so news appeared shifted by the site offset.
+* Fixed: re-publishing an item accumulated duplicate tags.
+* Fixed: a failed table creation was silent; it now raises an admin notice.
+* Fixed: `wpnc_admin_lang` was left behind on uninstall.
+* Added: delete a queue item, and undo an approval.
+* Added: per-source Test, Pause/Resume, and failure-history reset.
+* Added: automatic backoff for feeds that keep failing.
+* Added: CSV export of any queue view.
+* Added: log filtering by level.
+* Added: configurable retention for queue rows and logs, stated plainly in the
+  UI.
+* Added: post status (draft/pending/private) and post author settings.
+* Added: next scheduled run, and a warning when WP-Cron is disabled.
+* Changed: every AJAX failure now names its cause — network, server, session,
+  or validation — and offers a retry, instead of one generic message or, in
+  four places, no message at all.
+* Changed: settings now report rejected and clamped values instead of applying
+  them silently.
+* Changed: the admin panel is fully bilingual; 38 runtime messages and the
+  queue status labels were previously English-only in Persian mode.
+* Changed: the admin stylesheet has responsive rules; it previously had none.
+* Added: a unit test suite and static checks, run in CI.
+* Removed: the Elementor widget. It only wrapped the shortcode with no extra
+  controls; use Elementor's own Shortcode widget.
+* Removed: the admin email notification. Its daily lock made the count in the
+  message wrong.
+* Removed: Source Rules XPath. It had no validation, no test, and failed
+  silently.
 
 = 1.1.0 =
 * Rebuilt fetch pipeline with logging, queue repository, cron lock, and source parsing.
@@ -79,3 +197,10 @@ Yes. `uninstall.php` removes plugin options, scheduled events, transients, queue
 
 = 1.0.0 =
 * Initial release with RSS fetching, moderation, AI rewrite, Telegram support, and Elementor integration.
+
+== Upgrade Notice ==
+
+= 1.3.0 =
+Fixes duplicate publishing, overlapping fetches, and timezone-shifted dates.
+Stored timestamps are migrated to UTC once on upgrade. The Elementor widget,
+the admin email notification, and Source Rules XPath have been removed.

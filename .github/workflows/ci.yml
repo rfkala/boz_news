@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Structure, references, i18n parity, translations
+        run: python tools/verify.py
+
+      - name: Translation files are up to date with the source
+        run: |
+          python tools/make_translations.py
+          git diff --exit-code languages/ \
+            || (echo "languages/ is stale - run: python tools/make_translations.py" && exit 1)
+
+  lint:
+    name: PHP lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['7.4', '8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: php -l every file
+        run: |
+          find . -name '*.php' -not -path './vendor/*' -print0 \
+            | xargs -0 -n1 -P4 php -l
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['7.4', '8.2', '8.3']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring
+          coverage: none
+          tools: composer
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  js:
+    name: JS and CSS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Syntax check the scripts
+        run: |
+          node --check assets/admin.js
+          node --check assets/frontend.js
+
+      - name: Stylesheets balance
+        run: |
+          node -e "
+            const fs = require('fs');
+            for (const f of ['assets/admin.css', 'assets/frontend.css']) {
+              const css = fs.readFileSync(f, 'utf8');
+              let depth = 0;
+              for (const c of css) { if (c === '{') depth++; if (c === '}') depth--; }
+              if (depth !== 0) { console.error(f + ': unbalanced braces (' + depth + ')'); process.exit(1); }
+              console.log(f + ': balanced');
+            }
+          "

@@ -769,8 +769,7 @@ class WPNC_Admin {
 			WPNC_Settings::notify(
 				'wpnc_sources_dropped',
 				sprintf(
-					/* translators: %s: comma separated list of rejected lines */
-					__( 'These source lines were not valid URLs and were removed: %s', 'wp-news-collector' ),
+					'These source lines were not valid URLs and were removed: %s',
 					implode( ', ', array_map( 'sanitize_text_field', $dropped ) )
 				),
 				sprintf(
@@ -784,8 +783,7 @@ class WPNC_Admin {
 			WPNC_Settings::notify(
 				'wpnc_sources_unsafe',
 				sprintf(
-					/* translators: %s: comma separated list of unsafe URLs */
-					__( 'These sources point at a private or unreachable host and will be skipped: %s', 'wp-news-collector' ),
+					'These sources point at a private or unreachable host and will be skipped: %s',
 					implode( ', ', $unsafe )
 				),
 				sprintf(

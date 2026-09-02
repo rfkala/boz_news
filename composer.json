@@ -1,0 +1,23 @@
+{
+    "name": "arash/boz-news",
+    "description": "Fetch, moderate, rewrite, and publish news from RSS/Atom sources.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "scripts": {
+        "test": "phpunit",
+        "verify": "python tools/verify.py",
+        "check": [
+            "@verify",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

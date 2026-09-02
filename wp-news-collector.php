@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.2.0' );
+define( 'WPNC_VERSION', '1.3.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -21,6 +21,7 @@ define( 'WPNC_PLUGIN_FILE', __FILE__ );
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-db.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-logger.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';
@@ -241,9 +242,9 @@ function wpnc_add_privacy_policy_content() {
 	}
 
 	wp_add_privacy_policy_content(
-		__( 'WP News Collector', 'wp-news-collector' ),
+		__( 'Boz News', 'wp-news-collector' ),
 		wp_kses_post(
-			__( 'WP News Collector stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy.', 'wp-news-collector' )
+			__( 'Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy.', 'wp-news-collector' )
 		)
 	);
 }

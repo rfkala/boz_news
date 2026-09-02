@@ -357,7 +357,7 @@ class WPNC_Fetcher {
 			return 'skipped';
 		}
 
-		if ( ! $this->passes_keyword_filters( $item ) ) {
+		if ( ! WPNC_Filter::passes( $item['title'], $item['description'], get_option( 'wpnc_include_words', '' ), get_option( 'wpnc_exclude_words', '' ) ) ) {
 			return 'skipped';
 		}
 
@@ -423,56 +423,6 @@ class WPNC_Fetcher {
 		}
 
 		return 'queued';
-	}
-
-	/**
-	 * Keyword include/exclude filtering.
-	 *
-	 * @param array $item Item.
-	 * @return bool
-	 */
-	private function passes_keyword_filters( $item ) {
-		$include_words = $this->parse_words( get_option( 'wpnc_include_words', '' ) );
-		$exclude_words = $this->parse_words( get_option( 'wpnc_exclude_words', '' ) );
-		$content       = $this->lower( $item['title'] . ' ' . wp_strip_all_tags( $item['description'] ) );
-
-		foreach ( $exclude_words as $word ) {
-			if ( '' !== $word && false !== strpos( $content, $this->lower( $word ) ) ) {
-				return false;
-			}
-		}
-
-		if ( empty( $include_words ) ) {
-			return true;
-		}
-
-		foreach ( $include_words as $word ) {
-			if ( '' !== $word && false !== strpos( $content, $this->lower( $word ) ) ) {
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/**
-	 * Parse comma-separated words.
-	 *
-	 * @param string $words Words.
-	 * @return array
-	 */
-	private function parse_words( $words ) {
-		return array_filter( array_map( 'trim', explode( ',', (string) $words ) ) );
-	}
-
-	/**
-	 * Lowercase with multibyte support when available.
-	 *
-	 * @param string $value Value.
-	 * @return string
-	 */
-	private function lower( $value ) {
-		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $value ) : strtolower( $value );
 	}
 
 	/**
