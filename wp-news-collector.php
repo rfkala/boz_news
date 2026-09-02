@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.3.0' );
+define( 'WPNC_VERSION', '1.3.1' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -38,6 +38,28 @@ if ( is_admin() ) {
 }
 
 /**
+ * Cache-busting version for a bundled asset.
+ *
+ * WPNC_VERSION alone is not enough: shipping a changed script under an
+ * unchanged version leaves browsers on the cached copy, which shows up as a
+ * panel that renders its markup and then does nothing.
+ *
+ * @param string $relative Path relative to the plugin root.
+ * @return string
+ */
+function wpnc_asset_version( $relative ) {
+	$path = WPNC_PLUGIN_DIR . ltrim( $relative, '/' );
+
+	if ( ! file_exists( $path ) ) {
+		return WPNC_VERSION;
+	}
+
+	$modified = filemtime( $path );
+
+	return $modified ? WPNC_VERSION . '.' . $modified : WPNC_VERSION;
+}
+
+/**
  * Load plugin translations.
  */
 function wpnc_load_textdomain() {
@@ -49,8 +71,8 @@ add_action( 'plugins_loaded', 'wpnc_load_textdomain' );
  * Register shared frontend assets.
  */
 function wpnc_register_frontend_assets() {
-	wp_register_style( 'wpnc-frontend-style', WPNC_PLUGIN_URL . 'assets/frontend.css', array(), WPNC_VERSION );
-	wp_register_script( 'wpnc-frontend-script', WPNC_PLUGIN_URL . 'assets/frontend.js', array( 'jquery' ), WPNC_VERSION, true );
+	wp_register_style( 'wpnc-frontend-style', WPNC_PLUGIN_URL . 'assets/frontend.css', array(), wpnc_asset_version( 'assets/frontend.css' ) );
+	wp_register_script( 'wpnc-frontend-script', WPNC_PLUGIN_URL . 'assets/frontend.js', array( 'jquery' ), wpnc_asset_version( 'assets/frontend.js' ), true );
 	wp_localize_script(
 		'wpnc-frontend-script',
 		'wpnc_frontend_ajax',
@@ -78,8 +100,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 		return;
 	}
 
-	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), WPNC_VERSION );
-	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), WPNC_VERSION, true );
+	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), wpnc_asset_version( 'assets/admin.css' ) );
+	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), wpnc_asset_version( 'assets/admin.js' ), true );
 	wp_localize_script(
 		'wpnc-admin-script',
 		'wpnc_ajax',

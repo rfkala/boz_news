@@ -1070,7 +1070,8 @@ jQuery(function($) {
 
         var chart = svg('svg', {
             viewBox: '0 0 ' + W + ' ' + H,
-            preserveAspectRatio: 'none',
+            // Not 'none': that stretches the axis text along with the bars.
+            preserveAspectRatio: 'xMidYMid meet',
             role: 'img',
             'aria-label': t('dash_activity', 'Last 14 days'),
             class: 'wpnc-chart'

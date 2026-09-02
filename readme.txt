@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -153,6 +153,13 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.3.1 =
+* Added: a Dashboard tab with headline cards, a 14-day activity chart and a
+  per-source breakdown.
+* Fixed: scripts and styles were versioned by the plugin version alone, so a
+  changed asset shipped under an unchanged version left browsers on the cached
+  copy. They are versioned by file modification time now.
 
 = 1.3.0 =
 * Fixed: approving or rejecting the same item twice could publish one story
