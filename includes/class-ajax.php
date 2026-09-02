@@ -44,6 +44,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_test_source', array( $this, 'test_source' ) );
 		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
+		add_action( 'wp_ajax_wpnc_get_dashboard', array( $this, 'get_dashboard' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
 		add_action( 'wp_ajax_wpnc_get_sources_list', array( $this, 'get_sources_list' ) );
@@ -473,6 +474,92 @@ class WPNC_Ajax {
 			array(
 				'message' => wpnc__( 'Failure history cleared; this source will be tried on the next run.', 'تاریخچه خطا پاک شد؛ این منبع در اجرای بعدی دوباره تلاش می‌شود.' ),
 			)
+		);
+	}
+
+	/**
+	 * Everything the dashboard draws, in one request.
+	 */
+	public function get_dashboard() {
+		$this->check_admin_request();
+
+		$fetcher = new WPNC_Fetcher();
+		$sources = $fetcher->get_sources();
+		$health  = $fetcher->get_source_health();
+
+		$ok      = 0;
+		$failing = 0;
+		$paused  = 0;
+		$unsafe  = 0;
+
+		foreach ( $sources as $source ) {
+			if ( empty( $source['valid'] ) ) {
+				$unsafe++;
+				continue;
+			}
+			if ( empty( $source['enabled'] ) ) {
+				$paused++;
+				continue;
+			}
+
+			$record = isset( $health[ $source['id'] ] ) && is_array( $health[ $source['id'] ] )
+				? $health[ $source['id'] ]
+				: array();
+
+			if ( absint( isset( $record['fails'] ) ? $record['fails'] : 0 ) > 0 ) {
+				$failing++;
+			} else {
+				$ok++;
+			}
+		}
+
+		$last_run = (string) get_option( 'wpnc_last_run', '' );
+		$summary  = get_option( 'wpnc_last_summary', array() );
+
+		wp_send_json_success(
+			array(
+				'totals'   => $this->queue->get_totals(),
+				'activity' => $this->queue->get_daily_activity( 14 ),
+				'sources'  => $this->queue->get_top_sources( 8 ),
+				'health'   => array(
+					'total'   => count( $sources ),
+					'ok'      => $ok,
+					'failing' => $failing,
+					'paused'  => $paused,
+					'unsafe'  => $unsafe,
+				),
+				'last_run' => array(
+					'at'      => '' === $last_run ? '' : WPNC_Time::for_display( $last_run ),
+					'summary' => is_array( $summary ) ? $summary : array(),
+				),
+				'next_run' => $this->next_run_label(),
+			)
+		);
+	}
+
+	/**
+	 * Human description of the next scheduled fetch.
+	 *
+	 * @return string
+	 */
+	private function next_run_label() {
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			return wpnc__( 'WP-Cron is disabled', 'WP-Cron غیرفعال است' );
+		}
+
+		$next = wp_next_scheduled( 'wpnc_fetch_news_event' );
+		if ( ! $next ) {
+			return wpnc__( 'Not scheduled yet', 'هنوز زمان‌بندی نشده' );
+		}
+
+		if ( $next <= time() ) {
+			return wpnc__( 'Due now', 'زمانش رسیده' );
+		}
+
+		return sprintf(
+			/* translators: %s: human readable duration */
+			wpnc__( 'in %s', 'تا %s دیگر' ),
+			human_time_diff( time(), $next )
 		);
 	}
 

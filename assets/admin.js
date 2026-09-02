@@ -755,16 +755,34 @@ jQuery(function($) {
        Fetch tool
        ========================================================== */
 
-    function bindFetchTool() {
-        var $btn = $('#wpnc-run-fetch');
-        var $clear = $('#wpnc-clear-lock');
-        var $status = $('#wpnc-fetch-status');
-        var $progress = $('#wpnc-fetch-progress');
+    function bindFetchTool(opts) {
+        opts = opts || {};
+
+        var $btn = $(opts.button || '#wpnc-run-fetch');
+        var $clear = $(opts.clear || '#wpnc-clear-lock');
+        var $status = $(opts.status || '#wpnc-fetch-status');
+        var $progress = $(opts.progress || '#wpnc-fetch-progress');
         var $fill = $progress.find('.wpnc-progress-fill');
         var $label = $progress.find('.wpnc-progress-text');
+        var onDone = opts.onDone || function() {};
 
         if (!$btn.length) {
             return;
+        }
+
+        // The dashboard has no progress bar markup of its own; build one so
+        // the same code path can report into it.
+        if (!$progress.length && opts.status) {
+            $progress = $('<div>')
+                .addClass('wpnc-progress-wrap')
+                .attr({ role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100 })
+                .hide()
+                .append($('<div>').addClass('wpnc-progress-bar')
+                    .append($('<div>').addClass('wpnc-progress-fill')))
+                .append($('<span>').addClass('wpnc-progress-text'))
+                .appendTo($status.parent());
+            $fill = $progress.find('.wpnc-progress-fill');
+            $label = $progress.find('.wpnc-progress-text');
         }
 
         function setProgress(pct, text) {
@@ -895,6 +913,7 @@ jQuery(function($) {
                         showSummary(data);
                         loadStats();
                         loadLogs();
+                        onDone(data);
                     }, 400);
                 });
         }
@@ -924,6 +943,241 @@ jQuery(function($) {
     /* ==========================================================
        Utilities and boot
        ========================================================== */
+
+    /* ==========================================================
+       Dashboard
+       ========================================================== */
+
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+
+    function svg(tag, attrs) {
+        var node = document.createElementNS(SVG_NS, tag);
+        for (var k in attrs) {
+            if (Object.prototype.hasOwnProperty.call(attrs, k)) {
+                node.setAttribute(k, attrs[k]);
+            }
+        }
+        return node;
+    }
+
+    function loadDashboard() {
+        var $app = $('#wpnc-dash-app');
+        if (!$app.length) {
+            return;
+        }
+
+        renderLoading($app);
+
+        request('wpnc_get_dashboard')
+            .done(function(data) {
+                renderDashboard($app, data);
+            })
+            .fail(function(error) {
+                renderError($app, error, loadDashboard);
+            });
+    }
+
+    function renderDashboard($app, data) {
+        $app.empty();
+
+        var totals = data.totals || {};
+        $('#wpnc-dash-subtitle').text(
+            t('dash_next_run', 'Next fetch') + ': ' + (data.next_run || '-') +
+            (data.last_run && data.last_run.at
+                ? '  ·  ' + t('dash_last_run', 'Last run') + ': ' + data.last_run.at
+                : '')
+        );
+
+        renderCards($app, totals, data.health || {});
+
+        if (!totals.total) {
+            renderEmpty(
+                $('<div>').appendTo($app),
+                t('dash_empty', 'Nothing has been collected yet.'),
+                t('empty_pending_hint', 'Add RSS sources under Settings, then run Fetch Now.')
+            );
+            return;
+        }
+
+        renderActivity($app, data.activity || []);
+        renderSources($app, data.sources || []);
+    }
+
+    function card($row, opts) {
+        var $c = $('<div>').addClass('wpnc-card-stat ' + (opts.tone || '')).appendTo($row);
+        $('<span>').addClass('wpnc-card-stat-label').text(opts.label).appendTo($c);
+        $('<strong>').addClass('wpnc-card-stat-value').text(opts.value).appendTo($c);
+        if (opts.note) {
+            $('<span>').addClass('wpnc-card-stat-note').text(opts.note).appendTo($c);
+        }
+        return $c;
+    }
+
+    function renderCards($app, totals, health) {
+        var $row = $('<div>').addClass('wpnc-card-stats').appendTo($app);
+
+        card($row, {
+            label: t('pending_opt', 'Pending'),
+            value: totals.pending || 0,
+            tone: 'is-warning',
+            note: t('dash_awaiting', 'awaiting your review')
+        });
+        card($row, {
+            label: t('approved_opt', 'Approved'),
+            value: totals.approved || 0,
+            tone: 'is-success',
+            note: t('dash_published_note', 'published to the site')
+        });
+        card($row, {
+            label: t('error_opt', 'Error'),
+            value: totals.errors || 0,
+            tone: (totals.errors ? 'is-error' : ''),
+            note: t('dash_errors_note', 'failed to publish')
+        });
+
+        var sourceNote = [];
+        if (health.failing) { sourceNote.push(health.failing + ' ' + t('dash_failing', 'failing')); }
+        if (health.paused) { sourceNote.push(health.paused + ' ' + t('dash_paused', 'paused')); }
+        if (health.unsafe) { sourceNote.push(health.unsafe + ' ' + t('dash_unsafe', 'unsafe')); }
+
+        card($row, {
+            label: t('dash_sources', 'Sources'),
+            value: (health.ok || 0) + ' / ' + (health.total || 0),
+            tone: (health.failing || health.unsafe) ? 'is-warning' : '',
+            note: sourceNote.length ? sourceNote.join(' · ') : t('dash_all_healthy', 'all healthy')
+        });
+    }
+
+    /* Stacked columns: one per day, approved + rejected + errors + still
+       pending, so the shape shows both volume and what happened to it. */
+    function renderActivity($app, series) {
+        var $panel = $('<div>').addClass('wpnc-panel').appendTo($app);
+        $('<h3>').text(t('dash_activity', 'Last 14 days')).appendTo($panel);
+
+        var peak = 0;
+        series.forEach(function(d) { peak = Math.max(peak, d.total); });
+
+        if (!peak) {
+            $('<p>').addClass('wpnc-state-hint').text(
+                t('dash_no_activity', 'No items were collected in this period.')
+            ).appendTo($panel);
+            return;
+        }
+
+        var W = 720, H = 200, padB = 26, padT = 10;
+        var slot = W / series.length;
+        var barW = Math.max(6, Math.min(34, slot * 0.62));
+
+        var chart = svg('svg', {
+            viewBox: '0 0 ' + W + ' ' + H,
+            preserveAspectRatio: 'none',
+            role: 'img',
+            'aria-label': t('dash_activity', 'Last 14 days'),
+            class: 'wpnc-chart'
+        });
+
+        // Gridlines give the columns a scale to be read against.
+        [0, 0.5, 1].forEach(function(f) {
+            var y = padT + (H - padT - padB) * (1 - f);
+            chart.appendChild(svg('line', {
+                x1: 0, x2: W, y1: y, y2: y, class: 'wpnc-chart-grid'
+            }));
+            chart.appendChild(svg('text', {
+                x: 2, y: y - 3, class: 'wpnc-chart-axis'
+            })).textContent = String(Math.round(peak * f));
+        });
+
+        var plot = H - padT - padB;
+
+        series.forEach(function(d, i) {
+            var x = i * slot + (slot - barW) / 2;
+            var y = H - padB;
+
+            // Order matters: the settled outcomes sit at the bottom so the
+            // still-pending part is what sticks up.
+            var parts = [
+                { n: d.approved, cls: 'is-approved' },
+                { n: d.rejected, cls: 'is-rejected' },
+                { n: d.errors, cls: 'is-error' },
+                { n: Math.max(0, d.total - d.approved - d.rejected - d.errors), cls: 'is-pending' }
+            ];
+
+            parts.forEach(function(part) {
+                if (!part.n) { return; }
+                var h = (part.n / peak) * plot;
+                y -= h;
+                chart.appendChild(svg('rect', {
+                    x: x, y: y, width: barW, height: h,
+                    class: 'wpnc-bar ' + part.cls
+                }));
+            });
+
+            var title = svg('title');
+            title.textContent = d.label + ' — ' + d.total;
+            chart.appendChild(svg('rect', {
+                x: i * slot, y: padT, width: slot, height: plot,
+                class: 'wpnc-bar-hit'
+            })).appendChild(title);
+
+            if (series.length <= 16 || i % 2 === 0) {
+                var label = svg('text', {
+                    x: i * slot + slot / 2, y: H - 8,
+                    'text-anchor': 'middle', class: 'wpnc-chart-label'
+                });
+                label.textContent = d.label;
+                chart.appendChild(label);
+            }
+        });
+
+        $panel[0].appendChild(chart);
+
+        var $legend = $('<div>').addClass('wpnc-legend').appendTo($panel);
+        [
+            ['is-approved', t('approved_opt', 'Approved')],
+            ['is-pending', t('pending_opt', 'Pending')],
+            ['is-rejected', t('rejected_opt', 'Rejected')],
+            ['is-error', t('error_opt', 'Error')]
+        ].forEach(function(pair) {
+            $('<span>').addClass('wpnc-legend-item')
+                .append($('<i>').addClass('wpnc-swatch ' + pair[0]))
+                .append(document.createTextNode(' ' + pair[1]))
+                .appendTo($legend);
+        });
+    }
+
+    function renderSources($app, sources) {
+        var $panel = $('<div>').addClass('wpnc-panel').appendTo($app);
+        $('<h3>').text(t('dash_by_source', 'By source')).appendTo($panel);
+
+        if (!sources.length) {
+            $('<p>').addClass('wpnc-state-hint').text(
+                t('dash_no_sources_yet', 'No source has produced an item yet.')
+            ).appendTo($panel);
+            return;
+        }
+
+        var peak = 0;
+        sources.forEach(function(s) { peak = Math.max(peak, s.total); });
+
+        var $list = $('<div>').addClass('wpnc-bars').appendTo($panel);
+        sources.forEach(function(src) {
+            var $row = $('<div>').addClass('wpnc-bars-row').appendTo($list);
+            $('<span>').addClass('wpnc-bars-name').attr('dir', 'auto').text(src.name).appendTo($row);
+
+            var $track = $('<span>').addClass('wpnc-bars-track').appendTo($row);
+            var pct = peak ? (src.total / peak) * 100 : 0;
+            var approvedPct = src.total ? (src.approved / src.total) * 100 : 0;
+
+            $('<span>').addClass('wpnc-bars-fill').css('width', pct + '%')
+                .append($('<span>').addClass('wpnc-bars-fill-approved').css('width', approvedPct + '%'))
+                .appendTo($track);
+
+            $('<span>').addClass('wpnc-bars-value')
+                .text(src.approved + ' / ' + src.total)
+                .attr('title', t('dash_approved_of_total', 'approved of total'))
+                .appendTo($row);
+        });
+    }
 
     /* ==========================================================
        Source health actions
@@ -1028,6 +1282,14 @@ jQuery(function($) {
     loadQueue();
     loadStats();
     loadLogs();
+    loadDashboard();
     bindFetchTool();
+    bindFetchTool({
+        button: '#wpnc-dash-fetch',
+        clear: '#wpnc-dash-clear-lock',
+        status: '#wpnc-dash-status',
+        progress: '#wpnc-dash-progress',
+        onDone: loadDashboard
+    });
     bindSourceHealth();
 });

@@ -440,7 +440,7 @@
 
 .wpnc-state-error {
     border-color: #d63638;
-    border-left-width: 4px;
+    border-inline-start-width: 4px;
     background: #fcf0f1;
     text-align: start;
 }
@@ -741,4 +741,245 @@
     .wpnc-health-actions .button {
         margin: 0 4px 4px 0;
     }
+}
+
+/* ============================================================
+   Dashboard
+   ============================================================ */
+
+.wpnc-dash-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 18px 0 4px;
+}
+
+.wpnc-dash-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1d2327;
+}
+
+.wpnc-dash-sub {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #646970;
+}
+
+.wpnc-dash-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0;
+}
+
+.wpnc-dash-status:not(:empty) {
+    margin: 12px 0;
+}
+
+/* --- headline cards --- */
+
+.wpnc-card-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 14px;
+    margin: 18px 0 22px;
+}
+
+.wpnc-card-stat {
+    position: relative;
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    padding: 16px 18px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* The accent bar is what makes these read as a dashboard rather than as
+   four bordered boxes. */
+.wpnc-card-stat::before {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 4px;
+    background: #c3c4c7;
+}
+
+.wpnc-card-stat.is-warning::before { background: #dba617; }
+.wpnc-card-stat.is-success::before { background: #00a32a; }
+.wpnc-card-stat.is-error::before   { background: #d63638; }
+
+.wpnc-card-stat-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: #646970;
+    text-transform: uppercase;
+}
+
+.wpnc-card-stat-value {
+    display: block;
+    margin: 6px 0 2px;
+    font-size: 30px;
+    line-height: 1.1;
+    font-weight: 700;
+    color: #1d2327;
+    font-variant-numeric: tabular-nums;
+}
+
+.wpnc-card-stat-note {
+    display: block;
+    font-size: 12px;
+    color: #787c82;
+}
+
+/* --- panels --- */
+
+.wpnc-panel {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    padding: 18px 20px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+
+.wpnc-panel h3 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1d2327;
+}
+
+/* --- activity chart --- */
+
+.wpnc-chart {
+    display: block;
+    width: 100%;
+    height: 200px;
+    overflow: visible;
+}
+
+.wpnc-chart-grid {
+    stroke: #e6e7e8;
+    stroke-width: 1;
+}
+
+.wpnc-chart-axis,
+.wpnc-chart-label {
+    fill: #8c8f94;
+    font-size: 10px;
+}
+
+.wpnc-bar {
+    transition: opacity .15s ease;
+}
+
+.wpnc-bar.is-approved { fill: #00a32a; }
+.wpnc-bar.is-pending  { fill: #dba617; }
+.wpnc-bar.is-rejected { fill: #a7aaad; }
+.wpnc-bar.is-error    { fill: #d63638; }
+
+/* Invisible full-height column so the native SVG tooltip has something
+   forgiving to hover, instead of a 3px-tall bar. */
+.wpnc-bar-hit {
+    fill: transparent;
+}
+
+.wpnc-bar-hit:hover ~ .wpnc-bar,
+.wpnc-chart:hover .wpnc-bar {
+    opacity: .92;
+}
+
+.wpnc-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.wpnc-legend-item {
+    display: inline-flex;
+    align-items: center;
+}
+
+.wpnc-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-inline-end: 6px;
+}
+
+.wpnc-swatch.is-approved { background: #00a32a; }
+.wpnc-swatch.is-pending  { background: #dba617; }
+.wpnc-swatch.is-rejected { background: #a7aaad; }
+.wpnc-swatch.is-error    { background: #d63638; }
+
+/* --- per-source bars --- */
+
+.wpnc-bars-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 1fr) 3fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 0;
+}
+
+.wpnc-bars-row + .wpnc-bars-row {
+    border-top: 1px solid #f0f0f1;
+}
+
+.wpnc-bars-name {
+    font-size: 13px;
+    color: #1d2327;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.wpnc-bars-track {
+    display: block;
+    height: 10px;
+    border-radius: 999px;
+    background: #f0f0f1;
+    overflow: hidden;
+}
+
+.wpnc-bars-fill {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: #dba617;
+}
+
+/* The darker segment is the share that made it onto the site. */
+.wpnc-bars-fill-approved {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: #00a32a;
+}
+
+.wpnc-bars-value {
+    font-size: 12px;
+    color: #646970;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-dash-head { flex-direction: column; align-items: stretch; }
+    .wpnc-dash-actions .button { width: 100%; text-align: center; }
+    .wpnc-card-stats { grid-template-columns: repeat(2, 1fr); }
+    .wpnc-bars-row { grid-template-columns: 1fr auto; }
+    .wpnc-bars-track { grid-column: 1 / -1; }
 }

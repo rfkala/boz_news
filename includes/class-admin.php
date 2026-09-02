@@ -107,15 +107,17 @@ class WPNC_Admin {
 		}
 
 		$is_rtl     = ( 'en' !== get_option( 'wpnc_admin_lang', 'fa' ) );
-		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
 		$tabs       = array(
-			'settings'   => wpnc__( 'Settings', 'تنظیمات' ),
+			'dashboard'  => wpnc__( 'Dashboard', 'داشبورد' ),
 			'moderation' => wpnc__( 'Moderation Queue', 'صف تأیید' ),
+			'settings'   => wpnc__( 'Settings', 'تنظیمات' ),
 			'logs'       => wpnc__( 'Logs & Tools', 'لاگ و ابزارها' ),
 		);
 
 		if ( ! isset( $tabs[ $active_tab ] ) ) {
-			$active_tab = 'settings';
+			$active_tab = 'dashboard';
 		}
 		?>
 		<div class="wrap wpnc-wrap<?php echo $is_rtl ? ' wpnc-rtl' : ''; ?>">
@@ -133,7 +135,9 @@ class WPNC_Admin {
 
 			<div class="wpnc-tab-content">
 				<?php
-				if ( 'settings' === $active_tab ) {
+				if ( 'dashboard' === $active_tab ) {
+					$this->render_dashboard_tab();
+				} elseif ( 'settings' === $active_tab ) {
 					$this->render_settings_tab();
 				} elseif ( 'moderation' === $active_tab ) {
 					$this->render_moderation_tab();
@@ -461,6 +465,30 @@ class WPNC_Admin {
 			human_time_diff( time(), $next ),
 			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next )
 		);
+	}
+
+	private function render_dashboard_tab() {
+		?>
+		<div class="wpnc-dash">
+			<div class="wpnc-dash-head">
+				<div>
+					<h2 class="wpnc-dash-title"><?php wpnc_e( 'Overview', 'نمای کلی' ); ?></h2>
+					<p class="wpnc-dash-sub" id="wpnc-dash-subtitle"></p>
+				</div>
+				<p class="wpnc-dash-actions">
+					<button type="button" class="button button-primary" id="wpnc-dash-fetch">
+						<?php wpnc_e( 'Fetch Now', 'دریافت فوری' ); ?>
+					</button>
+					<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'boz-news', 'tab' => 'moderation' ), admin_url( 'admin.php' ) ) ); ?>">
+						<?php wpnc_e( 'Open the queue', 'رفتن به صف تأیید' ); ?>
+					</a>
+				</p>
+			</div>
+
+			<div id="wpnc-dash-status" class="wpnc-dash-status"></div>
+			<div id="wpnc-dash-app"></div>
+		</div>
+		<?php
 	}
 
 	private function render_moderation_tab() {

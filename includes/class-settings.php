@@ -472,6 +472,21 @@ class WPNC_Time {
 	}
 
 	/**
+	 * Short axis label for a Y-m-d day, in the site's own calendar.
+	 *
+	 * wp_date() honours a Jalali locale, so Persian sites get Persian dates
+	 * on the chart instead of Gregorian ones.
+	 *
+	 * @param string $day Y-m-d.
+	 * @return string
+	 */
+	public static function day_label( $day ) {
+		$timestamp = strtotime( $day . ' 12:00:00 UTC' );
+
+		return false === $timestamp ? (string) $day : wp_date( 'j M', $timestamp );
+	}
+
+	/**
 	 * Site GMT offset in seconds.
 	 *
 	 * @return int

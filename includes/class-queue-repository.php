@@ -358,6 +358,142 @@ class WPNC_Queue_Repository {
 	}
 
 	/**
+	 * Per-day counts for the activity chart.
+	 *
+	 * Rows are stored in UTC but a dashboard is read in local time, so the
+	 * grouping is shifted by the site offset. Otherwise everything imported
+	 * after 20:30 in Tehran would land on the following day's bar.
+	 *
+	 * @param int $days How many days back, including today.
+	 * @return array Ordered oldest first: date => counts.
+	 */
+	public function get_daily_activity( $days = 14 ) {
+		global $wpdb;
+
+		$days   = max( 1, min( 90, absint( $days ) ) );
+		$offset = WPNC_Time::offset_seconds();
+		$table  = $this->table_name();
+		$since  = WPNC_Time::days_ago( $days );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT DATE( DATE_ADD( created_at, INTERVAL %d SECOND ) ) AS day,
+					COUNT(*) AS total,
+					SUM( CASE WHEN status = 'approved' THEN 1 ELSE 0 END ) AS approved,
+					SUM( CASE WHEN status = 'rejected' THEN 1 ELSE 0 END ) AS rejected,
+					SUM( CASE WHEN status = 'error' THEN 1 ELSE 0 END ) AS errors
+				FROM $table
+				WHERE created_at >= %s
+				GROUP BY day
+				ORDER BY day ASC",
+				$offset,
+				$since
+			),
+			ARRAY_A
+		);
+
+		$byday = array();
+		foreach ( (array) $rows as $row ) {
+			$byday[ $row['day'] ] = $row;
+		}
+
+		// Fill the gaps so the chart has one column per day rather than
+		// silently compressing quiet days out of existence.
+		$series = array();
+		for ( $i = $days - 1; $i >= 0; $i-- ) {
+			$day  = gmdate( 'Y-m-d', WPNC_Time::timestamp() + $offset - ( $i * DAY_IN_SECONDS ) );
+			$have = isset( $byday[ $day ] ) ? $byday[ $day ] : array();
+
+			$series[] = array(
+				'day'      => $day,
+				'label'    => WPNC_Time::day_label( $day ),
+				'total'    => absint( isset( $have['total'] ) ? $have['total'] : 0 ),
+				'approved' => absint( isset( $have['approved'] ) ? $have['approved'] : 0 ),
+				'rejected' => absint( isset( $have['rejected'] ) ? $have['rejected'] : 0 ),
+				'errors'   => absint( isset( $have['errors'] ) ? $have['errors'] : 0 ),
+			);
+		}
+
+		return $series;
+	}
+
+	/**
+	 * Which sources are actually producing, and how much of it survives
+	 * moderation.
+	 *
+	 * @param int $limit Maximum sources returned.
+	 * @return array
+	 */
+	public function get_top_sources( $limit = 8 ) {
+		global $wpdb;
+
+		$limit = max( 1, min( 50, absint( $limit ) ) );
+		$table = $this->table_name();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT source_name,
+					COUNT(*) AS total,
+					SUM( CASE WHEN status = 'approved' THEN 1 ELSE 0 END ) AS approved,
+					SUM( CASE WHEN status = 'pending' THEN 1 ELSE 0 END ) AS pending
+				FROM $table
+				WHERE source_name <> ''
+				GROUP BY source_name
+				ORDER BY total DESC
+				LIMIT %d",
+				$limit
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[] = array(
+				'name'     => (string) $row['source_name'],
+				'total'    => absint( $row['total'] ),
+				'approved' => absint( $row['approved'] ),
+				'pending'  => absint( $row['pending'] ),
+			);
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Totals used by the headline cards, including all-time throughput.
+	 *
+	 * @return array
+	 */
+	public function get_totals() {
+		global $wpdb;
+
+		$table = $this->table_name();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row(
+			"SELECT COUNT(*) AS total,
+				SUM( CASE WHEN status = 'pending' THEN 1 ELSE 0 END ) AS pending,
+				SUM( CASE WHEN status = 'approved' THEN 1 ELSE 0 END ) AS approved,
+				SUM( CASE WHEN status = 'rejected' THEN 1 ELSE 0 END ) AS rejected,
+				SUM( CASE WHEN status = 'error' THEN 1 ELSE 0 END ) AS errors
+			FROM $table",
+			ARRAY_A
+		);
+
+		$row = is_array( $row ) ? $row : array();
+
+		return array(
+			'total'    => absint( isset( $row['total'] ) ? $row['total'] : 0 ),
+			'pending'  => absint( isset( $row['pending'] ) ? $row['pending'] : 0 ),
+			'approved' => absint( isset( $row['approved'] ) ? $row['approved'] : 0 ),
+			'rejected' => absint( isset( $row['rejected'] ) ? $row['rejected'] : 0 ),
+			'errors'   => absint( isset( $row['errors'] ) ? $row['errors'] : 0 ),
+		);
+	}
+
+	/**
 	 * Neutralise a CSV cell that a spreadsheet would treat as a formula.
 	 *
 	 * Feed titles come from other people's servers, and Excel and Sheets both
