@@ -14,9 +14,10 @@ uv.txt
 Thumbs.db
 *.swp
 
-# Local agent state
-.claude/settings.local.json
-.claude/scheduled_tasks.lock
+# Local agent state. The whole directory: launch.json and settings.local.json
+# both carry absolute paths and the names of other private projects, which
+# have no business in a public repository.
+.claude/
 
 # Portable PHP and PHPUnit, dropped in by tools/run-tests.ps1
 .php/
