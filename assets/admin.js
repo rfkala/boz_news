@@ -960,13 +960,21 @@ jQuery(function($) {
         return node;
     }
 
+    function renderDashboardSkeleton($app) {
+        var $wrap = $('<div>').addClass('wpnc-skeleton').appendTo($app.empty());
+        for (var i = 0; i < 4; i++) {
+            $('<div>').addClass('wpnc-skeleton-block').appendTo($wrap);
+        }
+        $('<div>').addClass('wpnc-skeleton-block is-wide').appendTo($wrap);
+    }
+
     function loadDashboard() {
         var $app = $('#wpnc-dash-app');
         if (!$app.length) {
             return;
         }
 
-        renderLoading($app);
+        renderDashboardSkeleton($app);
 
         request('wpnc_get_dashboard')
             .done(function(data) {
@@ -1000,6 +1008,7 @@ jQuery(function($) {
         }
 
         renderActivity($app, data.activity || []);
+        renderOutcome($app, totals);
         renderSources($app, data.sources || []);
     }
 
@@ -1103,14 +1112,25 @@ jQuery(function($) {
                 { n: Math.max(0, d.total - d.approved - d.rejected - d.errors), cls: 'is-pending' }
             ];
 
+            var topDrawn = false;
             parts.forEach(function(part) {
                 if (!part.n) { return; }
                 var h = (part.n / peak) * plot;
                 y -= h;
-                chart.appendChild(svg('rect', {
+
+                var attrs = {
                     x: x, y: y, width: barW, height: h,
                     class: 'wpnc-bar ' + part.cls
-                }));
+                };
+
+                // Only the topmost visible segment gets rounded corners, so a
+                // stack still reads as one column.
+                if (!topDrawn && h > 3) {
+                    attrs.rx = Math.min(3, barW / 2);
+                    topDrawn = true;
+                }
+
+                chart.appendChild(svg('rect', attrs));
             });
 
             var title = svg('title');
@@ -1142,6 +1162,62 @@ jQuery(function($) {
             $('<span>').addClass('wpnc-legend-item')
                 .append($('<i>').addClass('wpnc-swatch ' + pair[0]))
                 .append(document.createTextNode(' ' + pair[1]))
+                .appendTo($legend);
+        });
+    }
+
+    /* Proportion of everything collected that actually reached the site.
+       A ring answers "what share" at a glance in a way four numbers cannot. */
+    function renderOutcome($app, totals) {
+        var settled = (totals.approved || 0) + (totals.rejected || 0) + (totals.errors || 0);
+        if (!settled) {
+            return;
+        }
+
+        var $panel = $('<div>').addClass('wpnc-panel').appendTo($app);
+        $('<h3>').text(t('dash_outcome', 'What happens to what you collect')).appendTo($panel);
+
+        var $wrap = $('<div>').addClass('wpnc-ring-wrap').appendTo($panel);
+
+        var total = totals.total || 1;
+        var pct = Math.round(((totals.approved || 0) / total) * 100);
+        var R = 54;
+        var C = 2 * Math.PI * R;
+
+        var ring = svg('svg', {
+            viewBox: '0 0 132 132',
+            class: 'wpnc-ring',
+            role: 'img',
+            'aria-label': pct + '%'
+        });
+        ring.appendChild(svg('circle', { cx: 66, cy: 66, r: R, class: 'wpnc-ring-track' }));
+        ring.appendChild(svg('circle', {
+            cx: 66, cy: 66, r: R,
+            class: 'wpnc-ring-value is-approved',
+            'stroke-dasharray': C,
+            'stroke-dashoffset': C * (1 - pct / 100)
+        }));
+
+        var label = svg('text', { x: 66, y: 68, class: 'wpnc-ring-label' });
+        label.textContent = pct + '%';
+        ring.appendChild(label);
+
+        var sub = svg('text', { x: 66, y: 84, class: 'wpnc-ring-sub' });
+        sub.textContent = t('approved_opt', 'Approved');
+        ring.appendChild(sub);
+
+        $wrap[0].appendChild(ring);
+
+        var $legend = $('<div>').addClass('wpnc-ring-legend').appendTo($wrap);
+        [
+            [t('approved_opt', 'Approved'), totals.approved || 0],
+            [t('pending_opt', 'Pending'), totals.pending || 0],
+            [t('rejected_opt', 'Rejected'), totals.rejected || 0],
+            [t('error_opt', 'Error'), totals.errors || 0]
+        ].forEach(function(pair) {
+            $('<div>')
+                .append($('<span>').text(pair[0]))
+                .append($('<b>').text(pair[1]))
                 .appendTo($legend);
         });
     }

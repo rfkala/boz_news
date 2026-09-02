@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.3.1
+ * Version: 1.4.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.3.1' );
+define( 'WPNC_VERSION', '1.4.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -100,8 +100,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 		return;
 	}
 
-	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), wpnc_asset_version( 'assets/admin.css' ) );
-	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), wpnc_asset_version( 'assets/admin.js' ), true );
+	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), WPNC_VERSION );
+	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), WPNC_VERSION, true );
 	wp_localize_script(
 		'wpnc-admin-script',
 		'wpnc_ajax',
@@ -162,6 +162,7 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'empty_level_hint'       => 'Nothing was logged at this level. Choose All to see every entry.',
 				'dash_activity'          => 'Last 14 days',
 				'dash_by_source'         => 'By source',
+				'dash_outcome'           => 'What happens to what you collect',
 				'dash_sources'           => 'Sources',
 				'dash_next_run'          => 'Next fetch',
 				'dash_last_run'          => 'Last run',
@@ -248,6 +249,7 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'empty_level_hint'       => 'در این سطح چیزی ثبت نشده است. برای دیدن همه موارد گزینه «همه» را انتخاب کنید.',
 				'dash_activity'          => '۱۴ روز گذشته',
 				'dash_by_source'         => 'به تفکیک منبع',
+				'dash_outcome'           => 'سرنوشت خبرهایی که جمع می‌کنی',
 				'dash_sources'           => 'منابع',
 				'dash_next_run'          => 'دریافت بعدی',
 				'dash_last_run'          => 'آخرین اجرا',

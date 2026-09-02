@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -153,6 +153,16 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.4.0 =
+* Changed: the admin panel has its own design system - colour, spacing, radii
+  and elevation tokens built around the gold crown - instead of inheriting
+  wp-admin's default look. Segmented tabs, elevated cards, restyled forms and
+  tables.
+* Added: an approval ring showing what share of collected items reach the site,
+  and skeleton loaders in place of a spinner.
+* Fixed: panel direction now follows the plugin's own language setting. A
+  Persian panel on an English site previously resolved its layout left-to-right.
 
 = 1.3.1 =
 * Added: a Dashboard tab with headline cards, a 14-day activity chart and a

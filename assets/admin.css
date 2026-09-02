@@ -1,746 +1,254 @@
+/* ============================================================================
+   Boz News admin
+
+   A design system rather than a set of overrides. wp-admin's own chrome is
+   deliberately escaped inside .wpnc-wrap: its form tables, folder tabs and
+   flat grey panels are what made this look like a settings screen instead of
+   a product.
+
+   Written RTL-first. Every directional rule uses logical properties, so the
+   Persian and English layouts come from the same declarations rather than a
+   mirrored override block.
+   ============================================================================ */
+
+.wpnc-wrap {
+    /* --- brand: built out of the gold crown in the menu --- */
+    --wpnc-brand:        #c9a227;
+    --wpnc-brand-strong: #a8851b;
+    --wpnc-brand-soft:   #f7efd6;
+    --wpnc-brand-glow:   rgba(201, 162, 39, .28);
+
+    /* --- ink and surface --- */
+    --wpnc-ink:          #16181d;
+    --wpnc-ink-2:        #3c4149;
+    --wpnc-ink-3:        #6b7280;
+    --wpnc-ink-4:        #9aa1ac;
+
+    --wpnc-bg:           #f4f5f7;
+    --wpnc-surface:      #ffffff;
+    --wpnc-surface-2:    #fafbfc;
+    --wpnc-line:         #e4e6ea;
+    --wpnc-line-soft:    #eef0f3;
+
+    /* --- semantic --- */
+    --wpnc-ok:           #0f8a3d;
+    --wpnc-ok-soft:      #e8f6ec;
+    --wpnc-warn:         #b8860b;
+    --wpnc-warn-soft:    #fdf4dd;
+    --wpnc-danger:       #c8332f;
+    --wpnc-danger-soft:  #fdeceb;
+    --wpnc-info:         #2563eb;
+    --wpnc-info-soft:    #eaf1ff;
+
+    /* --- form --- */
+    --wpnc-r-sm: 6px;
+    --wpnc-r:    10px;
+    --wpnc-r-lg: 14px;
+    --wpnc-r-pill: 999px;
+
+    --wpnc-sh-1: 0 1px 2px rgba(16, 24, 40, .05);
+    --wpnc-sh-2: 0 1px 3px rgba(16, 24, 40, .07), 0 4px 12px rgba(16, 24, 40, .05);
+    --wpnc-sh-3: 0 2px 6px rgba(16, 24, 40, .08), 0 12px 28px rgba(16, 24, 40, .10);
+
+    --wpnc-gap: 16px;
+
+    background: var(--wpnc-bg);
+    margin-inline: -20px;
+    margin-block-start: -10px;
+    padding: 0 20px 40px;
+    min-height: calc(100vh - 32px);
+    color: var(--wpnc-ink-2);
+    box-sizing: border-box;
+}
+
+.wpnc-wrap *,
+.wpnc-wrap *::before,
+.wpnc-wrap *::after {
+    box-sizing: border-box;
+}
+
+/* The panel's language is a plugin setting, independent of the site locale,
+   so the direction has to be stated here. Without it a Persian panel on an
+   English site would resolve every logical property the wrong way round -
+   which is the one rule the whole logical-property approach rests on. */
+.wpnc-wrap.wpnc-rtl { direction: rtl; }
+.wpnc-wrap:not(.wpnc-rtl) { direction: ltr; }
+
 /* ============================================================
-   Page Title
+   Header
    ============================================================ */
 
 .wpnc-page-title {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 23px;
-    font-weight: 700;
-    color: #1d2327;
-    margin-bottom: 10px;
+    gap: 12px;
+    margin: 0;
+    padding: 26px 0 18px;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    color: var(--wpnc-ink);
 }
 
 .wpnc-title-crown {
-    font-size: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--wpnc-r);
+    font-size: 19px;
     line-height: 1;
-    color: #c9a227;
-    text-shadow: 0 1px 3px rgba(201,162,39,.35);
+    color: #fff;
+    text-shadow: none;
+    background: linear-gradient(140deg, var(--wpnc-brand) 0%, var(--wpnc-brand-strong) 100%);
+    box-shadow: 0 4px 12px var(--wpnc-brand-glow);
 }
 
-/* ============================================================
-   Grid & Cards
-   ============================================================ */
+/* --- tabs as a segmented control, not wp-admin folder tabs --- */
 
-.wpnc-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 18px;
-    margin-top: 20px;
-}
-
-.wpnc-card {
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+.wpnc-wrap .nav-tab-wrapper {
     display: flex;
-    flex-direction: column;
-    position: relative;
-    transition: box-shadow .18s ease, transform .18s ease;
-    overflow: hidden;
-}
-
-.wpnc-card:hover {
-    box-shadow: 0 4px 14px rgba(0,0,0,.12);
-    transform: translateY(-2px);
-}
-
-.wpnc-card-header {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    z-index: 10;
-    background: rgba(255,255,255,0.9);
-    padding: 4px 6px;
-    border-radius: 4px;
-    backdrop-filter: blur(2px);
-}
-
-.wpnc-card img {
-    width: 100%;
-    height: 160px;
-    object-fit: cover;
-    border-bottom: 1px solid #dcdcde;
-    display: block;
-}
-
-.wpnc-no-img {
-    width: 100%;
-    height: 160px;
-    background: linear-gradient(135deg, #f6f7f7 0%, #e8eaec 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #a7aaad;
-    font-size: 13px;
-    border-bottom: 1px solid #dcdcde;
-}
-
-.wpnc-card-content {
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    flex-grow: 1;
-}
-
-.wpnc-card-content h4 {
-    margin: 0 0 8px 0;
-    font-size: 13.5px;
-    line-height: 1.45;
-    font-weight: 600;
-    color: #1d2327;
-}
-
-.wpnc-source {
-    color: #50575e;
-    font-size: 11.5px;
-    margin-bottom: 4px;
-    font-weight: 500;
-}
-
-.wpnc-date {
-    color: #8c8f94;
-    font-size: 11px;
-    margin: 0 0 10px 0;
-}
-
-.wpnc-tags {
-    font-size: 11.5px;
-    margin: 0 0 8px 0;
-    color: #2271b1;
-}
-
-.wpnc-error-message {
-    font-size: 11.5px;
-    margin: 0 0 8px 0;
-    color: #b32d2e;
-    background: #fef7f7;
-    padding: 4px 6px;
-    border-radius: 3px;
-    border-left: 3px solid #b32d2e;
-}
-
-.wpnc-actions {
-    margin-top: auto;
-    display: flex;
-    gap: 6px;
-    padding-top: 10px;
-    border-top: 1px solid #f0f0f1;
-    flex-wrap: wrap;
-}
-
-/* ============================================================
-   Toolbar & Bulk Actions
-   ============================================================ */
-
-.wpnc-queue-toolbar {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin: 20px 0 10px;
-    flex-wrap: wrap;
-}
-
-.wpnc-queue-toolbar input[type="search"] {
-    min-width: 240px;
-}
-
-.wpnc-bulk-actions {
-    margin-bottom: 14px;
-    padding: 10px 14px;
-    background: #f8f9fa;
-    border: 1px solid #dcdcde;
-    border-radius: 5px;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-/* ============================================================
-   Pagination
-   ============================================================ */
-
-.wpnc-pagination {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-top: 20px;
-}
-
-/* ============================================================
-   Modal
-   ============================================================ */
-
-.wpnc-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.55);
-    z-index: 99999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.wpnc-modal-content {
-    background: #fff;
-    padding: 24px;
-    width: 540px;
-    max-width: 92%;
-    box-shadow: 0 8px 24px rgba(0,0,0,.2);
-    border-radius: 6px;
-}
-
-/* ============================================================
-   Tools Panel
-   ============================================================ */
-
-.wpnc-tools-panel {
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 6px;
-    padding: 18px 20px;
-    margin-top: 20px;
-}
-
-.wpnc-fetch-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 10px;
-}
-
-.wpnc-inline-status {
-    flex: 1;
-}
-
-/* ============================================================
-   Progress Bar
-   ============================================================ */
-
-.wpnc-progress-wrap {
-    margin: 10px 0 14px;
-}
-
-.wpnc-progress-bar {
-    height: 10px;
-    background: #e9ecef;
-    border-radius: 6px;
-    overflow: hidden;
-    margin-bottom: 6px;
-}
-
-.wpnc-progress-fill {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #2271b1, #72aee6);
-    border-radius: 6px;
-    transition: width .3s ease;
-}
-
-.wpnc-progress-text {
-    font-size: 12px;
-    color: #50575e;
-    display: block;
-}
-
-/* ============================================================
-   Status Indicators
-   ============================================================ */
-
-.wpnc-status-ok {
-    color: #1a7f37;
-    font-weight: 500;
-}
-
-.wpnc-status-warn {
-    color: #996800;
-    font-weight: 500;
-}
-
-.wpnc-status-error {
-    color: #b32d2e;
-    font-weight: 500;
-}
-
-.wpnc-fetch-messages {
-    margin: 8px 0 0 0;
-    padding: 0 0 0 18px;
-    font-size: 12px;
-    color: #50575e;
-}
-
-.wpnc-fetch-messages li {
-    margin-bottom: 3px;
-}
-
-/* ============================================================
-   Summary & Stats Grid
-   ============================================================ */
-
-.wpnc-summary-grid,
-#wpnc-stats-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    gap: 10px;
-    max-width: 920px;
-    margin-top: 10px;
-}
-
-.wpnc-summary-grid div,
-.wpnc-stat {
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 6px;
-    padding: 12px 14px;
-    text-align: center;
-    transition: box-shadow .15s;
-}
-
-.wpnc-summary-grid div:hover,
-.wpnc-stat:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,.08);
-}
-
-.wpnc-summary-grid strong,
-.wpnc-stat strong {
-    display: block;
-    font-size: 22px;
-    font-weight: 700;
-    line-height: 1.2;
-    color: #1d2327;
-}
-
-.wpnc-summary-grid span,
-.wpnc-stat span {
-    color: #646970;
-    font-size: 11.5px;
-    text-transform: capitalize;
-    display: block;
-    margin-top: 3px;
-}
-
-/* Color-coded stat cells */
-.wpnc-stat-success strong { color: #1a7f37; }
-.wpnc-stat-warning strong { color: #996800; }
-.wpnc-stat-error strong   { color: #b32d2e; }
-
-.wpnc-stat-success { border-color: #a8d5b5; background: #f3faf5; }
-.wpnc-stat-warning { border-color: #f2cf7a; background: #fdfbef; }
-.wpnc-stat-error   { border-color: #f4a9a8; background: #fef7f7; }
-
-/* ============================================================
-   Log Level Badges
-   ============================================================ */
-
-.wpnc-log-level {
-    display: inline-block;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: #e9ecef;
-    color: #3c434a;
-}
-
-.wpnc-log-error   { background: #fef7f7; color: #b32d2e; }
-.wpnc-log-warning { background: #fdfbef; color: #996800; }
-.wpnc-log-info    { background: #f0f6fc; color: #2271b1; }
-
-/* ============================================================
-   Logs Table
-   ============================================================ */
-
-.wpnc-logs-table td {
-    vertical-align: top;
-    font-size: 12.5px;
-}
-
-.wpnc-logs-table th {
-    font-size: 12.5px;
-}
-
-/* ============================================================
-   RTL Support (.wpnc-rtl applied to .wrap when lang=fa)
-   ============================================================ */
-
-.wpnc-rtl {
-    direction: rtl;
-}
-
-.wpnc-rtl .form-table th {
-    text-align: right;
-}
-
-.wpnc-rtl .form-table td {
-    text-align: right;
-}
-
-.wpnc-rtl .wpnc-card-header {
-    left: auto;
-    right: 8px;
-}
-
-.wpnc-rtl .wpnc-error-message {
-    border-left: none;
-    border-right: 3px solid #b32d2e;
-}
-
-.wpnc-rtl .wpnc-fetch-messages {
-    padding-left: 0;
-    padding-right: 18px;
-}
-
-.wpnc-rtl .wpnc-actions {
-    flex-direction: row-reverse;
-}
-
-.wpnc-rtl .wpnc-bulk-actions {
-    flex-direction: row-reverse;
-}
-
-.wpnc-rtl .wpnc-queue-toolbar {
-    flex-direction: row-reverse;
-}
-
-/* ============================================================
-   Shared states: loading, empty, error, flash
-   ============================================================ */
-
-.wpnc-state {
-    margin: 16px 0;
-    padding: 20px;
-    border: 1px solid #dcdcde;
-    border-radius: 6px;
-    background: #fff;
-    text-align: center;
-}
-
-.wpnc-state-title {
-    margin: 0 0 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #1d2327;
-}
-
-.wpnc-state-hint {
-    margin: 0 auto;
-    max-width: 46em;
-    font-size: 13px;
-    line-height: 1.6;
-    color: #646970;
-}
-
-.wpnc-state-error {
-    border-color: #d63638;
-    border-inline-start-width: 4px;
-    background: #fcf0f1;
-    text-align: start;
-}
-
-.wpnc-state-error .wpnc-state-title {
-    color: #8a1f21;
-}
-
-.wpnc-state-error .button {
-    margin-top: 10px;
-}
-
-.wpnc-state-loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: #646970;
-}
-
-.wpnc-spinner {
-    display: inline-block;
-    width: 14px;
-    height: 14px;
-    border: 2px solid #c3c4c7;
-    border-top-color: #2271b1;
-    border-radius: 50%;
-    animation: wpnc-spin .7s linear infinite;
-}
-
-@keyframes wpnc-spin {
-    to { transform: rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .wpnc-spinner {
-        animation-duration: 2.4s;
-    }
-    .wpnc-card {
-        transition: none;
-    }
-}
-
-.wpnc-flash {
-    margin: 0 0 14px;
-    padding: 10px 14px;
-    border-radius: 4px;
-    border-inline-start: 4px solid #2271b1;
-    background: #f0f6fc;
-    font-size: 13px;
-}
-
-.wpnc-flash-ok {
-    border-inline-start-color: #00a32a;
-    background: #edfaef;
-}
-
-.wpnc-flash-warn {
-    border-inline-start-color: #dba617;
-    background: #fcf9e8;
-}
-
-.wpnc-flash-error {
-    border-inline-start-color: #d63638;
-    background: #fcf0f1;
-}
-
-.wpnc-inline-error {
-    margin-top: 10px;
-    padding: 8px 12px;
-    border-inline-start: 4px solid #d63638;
-    background: #fcf0f1;
-    font-size: 13px;
-    color: #8a1f21;
-}
-
-/* ============================================================
-   Modal fields and badges
-   ============================================================ */
-
-.wpnc-field {
-    margin: 0 0 14px;
-}
-
-.wpnc-field label {
-    display: block;
-    margin-bottom: 4px;
-    font-weight: 600;
-    font-size: 13px;
-}
-
-.wpnc-modal-actions {
-    margin: 18px 0 0;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.wpnc-badge {
-    display: inline-block;
-    padding: 3px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 600;
-    background: #f0f0f1;
-    color: #50575e;
-}
-
-.wpnc-badge-approved {
-    background: #edfaef;
-    color: #00611c;
-}
-
-.wpnc-badge-rejected {
-    background: #f0f0f1;
-    color: #50575e;
-}
-
-.wpnc-card-busy {
-    opacity: .5;
-    pointer-events: none;
-}
-
-/* Wide tables scroll inside their own box instead of the page. */
-.wpnc-table-scroll {
+    gap: 4px;
+    margin: 0 0 22px;
+    padding: 4px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-1);
+    width: fit-content;
+    max-width: 100%;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
 }
 
-/* ============================================================
-   Small screens
-
-   There was no media query at all in this file; the grid collapsed by
-   luck, and the modal and toolbars were never checked.
-   ============================================================ */
-
-@media screen and (max-width: 782px) {
-    .wpnc-grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
-
-    .wpnc-queue-toolbar,
-    .wpnc-bulk-actions,
-    .wpnc-fetch-actions,
-    .wpnc-modal-actions {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .wpnc-queue-toolbar input[type="search"],
-    .wpnc-queue-toolbar select {
-        min-width: 0;
-        width: 100%;
-    }
-
-    /* WordPress already enlarges .button on mobile; make ours full width so
-       they are not half-width stragglers next to it. */
-    .wpnc-bulk-actions .button,
-    .wpnc-fetch-actions .button,
-    .wpnc-modal-actions .button,
-    .wpnc-actions .button {
-        width: 100%;
-        text-align: center;
-    }
-
-    .wpnc-actions {
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .wpnc-modal {
-        align-items: flex-start;
-        padding: 0;
-    }
-
-    .wpnc-modal-content {
-        width: 100%;
-        max-width: 100%;
-        min-height: 100%;
-        border-radius: 0;
-        padding: 18px 16px 32px;
-    }
-
-    .wpnc-pagination {
-        justify-content: space-between;
-    }
-
-    .wpnc-summary-grid,
-    #wpnc-stats-summary {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .wpnc-card img,
-    .wpnc-no-img {
-        height: 140px;
-    }
-}
-
-/* Empty states read as neutral, not as a failure. */
-.wpnc-state-empty {
-    border-style: dashed;
-    background: #fafafa;
-}
-
-/* The stats container is a grid, so a state block placed in it would become
-   one narrow cell. */
-#wpnc-stats-summary .wpnc-state,
-#wpnc-stats-summary .wpnc-state-hint {
-    grid-column: 1 / -1;
-}
-
-/* ============================================================
-   Warnings and source health
-   ============================================================ */
-
-.wpnc-warning-text {
-    color: #8a6d1f;
-}
-
-.wpnc-health-table td {
-    vertical-align: middle;
-}
-
-.wpnc-health-url {
-    word-break: break-all;
-    max-width: 32em;
-}
-
-.wpnc-badge.wpnc-health-ok {
-    background: #edfaef;
-    color: #00611c;
-}
-
-.wpnc-badge.wpnc-health-warn {
-    background: #fcf9e8;
-    color: #8a6d1f;
-}
-
-.wpnc-badge.wpnc-health-bad {
-    background: #fcf0f1;
-    color: #8a1f21;
-}
-
-.wpnc-badge.wpnc-health-off {
-    background: #f0f0f1;
-    color: #50575e;
-}
-
-/* ============================================================
-   Tab toolbars and per-source actions
-   ============================================================ */
-
-.wpnc-tab-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin: 14px 0;
-}
-
-.wpnc-health-actions {
+.wpnc-wrap .nav-tab {
+    margin: 0;
+    padding: 8px 18px;
+    border: 0;
+    border-radius: var(--wpnc-r-pill);
+    background: transparent;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--wpnc-ink-3);
     white-space: nowrap;
+    transition: background .15s ease, color .15s ease;
 }
 
-.wpnc-health-actions .button {
-    margin-inline-end: 4px;
+.wpnc-wrap .nav-tab:hover {
+    background: var(--wpnc-surface-2);
+    color: var(--wpnc-ink);
 }
 
-.wpnc-health-result {
-    display: block;
-    margin-top: 6px;
+.wpnc-wrap .nav-tab-active,
+.wpnc-wrap .nav-tab-active:hover,
+.wpnc-wrap .nav-tab-active:focus {
+    color: var(--wpnc-ink);
+    background: var(--wpnc-brand-soft);
+    box-shadow: inset 0 0 0 1px var(--wpnc-brand-glow);
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+
+.wpnc-wrap .button,
+.wpnc-wrap .button-secondary {
+    height: auto;
+    min-height: 34px;
+    padding: 7px 16px;
+    border-radius: var(--wpnc-r-sm);
+    border-color: var(--wpnc-line);
+    background: var(--wpnc-surface);
+    color: var(--wpnc-ink-2);
+    font-weight: 600;
+    line-height: 1.4;
+    box-shadow: var(--wpnc-sh-1);
+    transition: background .15s ease, border-color .15s ease, transform .08s ease;
+}
+
+.wpnc-wrap .button:hover {
+    background: var(--wpnc-surface-2);
+    border-color: var(--wpnc-ink-4);
+    color: var(--wpnc-ink);
+}
+
+.wpnc-wrap .button:active {
+    transform: translateY(1px);
+}
+
+.wpnc-wrap .button-primary {
+    border-color: transparent;
+    background: linear-gradient(140deg, var(--wpnc-brand) 0%, var(--wpnc-brand-strong) 100%);
+    color: #fff;
+    text-shadow: none;
+    box-shadow: 0 1px 2px rgba(16,24,40,.12), 0 4px 12px var(--wpnc-brand-glow);
+}
+
+.wpnc-wrap .button-primary:hover,
+.wpnc-wrap .button-primary:focus {
+    background: linear-gradient(140deg, var(--wpnc-brand-strong) 0%, var(--wpnc-brand-strong) 100%);
+    border-color: transparent;
+    color: #fff;
+}
+
+.wpnc-wrap .button-link-delete {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: var(--wpnc-danger);
+}
+
+.wpnc-wrap .button-link-delete:hover {
+    background: var(--wpnc-danger-soft);
+    border-color: transparent;
+    color: var(--wpnc-danger);
+}
+
+.wpnc-wrap .button:disabled,
+.wpnc-wrap .button[disabled] {
+    opacity: .55;
+    box-shadow: none;
+}
+
+.wpnc-wrap .button-small {
+    min-height: 28px;
+    padding: 4px 11px;
     font-size: 12px;
-    white-space: normal;
-    max-width: 30em;
 }
 
-.wpnc-health-result.wpnc-health-ok {
-    color: #00611c;
+/* ============================================================
+   Surfaces
+   ============================================================ */
+
+.wpnc-panel,
+.wpnc-tools-panel {
+    background: var(--wpnc-surface);
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    padding: 20px 22px 22px;
+    margin-bottom: var(--wpnc-gap);
+    box-shadow: var(--wpnc-sh-2);
 }
 
-.wpnc-health-result.wpnc-health-bad {
-    color: #8a1f21;
+.wpnc-panel h3,
+.wpnc-tools-panel h3 {
+    margin: 0 0 16px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -.005em;
+    color: var(--wpnc-ink);
 }
 
-@media screen and (max-width: 782px) {
-    .wpnc-tab-toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
+.wpnc-tab-content > hr {
+    display: none;
+}
 
-    .wpnc-health-actions {
-        white-space: normal;
-    }
-
-    .wpnc-health-actions .button {
-        margin: 0 4px 4px 0;
-    }
+.wpnc-tab-content > h3 {
+    margin: 26px 0 12px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--wpnc-ink);
 }
 
 /* ============================================================
@@ -749,24 +257,32 @@
 
 .wpnc-dash-head {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--wpnc-gap);
     flex-wrap: wrap;
-    margin: 18px 0 4px;
+    margin-bottom: 20px;
+    padding: 22px 24px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    background:
+        radial-gradient(120% 180% at 100% 0%, var(--wpnc-brand-soft) 0%, rgba(255,255,255,0) 55%),
+        var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-2);
 }
 
 .wpnc-dash-title {
     margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    color: #1d2327;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -.01em;
+    color: var(--wpnc-ink);
 }
 
 .wpnc-dash-sub {
-    margin: 4px 0 0;
+    margin: 6px 0 0;
     font-size: 13px;
-    color: #646970;
+    color: var(--wpnc-ink-3);
 }
 
 .wpnc-dash-actions {
@@ -777,134 +293,122 @@
 }
 
 .wpnc-dash-status:not(:empty) {
-    margin: 12px 0;
+    margin-bottom: var(--wpnc-gap);
 }
 
 /* --- headline cards --- */
 
 .wpnc-card-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 14px;
-    margin: 18px 0 22px;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: var(--wpnc-gap);
+    margin-bottom: var(--wpnc-gap);
 }
 
 .wpnc-card-stat {
     position: relative;
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 10px;
-    padding: 16px 18px;
+    padding: 18px 20px 20px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-2);
     overflow: hidden;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    transition: transform .18s ease, box-shadow .18s ease;
 }
 
-/* The accent bar is what makes these read as a dashboard rather than as
-   four bordered boxes. */
-.wpnc-card-stat::before {
+.wpnc-card-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--wpnc-sh-3);
+}
+
+/* A tinted wash rather than a hard rule: the colour reads as a state
+   without turning the card into a warning banner. */
+.wpnc-card-stat::after {
     content: "";
     position: absolute;
-    inset-block: 0;
-    inset-inline-start: 0;
-    width: 4px;
-    background: #c3c4c7;
+    inset-block-start: 0;
+    inset-inline: 0;
+    height: 3px;
+    background: var(--wpnc-ink-4);
 }
 
-.wpnc-card-stat.is-warning::before { background: #dba617; }
-.wpnc-card-stat.is-success::before { background: #00a32a; }
-.wpnc-card-stat.is-error::before   { background: #d63638; }
+.wpnc-card-stat.is-warning::after { background: linear-gradient(90deg, var(--wpnc-warn), #e0b642); }
+.wpnc-card-stat.is-success::after { background: linear-gradient(90deg, var(--wpnc-ok), #35b062); }
+.wpnc-card-stat.is-error::after   { background: linear-gradient(90deg, var(--wpnc-danger), #e05a56); }
 
 .wpnc-card-stat-label {
     display: block;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: .02em;
-    color: #646970;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
     text-transform: uppercase;
+    color: var(--wpnc-ink-4);
 }
 
 .wpnc-card-stat-value {
     display: block;
-    margin: 6px 0 2px;
-    font-size: 30px;
-    line-height: 1.1;
-    font-weight: 700;
-    color: #1d2327;
+    margin: 8px 0 4px;
+    font-size: 34px;
+    line-height: 1.05;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--wpnc-ink);
     font-variant-numeric: tabular-nums;
 }
 
 .wpnc-card-stat-note {
     display: block;
     font-size: 12px;
-    color: #787c82;
+    color: var(--wpnc-ink-3);
 }
 
-/* --- panels --- */
-
-.wpnc-panel {
-    background: #fff;
-    border: 1px solid #dcdcde;
-    border-radius: 10px;
-    padding: 18px 20px 20px;
-    margin-bottom: 18px;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04);
-}
-
-.wpnc-panel h3 {
-    margin: 0 0 14px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1d2327;
-}
-
-/* --- activity chart --- */
+/* --- charts --- */
 
 .wpnc-chart {
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 720 / 200;
+    aspect-ratio: 720 / 220;
     overflow: visible;
 }
 
 .wpnc-chart-grid {
-    stroke: #e6e7e8;
+    stroke: var(--wpnc-line-soft);
     stroke-width: 1;
 }
 
 .wpnc-chart-axis,
 .wpnc-chart-label {
-    fill: #8c8f94;
+    fill: var(--wpnc-ink-4);
     font-size: 10px;
+    font-weight: 600;
 }
 
 .wpnc-bar {
     transition: opacity .15s ease;
 }
 
-.wpnc-bar.is-approved { fill: #00a32a; }
-.wpnc-bar.is-pending  { fill: #dba617; }
-.wpnc-bar.is-rejected { fill: #a7aaad; }
-.wpnc-bar.is-error    { fill: #d63638; }
+.wpnc-bar.is-approved { fill: var(--wpnc-ok); }
+.wpnc-bar.is-pending  { fill: var(--wpnc-brand); }
+.wpnc-bar.is-rejected { fill: #b6bcc5; }
+.wpnc-bar.is-error    { fill: var(--wpnc-danger); }
 
-/* Invisible full-height column so the native SVG tooltip has something
-   forgiving to hover, instead of a 3px-tall bar. */
 .wpnc-bar-hit {
     fill: transparent;
 }
 
-.wpnc-bar-hit:hover ~ .wpnc-bar,
-.wpnc-chart:hover .wpnc-bar {
-    opacity: .92;
+.wpnc-bar-hit:hover {
+    fill: rgba(22, 24, 29, .035);
 }
 
 .wpnc-legend {
     display: flex;
-    gap: 16px;
+    gap: 18px;
     flex-wrap: wrap;
-    margin-top: 12px;
+    margin-top: 14px;
     font-size: 12px;
-    color: #646970;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
 }
 
 .wpnc-legend-item {
@@ -914,34 +418,105 @@
 
 .wpnc-swatch {
     display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    margin-inline-end: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+    margin-inline-end: 7px;
 }
 
-.wpnc-swatch.is-approved { background: #00a32a; }
-.wpnc-swatch.is-pending  { background: #dba617; }
-.wpnc-swatch.is-rejected { background: #a7aaad; }
-.wpnc-swatch.is-error    { background: #d63638; }
+.wpnc-swatch.is-approved { background: var(--wpnc-ok); }
+.wpnc-swatch.is-pending  { background: var(--wpnc-brand); }
+.wpnc-swatch.is-rejected { background: #b6bcc5; }
+.wpnc-swatch.is-error    { background: var(--wpnc-danger); }
+
+/* --- ring --- */
+
+.wpnc-ring-wrap {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+}
+
+.wpnc-ring {
+    width: 132px;
+    height: 132px;
+    flex: none;
+}
+
+.wpnc-ring-track {
+    fill: none;
+    stroke: var(--wpnc-line-soft);
+    stroke-width: 12;
+}
+
+.wpnc-ring-value {
+    fill: none;
+    stroke-width: 12;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    transition: stroke-dashoffset .5s ease;
+}
+
+.wpnc-ring-value.is-approved { stroke: var(--wpnc-ok); }
+
+.wpnc-ring-label {
+    fill: var(--wpnc-ink);
+    font-size: 22px;
+    font-weight: 800;
+    text-anchor: middle;
+}
+
+.wpnc-ring-sub {
+    fill: var(--wpnc-ink-4);
+    font-size: 9px;
+    font-weight: 700;
+    text-anchor: middle;
+    letter-spacing: .04em;
+}
+
+.wpnc-ring-legend {
+    flex: 1 1 180px;
+    margin: 0;
+}
+
+.wpnc-ring-legend div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    font-size: 13px;
+}
+
+.wpnc-ring-legend div + div {
+    border-top: 1px solid var(--wpnc-line-soft);
+}
+
+.wpnc-ring-legend b {
+    color: var(--wpnc-ink);
+    font-variant-numeric: tabular-nums;
+}
 
 /* --- per-source bars --- */
 
 .wpnc-bars-row {
     display: grid;
-    grid-template-columns: minmax(120px, 1fr) 3fr auto;
+    grid-template-columns: minmax(120px, 1.1fr) 3fr auto;
     align-items: center;
-    gap: 12px;
-    padding: 7px 0;
+    gap: 14px;
+    padding: 9px 0;
 }
 
 .wpnc-bars-row + .wpnc-bars-row {
-    border-top: 1px solid #f0f0f1;
+    border-top: 1px solid var(--wpnc-line-soft);
 }
 
 .wpnc-bars-name {
     font-size: 13px;
-    color: #1d2327;
+    font-weight: 600;
+    color: var(--wpnc-ink);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -949,38 +524,731 @@
 
 .wpnc-bars-track {
     display: block;
-    height: 10px;
-    border-radius: 999px;
-    background: #f0f0f1;
+    height: 9px;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-line-soft);
     overflow: hidden;
 }
 
 .wpnc-bars-fill {
     display: block;
     height: 100%;
-    border-radius: 999px;
-    background: #dba617;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-brand);
+    transition: width .5s ease;
 }
 
-/* The darker segment is the share that made it onto the site. */
 .wpnc-bars-fill-approved {
     display: block;
     height: 100%;
-    border-radius: 999px;
-    background: #00a32a;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-ok);
 }
 
 .wpnc-bars-value {
     font-size: 12px;
-    color: #646970;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 
+/* ============================================================
+   Moderation queue
+   ============================================================ */
+
+.wpnc-queue-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+}
+
+.wpnc-wrap input[type="search"],
+.wpnc-wrap input[type="text"],
+.wpnc-wrap input[type="url"],
+.wpnc-wrap input[type="number"],
+.wpnc-wrap input[type="password"],
+.wpnc-wrap select,
+.wpnc-wrap textarea {
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-sm);
+    background: var(--wpnc-surface);
+    box-shadow: none;
+    color: var(--wpnc-ink);
+    min-height: 34px;
+}
+
+.wpnc-wrap input:focus,
+.wpnc-wrap select:focus,
+.wpnc-wrap textarea:focus {
+    border-color: var(--wpnc-brand);
+    box-shadow: 0 0 0 3px var(--wpnc-brand-glow);
+    outline: none;
+}
+
+.wpnc-queue-toolbar input[type="search"] {
+    min-width: 260px;
+    flex: 1 1 260px;
+}
+
+.wpnc-bulk-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: var(--wpnc-gap);
+    padding: 12px 16px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-1);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+    gap: var(--wpnc-gap);
+    margin-top: var(--wpnc-gap);
+}
+
+.wpnc-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--wpnc-surface);
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    box-shadow: var(--wpnc-sh-2);
+    overflow: hidden;
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.wpnc-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--wpnc-sh-3);
+}
+
+.wpnc-card-header {
+    position: absolute;
+    inset-block-start: 10px;
+    inset-inline-start: 10px;
+    z-index: 2;
+    padding: 4px 7px;
+    border-radius: var(--wpnc-r-sm);
+    background: rgba(255, 255, 255, .92);
+    backdrop-filter: blur(3px);
+    box-shadow: var(--wpnc-sh-1);
+}
+
+.wpnc-card img {
+    display: block;
+    width: 100%;
+    height: 168px;
+    object-fit: cover;
+    border-bottom: 1px solid var(--wpnc-line);
+}
+
+.wpnc-no-img {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 168px;
+    background:
+        repeating-linear-gradient(45deg, var(--wpnc-surface-2) 0 10px, #f2f3f5 10px 20px);
+    color: var(--wpnc-ink-4);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--wpnc-line);
+}
+
+.wpnc-card-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    padding: 16px 18px 18px;
+}
+
+.wpnc-card-content h4 {
+    margin: 0 0 8px;
+    font-size: 14.5px;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-source,
+.wpnc-date,
+.wpnc-tags {
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-source {
+    font-weight: 600;
+    color: var(--wpnc-brand-strong);
+}
+
+.wpnc-error-message {
+    margin: 8px 0 0;
+    padding: 8px 10px;
+    border-radius: var(--wpnc-r-sm);
+    background: var(--wpnc-danger-soft);
+    color: var(--wpnc-danger);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.wpnc-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 14px;
+}
+
+.wpnc-card-busy {
+    opacity: .5;
+    pointer-events: none;
+}
+
+.wpnc-pagination {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 22px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
+}
+
+/* ============================================================
+   Badges
+   ============================================================ */
+
+.wpnc-badge {
+    display: inline-block;
+    padding: 4px 11px;
+    border-radius: var(--wpnc-r-pill);
+    font-size: 11.5px;
+    font-weight: 700;
+    background: var(--wpnc-line-soft);
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-badge-approved,
+.wpnc-badge.wpnc-health-ok { background: var(--wpnc-ok-soft); color: var(--wpnc-ok); }
+.wpnc-badge-rejected       { background: var(--wpnc-line-soft); color: var(--wpnc-ink-3); }
+.wpnc-badge.wpnc-health-warn { background: var(--wpnc-warn-soft); color: var(--wpnc-warn); }
+.wpnc-badge.wpnc-health-bad  { background: var(--wpnc-danger-soft); color: var(--wpnc-danger); }
+.wpnc-badge.wpnc-health-off  { background: var(--wpnc-line-soft); color: var(--wpnc-ink-3); }
+
+/* ============================================================
+   States: loading, empty, error
+   ============================================================ */
+
+.wpnc-state {
+    margin: var(--wpnc-gap) 0;
+    padding: 34px 24px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    background: var(--wpnc-surface);
+    text-align: center;
+}
+
+.wpnc-state-title {
+    margin: 0 0 6px;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-state-hint {
+    margin: 0 auto;
+    max-width: 46em;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-state-empty {
+    border-style: dashed;
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-state-error {
+    border-color: rgba(200, 51, 47, .35);
+    border-inline-start-width: 4px;
+    background: var(--wpnc-danger-soft);
+    text-align: start;
+}
+
+.wpnc-state-error .wpnc-state-title {
+    color: var(--wpnc-danger);
+}
+
+.wpnc-state-error .button {
+    margin-top: 12px;
+}
+
+.wpnc-state-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--wpnc-ink-3);
+    font-weight: 600;
+}
+
+.wpnc-spinner {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border: 2px solid var(--wpnc-line);
+    border-top-color: var(--wpnc-brand);
+    border-radius: 50%;
+    animation: wpnc-spin .7s linear infinite;
+}
+
+@keyframes wpnc-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Skeletons read as "content is coming" rather than "something is busy",
+   which is the honest signal while a panel is still empty. */
+.wpnc-skeleton {
+    display: grid;
+    gap: var(--wpnc-gap);
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.wpnc-skeleton-block {
+    height: 116px;
+    border-radius: var(--wpnc-r-lg);
+    background: linear-gradient(100deg, #eef0f3 30%, #f7f8fa 50%, #eef0f3 70%);
+    background-size: 240% 100%;
+    animation: wpnc-shimmer 1.4s ease-in-out infinite;
+}
+
+.wpnc-skeleton-block.is-wide {
+    grid-column: 1 / -1;
+    height: 240px;
+}
+
+@keyframes wpnc-shimmer {
+    from { background-position: 180% 0; }
+    to   { background-position: -60% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wpnc-spinner { animation-duration: 2.4s; }
+    .wpnc-skeleton-block { animation: none; }
+    .wpnc-card, .wpnc-card-stat { transition: none; }
+}
+
+/* ============================================================
+   Flash and inline messages
+   ============================================================ */
+
+.wpnc-flash {
+    margin: 0 0 var(--wpnc-gap);
+    padding: 12px 16px;
+    border: 1px solid var(--wpnc-line);
+    border-inline-start: 4px solid var(--wpnc-info);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-info-soft);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--wpnc-ink-2);
+    box-shadow: var(--wpnc-sh-1);
+}
+
+.wpnc-flash-ok    { border-inline-start-color: var(--wpnc-ok);     background: var(--wpnc-ok-soft); }
+.wpnc-flash-warn  { border-inline-start-color: var(--wpnc-warn);   background: var(--wpnc-warn-soft); }
+.wpnc-flash-error { border-inline-start-color: var(--wpnc-danger); background: var(--wpnc-danger-soft); }
+
+.wpnc-inline-error {
+    margin-top: 12px;
+    padding: 10px 13px;
+    border-inline-start: 3px solid var(--wpnc-danger);
+    border-radius: var(--wpnc-r-sm);
+    background: var(--wpnc-danger-soft);
+    font-size: 13px;
+    color: var(--wpnc-danger);
+}
+
+.wpnc-inline-status {
+    flex: 1;
+    font-size: 13px;
+}
+
+.wpnc-status-ok    { color: var(--wpnc-ok); font-weight: 600; }
+.wpnc-status-warn  { color: var(--wpnc-warn); font-weight: 600; }
+.wpnc-status-error { color: var(--wpnc-danger); font-weight: 600; }
+
+.wpnc-warning-text {
+    color: var(--wpnc-warn);
+}
+
+.wpnc-fetch-messages {
+    margin: 10px 0 0;
+    padding-inline-start: 18px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--wpnc-ink-3);
+}
+
+/* ============================================================
+   Fetch tools and progress
+   ============================================================ */
+
+.wpnc-fetch-actions,
+.wpnc-tab-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 14px;
+}
+
+.wpnc-tab-toolbar label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-progress-wrap {
+    margin: 12px 0 4px;
+}
+
+.wpnc-progress-bar {
+    height: 8px;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-line-soft);
+    overflow: hidden;
+}
+
+.wpnc-progress-fill {
+    height: 100%;
+    width: 0;
+    border-radius: var(--wpnc-r-pill);
+    background: linear-gradient(90deg, var(--wpnc-brand), var(--wpnc-brand-strong));
+    transition: width .3s ease;
+}
+
+.wpnc-progress-text {
+    display: block;
+    margin-top: 7px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-summary-grid,
+#wpnc-stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    max-width: 980px;
+    margin-top: 14px;
+}
+
+.wpnc-summary-grid div,
+.wpnc-stat {
+    padding: 14px 12px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface);
+    text-align: center;
+    box-shadow: var(--wpnc-sh-1);
+}
+
+.wpnc-summary-grid strong,
+.wpnc-stat strong {
+    display: block;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--wpnc-ink);
+    font-variant-numeric: tabular-nums;
+}
+
+.wpnc-summary-grid span,
+.wpnc-stat span {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-stat-success strong { color: var(--wpnc-ok); }
+.wpnc-stat-warning strong { color: var(--wpnc-warn); }
+.wpnc-stat-error strong   { color: var(--wpnc-danger); }
+
+#wpnc-stats-summary .wpnc-state,
+#wpnc-stats-summary .wpnc-state-hint {
+    grid-column: 1 / -1;
+}
+
+/* ============================================================
+   Tables
+   ============================================================ */
+
+.wpnc-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-1);
+}
+
+.wpnc-wrap .widefat {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+.wpnc-wrap .widefat thead th {
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--wpnc-line);
+    background: var(--wpnc-surface-2);
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    color: var(--wpnc-ink-4);
+}
+
+.wpnc-wrap .widefat td {
+    padding: 11px 14px;
+    border-top: 1px solid var(--wpnc-line-soft);
+    font-size: 13px;
+    color: var(--wpnc-ink-2);
+    vertical-align: middle;
+}
+
+.wpnc-wrap .widefat.striped tbody tr:nth-child(odd) {
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-log-level {
+    display: inline-block;
+    padding: 3px 9px;
+    border-radius: var(--wpnc-r-pill);
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    background: var(--wpnc-line-soft);
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-log-info    { background: var(--wpnc-info-soft);   color: var(--wpnc-info); }
+.wpnc-log-warning { background: var(--wpnc-warn-soft);   color: var(--wpnc-warn); }
+.wpnc-log-error   { background: var(--wpnc-danger-soft); color: var(--wpnc-danger); }
+
+.wpnc-health-actions {
+    white-space: nowrap;
+}
+
+.wpnc-health-actions .button {
+    margin-inline-end: 4px;
+}
+
+.wpnc-health-url {
+    max-width: 32em;
+    word-break: break-all;
+    font-size: 12.5px;
+}
+
+.wpnc-health-result {
+    display: block;
+    margin-top: 7px;
+    max-width: 30em;
+    font-size: 12px;
+    white-space: normal;
+}
+
+.wpnc-health-result.wpnc-health-ok  { color: var(--wpnc-ok); }
+.wpnc-health-result.wpnc-health-bad { color: var(--wpnc-danger); }
+
+/* ============================================================
+   Modal
+   ============================================================ */
+
+.wpnc-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(16, 24, 40, .55);
+    backdrop-filter: blur(3px);
+}
+
+.wpnc-modal-content {
+    width: 580px;
+    max-width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 26px 28px 28px;
+    border-radius: var(--wpnc-r-lg);
+    background: var(--wpnc-surface);
+    box-shadow: 0 24px 60px rgba(16, 24, 40, .3);
+}
+
+.wpnc-modal-content h2 {
+    margin: 0 0 20px;
+    padding: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-field {
+    margin: 0 0 16px;
+}
+
+.wpnc-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-field .large-text {
+    width: 100%;
+}
+
+.wpnc-modal-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 22px 0 0;
+}
+
+/* ============================================================
+   Settings form
+   ============================================================ */
+
+.wpnc-wrap form .form-table {
+    margin-top: 0;
+    background: var(--wpnc-surface);
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    box-shadow: var(--wpnc-sh-2);
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+
+.wpnc-wrap form .form-table th {
+    width: 230px;
+    padding: 18px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--wpnc-ink);
+    vertical-align: top;
+}
+
+.wpnc-wrap form .form-table td {
+    padding: 16px 22px 18px;
+    vertical-align: top;
+}
+
+.wpnc-wrap form .form-table tr + tr th,
+.wpnc-wrap form .form-table tr + tr td {
+    border-top: 1px solid var(--wpnc-line-soft);
+}
+
+.wpnc-wrap .form-table .description {
+    margin-top: 7px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--wpnc-ink-3);
+    font-style: normal;
+}
+
+.wpnc-wrap .form-table label {
+    font-size: 13px;
+}
+
+.wpnc-wrap .notice {
+    border-radius: var(--wpnc-r);
+    border-inline-start-width: 4px;
+    box-shadow: var(--wpnc-sh-1);
+}
+
+/* ============================================================
+   Small screens
+   ============================================================ */
+
 @media screen and (max-width: 782px) {
-    .wpnc-dash-head { flex-direction: column; align-items: stretch; }
-    .wpnc-dash-actions .button { width: 100%; text-align: center; }
+    .wpnc-wrap {
+        margin-inline: -10px;
+        padding-inline: 10px;
+    }
+
+    .wpnc-grid { grid-template-columns: 1fr; }
+
+    .wpnc-dash-head,
+    .wpnc-queue-toolbar,
+    .wpnc-bulk-actions,
+    .wpnc-fetch-actions,
+    .wpnc-tab-toolbar,
+    .wpnc-modal-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .wpnc-dash-actions .button,
+    .wpnc-bulk-actions .button,
+    .wpnc-fetch-actions .button,
+    .wpnc-modal-actions .button,
+    .wpnc-actions .button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .wpnc-actions { flex-direction: column; }
+
     .wpnc-card-stats { grid-template-columns: repeat(2, 1fr); }
+    .wpnc-card-stat-value { font-size: 26px; }
+
     .wpnc-bars-row { grid-template-columns: 1fr auto; }
     .wpnc-bars-track { grid-column: 1 / -1; }
+
+    .wpnc-modal { padding: 0; }
+    .wpnc-modal-content {
+        width: 100%;
+        max-height: 100vh;
+        min-height: 100vh;
+        border-radius: 0;
+    }
+
+    .wpnc-wrap form .form-table th {
+        width: auto;
+        padding-bottom: 0;
+    }
+
+    .wpnc-health-actions { white-space: normal; }
+    .wpnc-health-actions .button { margin: 0 4px 4px 0; }
+}
+
+@media screen and (max-width: 480px) {
+    .wpnc-card img,
+    .wpnc-no-img { height: 150px; }
+    .wpnc-card-stats { grid-template-columns: 1fr; }
 }
