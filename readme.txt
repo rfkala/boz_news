@@ -142,7 +142,7 @@ Static checks (no PHP required):
 
 Unit tests, without installing anything (Windows):
 
-`.	oolsun-tests.ps1`
+`tools/run-tests.ps1`
 
 It uses a portable PHP ZIP and phpunit.phar; run it with `-Setup` for the two
 download links. Where Composer is available, `composer install && vendor/bin/phpunit`

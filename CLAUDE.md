@@ -32,12 +32,12 @@ real weight:
 ```
 python tools/verify.py     # structure, references, i18n parity, translations
 node --check assets/admin.js
-.	oolsun-tests.ps1      # unit tests
+tools/run-tests.ps1      # unit tests
 ```
 
 `run-tests.ps1` needs no installer, no admin rights and no Docker: it finds a
 portable PHP (a ZIP extracted to `.php/`) and `phpunit.phar`, writes the
-minimal `php.ini` the ZIP omits, and runs the suite. `.	oolsun-tests.ps1
+minimal `php.ini` the ZIP omits, and runs the suite. `tools/run-tests.ps1
 -Setup` prints the two download links. Composer works too where it is
 available, but is not required.
 
