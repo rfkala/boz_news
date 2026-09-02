@@ -140,9 +140,13 @@ Static checks (no PHP required):
 
 `python tools/verify.py`
 
-Unit tests:
+Unit tests, without installing anything (Windows):
 
-`composer install && vendor/bin/phpunit`
+`.	oolsun-tests.ps1`
+
+It uses a portable PHP ZIP and phpunit.phar; run it with `-Setup` for the two
+download links. Where Composer is available, `composer install && vendor/bin/phpunit`
+works as well.
 
 Regenerate translation files after changing any `__()` string:
 

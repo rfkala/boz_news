@@ -17,3 +17,7 @@ Thumbs.db
 # Local agent state
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Portable PHP and PHPUnit, dropped in by tools/run-tests.ps1
+.php/
+phpunit.phar
