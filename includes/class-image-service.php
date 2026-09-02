@@ -77,29 +77,55 @@ class WPNC_Image_Service {
 	}
 
 	/**
+	 * Why the last extract_full_text() call returned nothing.
+	 *
+	 * @var string
+	 */
+	private $last_failure = '';
+
+	/**
+	 * Reason the last extraction produced no text, or an empty string.
+	 *
+	 * @return string
+	 */
+	public function last_failure() {
+		return $this->last_failure;
+	}
+
+	/**
 	 * Extract article body text.
+	 *
+	 * Returns '' for every failure. The reason is recorded separately so the
+	 * caller can log it rather than silently keeping the feed summary and
+	 * leaving the admin to wonder whether the setting works at all.
 	 *
 	 * @param string $url Article URL.
 	 * @return string
 	 */
 	public function extract_full_text( $url ) {
+		$this->last_failure = '';
+
 		if ( ! $this->feed_reader->is_safe_url( $url ) ) {
+			$this->last_failure = 'unsafe_url';
 			return '';
 		}
 
 		$html = $this->remote_get_body( $url );
 		if ( empty( $html ) ) {
+			$this->last_failure = 'no_response';
 			return '';
 		}
 
 		$doc = $this->load_dom( $html );
 		if ( ! $doc ) {
+			$this->last_failure = 'unparseable_html';
 			return '';
 		}
 
 		$xpath      = new DOMXPath( $doc );
 		$paragraphs = $xpath->query( self::CONTENT_QUERY );
 		if ( ! $paragraphs || 0 === $paragraphs->length ) {
+			$this->last_failure = 'no_matching_paragraphs';
 			return '';
 		}
 
@@ -118,6 +144,10 @@ class WPNC_Image_Service {
 			if ( $count >= 30 ) {
 				break;
 			}
+		}
+
+		if ( '' === $content ) {
+			$this->last_failure = 'paragraphs_too_short';
 		}
 
 		return $content;

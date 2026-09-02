@@ -369,8 +369,24 @@ class WPNC_Fetcher {
 
 		if ( get_option( 'wpnc_extract_full_text', 0 ) ) {
 			$full_text = $this->image_service->extract_full_text( $item['main_link'] );
+
 			if ( ! empty( $full_text ) ) {
 				$item['description'] = $full_text;
+			} else {
+				// The feed summary is kept, which is the right fallback, but
+				// it used to happen without a trace.
+				$this->logger->log(
+					WPNC_Logger::LEVEL_WARNING,
+					wpnc__(
+						'Full-text extraction found nothing; the feed summary was kept.',
+						'استخراج متن کامل چیزی پیدا نکرد؛ خلاصه فید حفظ شد.'
+					),
+					array(
+						'reason' => $this->image_service->last_failure(),
+						'url'    => $item['main_link'],
+					),
+					$item['source_key']
+				);
 			}
 		}
 
