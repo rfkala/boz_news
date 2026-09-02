@@ -21,3 +21,6 @@ Thumbs.db
 # Portable PHP and PHPUnit, dropped in by tools/run-tests.ps1
 .php/
 phpunit.phar
+
+# Release archives built by tools/build-zip.py
+dist/

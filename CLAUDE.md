@@ -44,6 +44,16 @@ available, but is not required.
 `tools/check_references.py` catches a method renamed in one file and still
 called in another — the failure mode `php -l` cannot see.
 
+## Where this actually runs
+
+This repo is the plugin source only - no WordPress, no PHP, no MySQL. See
+`tools/local-wp.md` for the three separate environments and how to get each.
+
+- `tools/link-to-wp.ps1` junctions this folder into a local WordPress, so
+  there is no upload step while developing.
+- `tools/build-zip.py` builds the release archive. Never hand-zip the repo -
+  that ships tests/, tools/ and .github/ to the live site.
+
 ## Architecture
 
 - `class-fetcher.php` — orchestration, cron, the run lock, source health.

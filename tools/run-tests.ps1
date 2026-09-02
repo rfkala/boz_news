@@ -37,11 +37,25 @@ function Find-Php {
         "$env:USERPROFILE\php\php.exe",
         'C:\php\php.exe',
         'C:\tools\php\php.exe',
-        'C:\xampp\php\php.exe',
-        'C:\laragon\bin\php\php.exe'
+        'C:\xampp\php\php.exe'
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) { return $c }
+    }
+
+    # Laragon and some XAMPP layouts keep PHP in a version-named subfolder,
+    # e.g. C:\laragon\bin\php\php-8.3.2-Win32-vs16-x64\php.exe. Take the
+    # highest version found.
+    $globs = @(
+        'C:\laragon\bin\php\*\php.exe',
+        "$env:USERPROFILE\laragon\bin\php\*\php.exe",
+        'D:\laragon\bin\php\*\php.exe'
+    )
+    foreach ($g in $globs) {
+        $found = Get-ChildItem -Path $g -ErrorAction SilentlyContinue |
+            Sort-Object -Property FullName -Descending |
+            Select-Object -First 1
+        if ($found) { return $found.FullName }
     }
 
     return $null
