@@ -73,13 +73,22 @@ class WPNC_DB {
 		set_transient( self::UPGRADE_LOCK, WPNC_Time::timestamp(), 5 * MINUTE_IN_SECONDS );
 
 		try {
-			$this->create_tables();
+			$tables_ready = $this->create_tables();
 
 			// 1.2.0 moved every stored datetime to UTC. Rows written by
 			// earlier versions hold site-local time, so shift them once or
 			// retention will delete them off by the site's GMT offset.
+			//
+			// Skipped when the tables are not there: rewriting timestamps in
+			// a table that failed to create would only produce SQL errors,
+			// and the version must not advance past a migration that never
+			// ran.
+			if ( ! $tables_ready ) {
+				return;
+			}
+
 			if ( '0' !== $version && version_compare( $version, '1.2.0', '<' ) ) {
-				$this->migrate_datetimes_to_utc();
+				$this->migrate_datetimes_to_utc( $version );
 			}
 
 			update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
@@ -93,8 +102,10 @@ class WPNC_DB {
 	 *
 	 * pub_date is deliberately excluded: it was already written through
 	 * gmdate() before 1.2.0 and is therefore already UTC.
+	 *
+	 * @param string $from_version Version being upgraded from, for the record.
 	 */
-	private function migrate_datetimes_to_utc() {
+	private function migrate_datetimes_to_utc( $from_version ) {
 		global $wpdb;
 
 		$offset = WPNC_Time::offset_seconds();
@@ -106,7 +117,7 @@ class WPNC_DB {
 		$logs  = $wpdb->prefix . 'news_collector_logs';
 
 		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$wpdb->query(
+		$queue_rows = (int) $wpdb->query(
 			$wpdb->prepare(
 				"UPDATE $queue SET
 					created_at   = DATE_SUB( created_at, INTERVAL %d SECOND ),
@@ -118,13 +129,36 @@ class WPNC_DB {
 			)
 		);
 
-		$wpdb->query(
+		$log_rows = (int) $wpdb->query(
 			$wpdb->prepare(
 				"UPDATE $logs SET created_at = DATE_SUB( created_at, INTERVAL %d SECOND )",
 				$offset
 			)
 		);
 		// phpcs:enable WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+
+		// A one-way rewrite of every stored timestamp should leave a record
+		// saying it happened and by how much.
+		$logger = new WPNC_Logger();
+		$logger->log(
+			WPNC_Logger::LEVEL_WARNING,
+			sprintf(
+				/* translators: 1: queue row count, 2: log row count, 3: offset in hours */
+				wpnc__(
+					'Upgrade migrated stored timestamps to UTC: %1$d queue rows and %2$d log rows shifted by %3$s hours.',
+					'ارتقا زمان‌های ذخیره‌شده را به UTC منتقل کرد: %1$d ردیف صف و %2$d ردیف لاگ به اندازه %3$s ساعت جابه‌جا شدند.'
+				),
+				$queue_rows,
+				$log_rows,
+				number_format_i18n( $offset / HOUR_IN_SECONDS, 1 )
+			),
+			array(
+				'from_version'   => $from_version,
+				'offset_seconds' => $offset,
+				'queue_rows'     => $queue_rows,
+				'log_rows'       => $log_rows,
+			)
+		);
 	}
 
 	/**
