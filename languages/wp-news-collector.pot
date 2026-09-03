@@ -7,11 +7,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:301
+#: wp-news-collector.php:331
 msgid "Boz News"
 msgstr ""
 
-#: wp-news-collector.php:303
+#: wp-news-collector.php:333
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr ""
 
@@ -40,7 +40,7 @@ msgstr ""
 msgid "No more news"
 msgstr ""
 
-#: includes/class-ajax.php:728
+#: includes/class-ajax.php:841
 msgid "No more posts available."
 msgstr ""
 

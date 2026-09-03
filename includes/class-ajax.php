@@ -44,6 +44,8 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_test_source', array( $this, 'test_source' ) );
 		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
+		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
+		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
 		add_action( 'wp_ajax_wpnc_get_dashboard', array( $this, 'get_dashboard' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
@@ -473,6 +475,117 @@ class WPNC_Ajax {
 		wp_send_json_success(
 			array(
 				'message' => wpnc__( 'Failure history cleared; this source will be tried on the next run.', 'تاریخچه خطا پاک شد؛ این منبع در اجرای بعدی دوباره تلاش می‌شود.' ),
+			)
+		);
+	}
+
+	/**
+	 * Pull the full article body for one queue item, on demand.
+	 *
+	 * The fetch-time setting does this for every item; this is the button for
+	 * when you want it for the one story in front of you. Nothing is saved
+	 * here - the text goes back to the editor and the editor decides.
+	 */
+	public function fetch_full_text() {
+		$this->check_admin_request();
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 120 );
+
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		$service = new WPNC_Image_Service();
+		$content = $service->extract_full_text( $item->main_link );
+
+		if ( '' === $content ) {
+			$reasons = array(
+				'unsafe_url'             => wpnc__( 'That article URL is not safe to request.', 'آدرس این مقاله برای درخواست امن نیست.' ),
+				'no_response'            => wpnc__( 'The article page did not respond.', 'صفحه مقاله پاسخ نداد.' ),
+				'unparseable_html'       => wpnc__( 'The article page could not be parsed.', 'صفحه مقاله قابل تحلیل نبود.' ),
+				'no_matching_paragraphs' => wpnc__( 'No article body was found on that page.', 'در آن صفحه بدنه مقاله پیدا نشد.' ),
+				'paragraphs_too_short'   => wpnc__( 'The page had no text long enough to be an article.', 'متن آن صفحه برای یک مقاله بیش از حد کوتاه بود.' ),
+			);
+
+			$reason = $service->last_failure();
+
+			$this->fail(
+				isset( $reasons[ $reason ] ) ? $reasons[ $reason ] : wpnc__( 'Nothing could be extracted.', 'چیزی قابل استخراج نبود.' ),
+				'wpnc_no_full_text'
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'content' => $content,
+				'message' => sprintf(
+					/* translators: %d: word count */
+					wpnc__( 'Full text loaded, about %d words.', 'متن کامل بارگذاری شد، حدود %d کلمه.' ),
+					str_word_count( wp_strip_all_tags( $content ) )
+				),
+			)
+		);
+	}
+
+	/**
+	 * Run an AI action over the editor's current content.
+	 */
+	public function ai_transform() {
+		$this->check_admin_request();
+
+		if ( ! WPNC_AI_Rewriter::is_configured() ) {
+			$this->fail(
+				wpnc__(
+					'Add an OpenAI API key under Settings to use the assistant.',
+					'برای استفاده از دستیار، کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید.'
+				),
+				'wpnc_ai_not_configured',
+				array(),
+				409
+			);
+		}
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 180 );
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$content     = isset( $_POST['content'] ) ? wp_kses( wp_unslash( $_POST['content'] ), WPNC_AI_Rewriter::allowed_html() ) : '';
+		$title       = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+		$action      = isset( $_POST['ai_action'] ) ? sanitize_key( wp_unslash( $_POST['ai_action'] ) ) : 'rewrite';
+		$instruction = isset( $_POST['instruction'] ) ? sanitize_textarea_field( wp_unslash( $_POST['instruction'] ) ) : '';
+
+		$rewriter = new WPNC_AI_Rewriter();
+		$result   = $rewriter->transform(
+			array(
+				'content'     => $content,
+				'title'       => $title,
+				'action'      => $action,
+				'instruction' => $instruction,
+				'language'    => sanitize_text_field( get_option( 'wpnc_target_language', '' ) ),
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			$this->logger->log(
+				WPNC_Logger::LEVEL_WARNING,
+				wpnc__( 'AI assistant request failed.', 'درخواست دستیار هوش مصنوعی ناموفق بود.' ),
+				array(
+					'action' => $action,
+					'error'  => $result->get_error_message(),
+				)
+			);
+
+			$this->fail( $result->get_error_message(), 'wpnc_ai_failed' );
+		}
+
+		wp_send_json_success(
+			array(
+				'content' => $result['content'],
+				'message' => wpnc__( 'The assistant returned a new version.', 'دستیار نسخه جدیدی برگرداند.' ),
 			)
 		);
 	}

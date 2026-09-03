@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -153,6 +153,24 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.5.0 =
+* Added: the edit screen is a real editor. WordPress's own TinyMCE with
+  formatting, links, lists and media, in place of a plain textarea.
+* Added: "Load full article" pulls the whole story into the editor on demand,
+  for the one item in front of you rather than as a global setting.
+* Added: an AI assistant in the editor - rewrite, expand, shorten, translate,
+  suggest titles or tags - plus a free-form box where you say what you want
+  changed and it applies it. Every result is undoable.
+* Changed: full-text extraction keeps the article's structure. Headings,
+  lists, quotes, links and images survive, with relative URLs made absolute.
+  It previously ran esc_html() over each paragraph and threw all of that away.
+* Fixed: admin scripts and styles lost their modification-time versioning
+  because the translation generator rewrote that block from a stale template.
+  A check now fails the build if it regresses again.
+* Fixed: the activity chart wasted most of its height when one day was busy,
+  put its value axis on the wrong side in Persian, and showed approved/total
+  ratios reversed inside a right-to-left line.
 
 = 1.4.0 =
 * Changed: the admin panel has its own design system - colour, spacing, radii

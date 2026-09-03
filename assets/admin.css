@@ -368,7 +368,8 @@
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 720 / 220;
+    aspect-ratio: 720 / 170;
+    max-height: 210px;
     overflow: visible;
 }
 
@@ -1251,4 +1252,165 @@
     .wpnc-card img,
     .wpnc-no-img { height: 150px; }
     .wpnc-card-stats { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   Edit workbench
+   ============================================================ */
+
+.wpnc-modal-content.is-wide {
+    width: 880px;
+}
+
+.wpnc-modal-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.wpnc-modal-head h2 {
+    margin: 0;
+}
+
+.wpnc-modal-source {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--wpnc-brand-strong);
+    text-decoration: none;
+}
+
+.wpnc-modal-source:hover {
+    text-decoration: underline;
+}
+
+.wpnc-field-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.wpnc-field-head label {
+    margin: 0;
+}
+
+.wpnc-field-tools {
+    display: inline-flex;
+    gap: 6px;
+}
+
+/* wp-admin styles the editor chrome for a full-width page; inside a modal it
+   needs its own frame or it floats unattached. */
+.wpnc-field .wp-editor-wrap {
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    overflow: hidden;
+    background: var(--wpnc-surface);
+}
+
+.wpnc-field .wp-editor-tabs {
+    padding: 6px 8px 0;
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-field .wp-editor-container {
+    border: 0;
+}
+
+.wpnc-field .mce-toolbar-grp,
+.wpnc-field .quicktags-toolbar {
+    border-bottom: 1px solid var(--wpnc-line-soft);
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-field textarea.wp-editor-area {
+    border: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.wpnc-editor-status {
+    margin-top: 10px;
+    padding: 9px 12px;
+    border-radius: var(--wpnc-r-sm);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.wpnc-editor-status.is-ok    { background: var(--wpnc-ok-soft);     color: var(--wpnc-ok); }
+.wpnc-editor-status.is-busy  { background: var(--wpnc-info-soft);   color: var(--wpnc-info); }
+.wpnc-editor-status.is-error { background: var(--wpnc-danger-soft); color: var(--wpnc-danger); }
+
+/* --- AI strip --- */
+
+.wpnc-ai {
+    margin-top: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background:
+        radial-gradient(120% 220% at 100% 0%, var(--wpnc-brand-soft) 0%, rgba(255,255,255,0) 60%),
+        var(--wpnc-surface-2);
+}
+
+.wpnc-ai-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 12px;
+}
+
+.wpnc-ai-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: var(--wpnc-r-pill);
+    background: linear-gradient(140deg, var(--wpnc-brand), var(--wpnc-brand-strong));
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.wpnc-ai-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-ai-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.wpnc-ai-custom {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.wpnc-ai-custom input {
+    flex: 1;
+    min-width: 0;
+}
+
+.wpnc-ai-off {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--wpnc-ink-3);
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-ai-custom { flex-direction: column; }
+    .wpnc-field-head { flex-direction: column; align-items: stretch; }
+    .wpnc-field-tools .button { flex: 1; }
 }

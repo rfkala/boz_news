@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.4.0' );
+define( 'WPNC_VERSION', '1.5.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -100,8 +100,12 @@ function wpnc_enqueue_admin_assets( $hook ) {
 		return;
 	}
 
-	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), WPNC_VERSION );
-	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), WPNC_VERSION, true );
+	// Brings in TinyMCE and Quicktags so wp.editor.initialize() works on the
+	// textarea the moderation modal creates at runtime.
+	wp_enqueue_editor();
+
+	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), wpnc_asset_version( 'assets/admin.css' ) );
+	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), wpnc_asset_version( 'assets/admin.js' ), true );
 	wp_localize_script(
 		'wpnc-admin-script',
 		'wpnc_ajax',
@@ -110,6 +114,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			'nonce'          => wp_create_nonce( 'wpnc_admin_nonce' ),
 			'lang'           => get_option( 'wpnc_admin_lang', 'fa' ),
 			'post_edit_base' => admin_url( 'post.php?action=edit&post=' ),
+			'ai_enabled'     => WPNC_AI_Rewriter::is_configured(),
+			'ai_actions'     => WPNC_AI_Rewriter::actions(),
 			'i18n'           => array(
 				'loading'                => 'Loading...',
 				'processing'             => 'Processing...',
@@ -177,6 +183,18 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dash_no_activity'       => 'No items were collected in this period.',
 				'dash_no_sources_yet'    => 'No source has produced an item yet.',
 				'dash_approved_of_total' => 'approved of total',
+				'load_full_text'         => 'Load full article',
+				'open_original'          => 'Open the original',
+				'undo'                   => 'Undo',
+				'ai_badge'               => 'AI',
+				'ai_title'               => 'Assistant',
+				'ai_apply'               => 'Apply',
+				'ai_working'             => 'The assistant is working on it...',
+				'ai_undo_hint'           => 'Use Undo to go back.',
+				'ai_need_instruction'    => 'Tell the assistant what to change.',
+				'ai_instruction_label'   => 'What should the assistant change?',
+				'ai_placeholder'         => 'e.g. add a short intro paragraph explaining the background',
+				'ai_disabled'            => 'Add an OpenAI API key under Settings to use the assistant.',
 				'error_network'          => 'Could not reach the server. Check your connection and try again.',
 				'error_server'           => 'The server returned an error. Check Logs & Tools for details.',
 				'error_forbidden'        => 'Your session expired or you lack permission. Reload the page and sign in again.',
@@ -264,6 +282,18 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dash_no_activity'       => 'در این بازه خبری جمع‌آوری نشده است.',
 				'dash_no_sources_yet'    => 'هنوز هیچ منبعی خبری تولید نکرده است.',
 				'dash_approved_of_total' => 'تأییدشده از کل',
+				'load_full_text'         => 'دریافت متن کامل',
+				'open_original'          => 'مشاهده اصل خبر',
+				'undo'                   => 'بازگردانی',
+				'ai_badge'               => 'هوش مصنوعی',
+				'ai_title'               => 'دستیار',
+				'ai_apply'               => 'اعمال',
+				'ai_working'             => 'دستیار در حال کار است...',
+				'ai_undo_hint'           => 'برای بازگشت، «بازگردانی» را بزنید.',
+				'ai_need_instruction'    => 'به دستیار بگویید چه تغییری می‌خواهید.',
+				'ai_instruction_label'   => 'دستیار چه تغییری بدهد؟',
+				'ai_placeholder'         => 'مثلاً: یک پاراگراف مقدمه کوتاه دربارهٔ پیشینه اضافه کن',
+				'ai_disabled'            => 'برای استفاده از دستیار، کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید.',
 				'error_network'          => 'ارتباط با سرور برقرار نشد. اتصال خود را بررسی و دوباره تلاش کنید.',
 				'error_server'           => 'سرور خطا برگرداند. برای جزئیات به تب لاگ و ابزارها مراجعه کنید.',
 				'error_forbidden'        => 'نشست شما منقضی شده یا دسترسی ندارید. صفحه را تازه کنید و دوباره وارد شوید.',

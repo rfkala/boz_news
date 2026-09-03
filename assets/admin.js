@@ -407,26 +407,161 @@ jQuery(function($) {
         return $field;
     }
 
+    /* ==========================================================
+       Edit modal: a workbench, not a text box
+
+       The description is edited in WordPress's own TinyMCE via
+       wp.editor.initialize(), so formatting, links, lists and images all
+       survive - which only matters because full-text extraction now keeps
+       them instead of flattening the article to plain paragraphs.
+       ========================================================== */
+
+    var EDITOR_ID = 'wpnc-edit-desc';
+    var editorHistory = [];
+
+    function editorAvailable() {
+        return !!(window.wp && wp.editor && typeof wp.editor.initialize === 'function');
+    }
+
+    function editorGet() {
+        if (editorAvailable() && window.tinymce) {
+            var ed = tinymce.get(EDITOR_ID);
+            if (ed && !ed.isHidden()) {
+                return ed.getContent();
+            }
+        }
+        return $('#' + EDITOR_ID).val() || '';
+    }
+
+    function editorSet(html) {
+        if (editorAvailable() && window.tinymce) {
+            var ed = tinymce.get(EDITOR_ID);
+            if (ed && !ed.isHidden()) {
+                ed.setContent(html || '');
+                $('#' + EDITOR_ID).val(html || '');
+                return;
+            }
+        }
+        $('#' + EDITOR_ID).val(html || '');
+    }
+
+    /* Every AI action and full-text load is undoable, because an assistant
+       that silently replaces an editor's work is not usable. */
+    function editorPush() {
+        editorHistory.push(editorGet());
+        $('#wpnc-editor-undo').prop('disabled', false);
+    }
+
+    function editorUndo() {
+        if (!editorHistory.length) {
+            return;
+        }
+        editorSet(editorHistory.pop());
+        $('#wpnc-editor-undo').prop('disabled', !editorHistory.length);
+    }
+
+    function editorStatus(message, type) {
+        var $box = $('#wpnc-editor-status');
+        if (!message) {
+            $box.empty().hide();
+            return;
+        }
+        $box.attr('class', 'wpnc-editor-status is-' + (type || 'ok'))
+            .attr('dir', 'auto')
+            .text(message)
+            .show();
+    }
+
+    function renderAiStrip($parent) {
+        var $strip = $('<div>').addClass('wpnc-ai').appendTo($parent);
+
+        $('<div>').addClass('wpnc-ai-head')
+            .append($('<span>').addClass('wpnc-ai-badge').text(t('ai_badge', 'AI')))
+            .append($('<span>').addClass('wpnc-ai-title').text(t('ai_title', 'Assistant')))
+            .appendTo($strip);
+
+        if (!wpnc_ajax.ai_enabled) {
+            $('<p>').addClass('wpnc-ai-off').attr('dir', 'auto')
+                .text(t('ai_disabled', 'Add an OpenAI API key under Settings to use the assistant.'))
+                .appendTo($strip);
+            return;
+        }
+
+        var $actions = $('<div>').addClass('wpnc-ai-actions').appendTo($strip);
+        var actions = wpnc_ajax.ai_actions || {};
+        Object.keys(actions).forEach(function(key) {
+            $('<button>')
+                .attr({ type: 'button', 'data-action': key })
+                .addClass('button button-small wpnc-ai-run')
+                .text(actions[key])
+                .appendTo($actions);
+        });
+
+        var $custom = $('<div>').addClass('wpnc-ai-custom').appendTo($strip);
+        $('<label>')
+            .addClass('screen-reader-text')
+            .attr('for', 'wpnc-ai-instruction')
+            .text(t('ai_instruction_label', 'What should the assistant change?'))
+            .appendTo($custom);
+        $('<input>')
+            .attr({
+                type: 'text',
+                id: 'wpnc-ai-instruction',
+                dir: 'auto',
+                placeholder: t('ai_placeholder', 'e.g. add a short intro paragraph explaining the background')
+            })
+            .appendTo($custom);
+        $('<button>')
+            .attr({ type: 'button', 'data-action': 'custom' })
+            .addClass('button button-primary wpnc-ai-run')
+            .text(t('ai_apply', 'Apply'))
+            .appendTo($custom);
+    }
+
     function renderEditModal($app) {
         var $modal = $('<div>')
             .attr({ id: 'wpnc-edit-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'wpnc-edit-heading' })
             .addClass('wpnc-modal')
             .hide();
-        var $content = $('<div>').addClass('wpnc-modal-content').appendTo($modal);
+        var $content = $('<div>').addClass('wpnc-modal-content is-wide').appendTo($modal);
 
-        $('<h2>').attr('id', 'wpnc-edit-heading').text(t('edit_item', 'Edit News Item')).appendTo($content);
+        var $head = $('<div>').addClass('wpnc-modal-head').appendTo($content);
+        $('<h2>').attr('id', 'wpnc-edit-heading').text(t('edit_item', 'Edit News Item')).appendTo($head);
+        $('<a>').attr({ id: 'wpnc-edit-source', target: '_blank', rel: 'noopener noreferrer' })
+            .addClass('wpnc-modal-source')
+            .text(t('open_original', 'Open the original'))
+            .appendTo($head);
+
         $('<input>').attr({ type: 'hidden', id: 'wpnc-edit-id' }).appendTo($content);
 
         labelledField($content, 'wpnc-edit-title', t('field_title', 'Title'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
-        labelledField($content, 'wpnc-edit-desc', t('field_description', 'Description'),
-            $('<textarea>').attr({ rows: 8, dir: 'auto' }).addClass('large-text'));
+
+        var $descField = $('<div>').addClass('wpnc-field').appendTo($content);
+        var $descHead = $('<div>').addClass('wpnc-field-head').appendTo($descField);
+        $('<label>').attr('for', EDITOR_ID).text(t('field_description', 'Description')).appendTo($descHead);
+
+        var $tools = $('<span>').addClass('wpnc-field-tools').appendTo($descHead);
+        $('<button>').attr({ type: 'button', id: 'wpnc-load-full-text' })
+            .addClass('button button-small')
+            .text(t('load_full_text', 'Load full article'))
+            .appendTo($tools);
+        $('<button>').attr({ type: 'button', id: 'wpnc-editor-undo' })
+            .addClass('button button-small')
+            .prop('disabled', true)
+            .text(t('undo', 'Undo'))
+            .appendTo($tools);
+
+        $('<textarea>').attr({ id: EDITOR_ID, rows: 16, dir: 'auto' }).addClass('large-text').appendTo($descField);
+        $('<div>').attr('id', 'wpnc-editor-status').addClass('wpnc-editor-status').hide().appendTo($descField);
+
+        renderAiStrip($descField);
+
         labelledField($content, 'wpnc-edit-tags', t('field_tags', 'Tags (comma separated)'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
 
         $('<p>').addClass('wpnc-modal-actions')
             .append($('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-save-edit').text(t('save', 'Save')))
-            .append(' ')
             .append($('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-close-modal').text(t('cancel', 'Cancel')))
             .appendTo($content);
 
@@ -436,16 +571,50 @@ jQuery(function($) {
     }
 
     function openModal(item) {
+        editorHistory = [];
+
         $('#wpnc-edit-id').val(item.id);
         $('#wpnc-edit-title').val(item.title || '');
-        $('#wpnc-edit-desc').val(item.description || '');
         $('#wpnc-edit-tags').val(item.tags || '');
         $('#wpnc-edit-error').hide().empty();
+        $('#wpnc-editor-undo').prop('disabled', true);
+        editorStatus('');
+
+        var $source = $('#wpnc-edit-source');
+        if (item.main_link) {
+            $source.attr('href', item.main_link).show();
+        } else {
+            $source.hide();
+        }
+
         $('#wpnc-edit-modal').show();
+
+        // TinyMCE has to be initialised while the textarea is visible, and
+        // torn down on close or the next open gets a stale instance.
+        if (editorAvailable()) {
+            wp.editor.remove(EDITOR_ID);
+            $('#' + EDITOR_ID).val(item.description || '');
+            wp.editor.initialize(EDITOR_ID, {
+                tinymce: {
+                    wpautop: true,
+                    toolbar1: 'formatselect,bold,italic,bullist,numlist,blockquote,link,unlink,removeformat,undo,redo',
+                    directionality: (wpnc_ajax.lang === 'fa') ? 'rtl' : 'ltr'
+                },
+                quicktags: true,
+                mediaButtons: true
+            });
+        } else {
+            $('#' + EDITOR_ID).val(item.description || '');
+        }
+
         $('#wpnc-edit-title').trigger('focus');
     }
 
     function closeModal() {
+        if (editorAvailable()) {
+            wp.editor.remove(EDITOR_ID);
+        }
+        editorHistory = [];
         $('#wpnc-edit-modal').hide();
     }
 
@@ -521,6 +690,11 @@ jQuery(function($) {
         });
 
         $('#wpnc-save-edit').off('click').on('click', saveEdit);
+        $('#wpnc-load-full-text').off('click').on('click', loadFullText);
+        $('#wpnc-editor-undo').off('click').on('click', editorUndo);
+        $('.wpnc-ai-run').off('click').on('click', function() {
+            runAi($(this), $(this).data('action'));
+        });
 
         $('#wpnc-bulk-approve').off('click').on('click', function() {
             actionBulk($(this), 'wpnc_bulk_approve');
@@ -555,6 +729,60 @@ jQuery(function($) {
         });
     }
 
+    function loadFullText() {
+        var $button = $('#wpnc-load-full-text');
+
+        setBusy($button, true);
+        editorStatus(t('loading', 'Loading...'), 'busy');
+
+        request('wpnc_fetch_full_text', { id: $('#wpnc-edit-id').val() })
+            .done(function(data) {
+                editorPush();
+                editorSet(data.content);
+                editorStatus(data.message, 'ok');
+            })
+            .fail(function(error) {
+                editorStatus(error.message, 'error');
+            })
+            .always(function() {
+                setBusy($button, false);
+            });
+    }
+
+    function runAi($button, action) {
+        var instruction = $('#wpnc-ai-instruction').val() || '';
+
+        if (action === 'custom' && !$.trim(instruction)) {
+            editorStatus(t('ai_need_instruction', 'Tell the assistant what to change.'), 'error');
+            $('#wpnc-ai-instruction').trigger('focus');
+            return;
+        }
+
+        $('.wpnc-ai-run').prop('disabled', true);
+        setBusy($button, true);
+        editorStatus(t('ai_working', 'The assistant is working on it...'), 'busy');
+
+        request('wpnc_ai_transform', {
+            id: $('#wpnc-edit-id').val(),
+            title: $('#wpnc-edit-title').val(),
+            content: editorGet(),
+            ai_action: action,
+            instruction: instruction
+        })
+            .done(function(data) {
+                editorPush();
+                editorSet(data.content);
+                editorStatus(data.message + ' ' + t('ai_undo_hint', 'Use Undo to go back.'), 'ok');
+            })
+            .fail(function(error) {
+                editorStatus(error.message, 'error');
+            })
+            .always(function() {
+                $('.wpnc-ai-run').prop('disabled', false);
+                setBusy($button, false);
+            });
+    }
+
     function saveEdit() {
         var $button = $(this);
         var $error = $('#wpnc-edit-error');
@@ -572,7 +800,7 @@ jQuery(function($) {
         request('wpnc_edit_item', {
             id: $('#wpnc-edit-id').val(),
             title: title,
-            description: $('#wpnc-edit-desc').val(),
+            description: editorGet(),
             tags: $('#wpnc-edit-tags').val()
         })
             .done(function(data) {
@@ -1063,17 +1291,23 @@ jQuery(function($) {
         var $panel = $('<div>').addClass('wpnc-panel').appendTo($app);
         $('<h3>').text(t('dash_activity', 'Last 14 days')).appendTo($panel);
 
-        var peak = 0;
-        series.forEach(function(d) { peak = Math.max(peak, d.total); });
+        var busiest = 0;
+        series.forEach(function(d) { busiest = Math.max(busiest, d.total); });
 
-        if (!peak) {
+        // A floor keeps a single busy day from becoming one hairline bar in a
+        // mostly empty box, and rounding up gives the axis a sane top.
+        var peak = Math.max(busiest, 4);
+        peak = Math.ceil(peak / 4) * 4;
+
+        if (!busiest) {
             $('<p>').addClass('wpnc-state-hint').text(
                 t('dash_no_activity', 'No items were collected in this period.')
             ).appendTo($panel);
             return;
         }
 
-        var W = 720, H = 200, padB = 26, padT = 10;
+        var rtl = $('.wpnc-wrap').hasClass('wpnc-rtl');
+        var W = 720, H = 170, padB = 24, padT = 10;
         var slot = W / series.length;
         var barW = Math.max(6, Math.min(34, slot * 0.62));
 
@@ -1092,8 +1326,13 @@ jQuery(function($) {
             chart.appendChild(svg('line', {
                 x1: 0, x2: W, y1: y, y2: y, class: 'wpnc-chart-grid'
             }));
+            // SVG coordinates do not follow the CSS writing direction, so
+            // the value axis has to be placed explicitly.
             chart.appendChild(svg('text', {
-                x: 2, y: y - 3, class: 'wpnc-chart-axis'
+                x: rtl ? W - 2 : 2,
+                y: y - 4,
+                'text-anchor': rtl ? 'end' : 'start',
+                class: 'wpnc-chart-axis'
             })).textContent = String(Math.round(peak * f));
         });
 
@@ -1250,8 +1489,8 @@ jQuery(function($) {
                 .appendTo($track);
 
             $('<span>').addClass('wpnc-bars-value')
+                .attr({ dir: 'ltr', title: t('dash_approved_of_total', 'approved of total') })
                 .text(src.approved + ' / ' + src.total)
-                .attr('title', t('dash_approved_of_total', 'approved of total'))
                 .appendTo($row);
         });
     }
