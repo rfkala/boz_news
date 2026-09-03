@@ -46,25 +46,28 @@ class WPNC_Scheduler {
 	/**
 	 * Work out when the next item should go out.
 	 *
-	 * Pure so the rule is testable: the next slot is one interval after the
-	 * latest thing already queued, but never in the past, and never sooner
-	 * than one interval from now when something is already scheduled ahead.
+	 * Pure so the rule is testable. Two cases, and conflating them is what
+	 * made a batch of approvals all land on the same instant:
 	 *
-	 * @param int $now        Current UTC timestamp.
-	 * @param int $last_slot  Timestamp of the furthest already-scheduled post, 0 when none.
-	 * @param int $interval   Seconds between items.
+	 * - Nothing has been placed yet ($last_slot of 0): go out now.
+	 * - Something has been placed: go one interval after it, but never
+	 *   earlier than now, so an old post does not schedule us into the past.
+	 *
+	 * @param int $now       Current UTC timestamp.
+	 * @param int $last_slot Timestamp of the last item placed, 0 when none.
+	 * @param int $interval  Seconds between items.
 	 * @return int UTC timestamp for the next slot.
 	 */
 	public static function calculate_slot( $now, $last_slot, $interval ) {
-		$now      = absint( $now );
-		$interval = max( 1, absint( $interval ) );
+		$now       = absint( $now );
+		$interval  = max( 1, absint( $interval ) );
+		$last_slot = absint( $last_slot );
 
-		if ( $last_slot <= $now ) {
-			// Nothing pending ahead of us, so this one goes out now.
+		if ( 0 === $last_slot ) {
 			return $now;
 		}
 
-		return $last_slot + $interval;
+		return max( $now, $last_slot + $interval );
 	}
 
 	/**
@@ -78,15 +81,25 @@ class WPNC_Scheduler {
 		$now      = WPNC_Time::timestamp();
 		$interval = self::interval_seconds();
 
-		// The furthest-out post this plugin has already scheduled. Only ours,
-		// so an editor's own scheduled posts are not counted or displaced.
+		// Both statuses matter. Counting only 'future' meant the first item
+		// of a batch published immediately as 'publish', left nothing
+		// pending, and so the next item published immediately as well.
+		//
+		// The window keeps the query cheap and stops an archive of old
+		// imports from being scanned; anything older than one interval
+		// cannot pace us anyway. Only this plugin's own posts are counted,
+		// so an editor's scheduled posts are never displaced.
+		$window = gmdate( 'Y-m-d H:i:s', $now - $interval );
+
 		$latest = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT MAX( p.post_date_gmt )
 				FROM $wpdb->posts p
 				INNER JOIN $wpdb->postmeta m ON m.post_id = p.ID AND m.meta_key = %s
-				WHERE p.post_status = 'future'",
-				'_wpnc_source_url'
+				WHERE p.post_status IN ( 'future', 'publish' )
+					AND p.post_date_gmt >= %s",
+				'_wpnc_source_url',
+				$window
 			)
 		);
 

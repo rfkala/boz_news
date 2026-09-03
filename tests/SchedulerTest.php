@@ -33,9 +33,11 @@ class SchedulerTest extends TestCase {
 		);
 	}
 
-	public function test_a_slot_exactly_now_means_publish_now() {
+	public function test_something_placed_at_this_instant_still_pushes_the_next_one() {
+		// This expectation used to be self::NOW, which is precisely the bug:
+		// two posts would have shared one instant.
 		$this->assertSame(
-			self::NOW,
+			self::NOW + 900,
 			WPNC_Scheduler::calculate_slot( self::NOW, self::NOW, 900 )
 		);
 	}

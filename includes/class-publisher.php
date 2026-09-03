@@ -203,13 +203,18 @@ class WPNC_Publisher {
 		}
 
 		$slot = WPNC_Scheduler::next_slot();
+		$now  = WPNC_Time::timestamp();
 
-		// A slot at or before now means nothing is queued ahead, so there is
-		// no reason to hold the post back.
-		if ( $slot <= WPNC_Time::timestamp() ) {
+		// With pacing on, the post date is the slot rather than the feed's
+		// date. That is what lets the next item pace off this one: stamping
+		// an immediately published item with an hours-old feed date put it
+		// outside the lookback window, so every item in a batch found
+		// nothing ahead of it and published at once. The feed's own date is
+		// still kept in _wpnc_original_date.
+		if ( $slot <= $now ) {
 			return array(
 				'status'   => 'publish',
-				'date_gmt' => $pub_date,
+				'date_gmt' => gmdate( 'Y-m-d H:i:s', $now ),
 			);
 		}
 

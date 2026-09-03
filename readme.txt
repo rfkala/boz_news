@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -153,6 +153,12 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.6.1 =
+* Fixed: publication pacing did not pace. Every item in an approved batch was
+  given the same slot, so twenty approvals still produced twenty simultaneous
+  posts - the exact problem the feature exists to solve. Caught by its own
+  unit test before release.
 
 = 1.6.0 =
 * Added: a post template. The body of every published post is assembled from
