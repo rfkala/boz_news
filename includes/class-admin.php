@@ -80,6 +80,9 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_default_category', array( 'WPNC_Settings', 'sanitize_category' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_post_author', array( 'WPNC_Settings', 'sanitize_post_author' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_post_status', array( 'WPNC_Settings', 'sanitize_post_status' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_content_template', array( $this, 'sanitize_template' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_stagger_enabled', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_stagger_minutes', array( 'WPNC_Settings', 'sanitize_stagger_minutes' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_publish', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_default_image', array( 'WPNC_Settings', 'sanitize_image_url' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_extract_full_text', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
@@ -212,6 +215,9 @@ class WPNC_Admin {
 		$post_author     = absint( get_option( 'wpnc_post_author', 0 ) );
 		$auto_publish    = absint( get_option( 'wpnc_auto_publish', 0 ) );
 		$queue_retention = absint( get_option( 'wpnc_queue_retention_days', WPNC_Settings::DEFAULT_QUEUE_RETENTION ) );
+		$stagger_on      = absint( get_option( 'wpnc_stagger_enabled', 0 ) );
+		$stagger_minutes = WPNC_Scheduler::interval_minutes();
+		$stagger_pending = $stagger_on ? WPNC_Scheduler::pending_count() : 0;
 		$log_retention   = absint( get_option( 'wpnc_log_retention_days', WPNC_Settings::DEFAULT_LOG_RETENTION ) );
 		?>
 		<form method="post" action="options.php">
@@ -298,6 +304,44 @@ class WPNC_Admin {
 							<option value="private" <?php selected( $post_status, 'private' ); ?>><?php wpnc_e( 'Private', 'خصوصی' ); ?></option>
 						</select>
 						<p class="description"><?php wpnc_e( 'Approved items are created with this status. Choose Draft to review each item in the post editor before it goes live.', 'آیتم‌های تأییدشده با این وضعیت ساخته می‌شوند. برای بازبینی هر خبر در ویرایشگر پیش از انتشار، «پیش‌نویس» را انتخاب کنید.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_content_template"><?php wpnc_e( 'Post Template', 'قالب پست' ); ?></label></th>
+					<td>
+						<textarea id="wpnc_content_template" name="wpnc_content_template" rows="6" class="large-text code" dir="ltr"><?php echo esc_textarea( get_option( 'wpnc_content_template', WPNC_Template::DEFAULT_TEMPLATE ) ); ?></textarea>
+						<p class="description">
+							<?php wpnc_e( 'How the body of each published post is assembled. Leave empty for the default.', 'بدنه هر پست منتشرشده چطور ساخته شود. برای حالت پیش‌فرض خالی بگذارید.' ); ?>
+						</p>
+						<div class="wpnc-placeholders">
+							<?php foreach ( WPNC_Template::placeholders() as $token => $label ) : ?>
+								<span><code><?php echo esc_html( $token ); ?></code> <?php echo esc_html( $label ); ?></span>
+							<?php endforeach; ?>
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php wpnc_e( 'Publication Pacing', 'سرعت انتشار' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="wpnc_stagger_enabled" value="1" <?php checked( $stagger_on, 1 ); ?> />
+							<?php wpnc_e( 'Space published items out instead of publishing them all at once', 'انتشار خبرها با فاصله، به‌جای انتشار هم‌زمان همه' ); ?>
+						</label>
+						<p>
+							<label for="wpnc_stagger_minutes"><?php wpnc_e( 'One item every', 'هر خبر با فاصله' ); ?></label>
+							<input id="wpnc_stagger_minutes" type="number" min="1" max="1440" name="wpnc_stagger_minutes" value="<?php echo esc_attr( $stagger_minutes ); ?>" />
+							<?php wpnc_e( 'minutes', 'دقیقه' ); ?>
+						</p>
+						<p class="description">
+							<?php wpnc_e( 'Approving twenty items would otherwise put twenty posts on the site in the same second. With pacing on they are scheduled ahead instead; the first one still goes out immediately.', 'بدون این گزینه، تأیید بیست خبر یعنی بیست پست در یک لحظه روی سایت. با فعال بودن آن، خبرها زمان‌بندی می‌شوند؛ اولی همچنان فوری منتشر می‌شود.' ); ?>
+							<?php if ( $stagger_on && $stagger_pending ) : ?>
+								<br>
+								<strong><?php echo esc_html( sprintf( wpnc__( '%d items are currently scheduled and waiting.', 'هم‌اکنون %d خبر زمان‌بندی شده و در انتظار است.' ), $stagger_pending ) ); ?></strong>
+							<?php endif; ?>
+						</p>
+						<p class="description wpnc-warning-text">
+							<?php wpnc_e( 'Scheduled posts need WP-Cron to fire, so a site with DISABLE_WP_CRON must have a real cron job calling wp-cron.php.', 'پست‌های زمان‌بندی‌شده برای انتشار به WP-Cron نیاز دارند؛ اگر DISABLE_WP_CRON فعال است باید یک کران واقعی wp-cron.php را صدا بزند.' ); ?>
+						</p>
 					</td>
 				</tr>
 				<tr>
@@ -770,6 +814,28 @@ class WPNC_Admin {
 			</table>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Keep the template's markup but warn about the one mistake that silently
+	 * publishes empty posts.
+	 *
+	 * @param string $value Raw template.
+	 * @return string
+	 */
+	public function sanitize_template( $value ) {
+		$value = wp_kses_post( (string) $value );
+
+		if ( WPNC_Template::omits_content( $value ) ) {
+			WPNC_Settings::notify(
+				'wpnc_template_no_content',
+				'The template has no {content} placeholder, so published posts will not contain the article.',
+				'قالب جای‌نگهدار {content} ندارد، پس پست‌های منتشرشده متن خبر را نخواهند داشت.',
+				'warning'
+			);
+		}
+
+		return $value;
 	}
 
 	public function sanitize_rss_links( $value ) {

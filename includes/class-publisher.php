@@ -59,20 +59,27 @@ class WPNC_Publisher {
 			return new WP_Error( 'wpnc_publish_missing_data', wpnc__( 'Cannot publish an item without title and source URL.', 'انتشار بدون عنوان و آدرس منبع ممکن نیست.' ) );
 		}
 
-		$content = $description . "\n\n" . sprintf(
-			'<p class="wpnc-source-link">%s <a href="%s" target="_blank" rel="nofollow noopener">%s</a></p>',
-			esc_html__( 'Source:', 'wp-news-collector' ),
-			esc_url( $main_link ),
-			esc_html( $source_name ? $source_name : $main_link )
+		$content = $this->build_content(
+			array(
+				'content'     => $description,
+				'title'       => $title,
+				'source_name' => $source_name,
+				'main_link'   => $main_link,
+				'pub_date'    => $pub_date,
+				'image_url'   => esc_url_raw( $item['image_url'] ?? '' ),
+				'tags'        => sanitize_text_field( $item['tags'] ?? '' ),
+			)
 		);
+
+		$schedule = $this->schedule_for( $pub_date );
 
 		$post_id = wp_insert_post(
 			array(
 				'post_title'    => wp_strip_all_tags( $title ),
 				'post_content'  => $content,
-				'post_status'   => $this->get_post_status(),
+				'post_status'   => $schedule['status'],
 				'post_author'   => $this->get_post_author(),
-				'post_date_gmt' => $pub_date,
+				'post_date_gmt' => $schedule['date_gmt'],
 				'post_type'     => $post_type,
 			),
 			true
@@ -92,6 +99,7 @@ class WPNC_Publisher {
 		}
 
 		add_post_meta( $post_id, '_wpnc_source_url', $main_link, true );
+		add_post_meta( $post_id, '_wpnc_original_date', $pub_date, true );
 		add_post_meta( $post_id, '_wpnc_source_name', $source_name, true );
 		if ( ! empty( $item['guid'] ) ) {
 			add_post_meta( $post_id, '_wpnc_source_guid', sanitize_text_field( $item['guid'] ), true );
@@ -133,6 +141,82 @@ class WPNC_Publisher {
 		}
 
 		return $post_id;
+	}
+
+	/**
+	 * Assemble the post body from the configured template.
+	 *
+	 * @param array $parts Item values.
+	 * @return string
+	 */
+	private function build_content( $parts ) {
+		$link_text = $parts['source_name'] ? $parts['source_name'] : $parts['main_link'];
+
+		$image = '';
+		if ( ! empty( $parts['image_url'] ) ) {
+			$image = sprintf(
+				'<figure class="wpnc-source-image"><img src="%s" alt="%s" /></figure>',
+				esc_url( $parts['image_url'] ),
+				esc_attr( $parts['title'] )
+			);
+		}
+
+		return WPNC_Template::render(
+			(string) get_option( 'wpnc_content_template', '' ),
+			array(
+				'content'      => $parts['content'],
+				'title'        => esc_html( $parts['title'] ),
+				'excerpt'      => esc_html( WPNC_Template::excerpt( $parts['content'] ) ),
+				'source_name'  => esc_html( $parts['source_name'] ),
+				'source_url'   => esc_url( $parts['main_link'] ),
+				'source_label' => esc_html( wpnc__( 'Source:', 'منبع:' ) ),
+				'source_link'  => sprintf(
+					'<a href="%s" target="_blank" rel="nofollow noopener">%s</a>',
+					esc_url( $parts['main_link'] ),
+					esc_html( $link_text )
+				),
+				'date'         => esc_html( WPNC_Time::for_display( $parts['pub_date'] ) ),
+				'image'        => $image,
+				'tags'         => esc_html( $parts['tags'] ),
+			)
+		);
+	}
+
+	/**
+	 * Decide the status and time a new post goes out with.
+	 *
+	 * With pacing on, items are spaced instead of all landing at once. The
+	 * original publication date is kept in meta either way, because the feed
+	 * date is still the truth about when the story happened.
+	 *
+	 * @param string $pub_date Original publication date, UTC.
+	 * @return array { status, date_gmt }
+	 */
+	private function schedule_for( $pub_date ) {
+		$status = $this->get_post_status();
+
+		if ( 'publish' !== $status || ! WPNC_Scheduler::is_enabled() ) {
+			return array(
+				'status'   => $status,
+				'date_gmt' => $pub_date,
+			);
+		}
+
+		$slot = WPNC_Scheduler::next_slot();
+
+		// A slot at or before now means nothing is queued ahead, so there is
+		// no reason to hold the post back.
+		if ( $slot <= WPNC_Time::timestamp() ) {
+			return array(
+				'status'   => 'publish',
+				'date_gmt' => $pub_date,
+			);
+		}
+
+		return array(
+			'status'   => 'future',
+			'date_gmt' => gmdate( 'Y-m-d H:i:s', $slot ),
+		);
 	}
 
 	/**

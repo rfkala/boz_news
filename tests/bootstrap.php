@@ -153,6 +153,20 @@ function get_userdata( $user_id ) {
 		: false;
 }
 
+function wp_trim_words( $text, $words = 55, $more = null ) {
+	$parts = preg_split( '/\s+/', trim( (string) $text ) );
+	if ( count( $parts ) <= $words ) {
+		return implode( ' ', $parts );
+	}
+
+	return implode( ' ', array_slice( $parts, 0, $words ) ) . ( null === $more ? '' : $more );
+}
+
+function wp_kses_post( $value ) {
+	return (string) $value;
+}
+
+
 function wp_date( $format, $timestamp = null ) {
 	return gmdate( $format, $timestamp );
 }
@@ -165,7 +179,17 @@ function esc_html( $text ) {
 	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
 }
 
+function esc_attr( $text ) {
+	return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_url( $url ) {
+	return esc_url_raw( $url );
+}
+
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';

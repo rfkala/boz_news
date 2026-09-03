@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.5.0
+ * Version: 1.6.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.5.0' );
+define( 'WPNC_VERSION', '1.6.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -22,6 +22,8 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-db.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-logger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';

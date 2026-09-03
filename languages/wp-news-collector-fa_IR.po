@@ -8,15 +8,15 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:331
+#: wp-news-collector.php:333
 msgid "Boz News"
 msgstr "بُز نیوز"
 
-#: wp-news-collector.php:333
+#: wp-news-collector.php:335
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr "بُز نیوز آیتم‌های فید RSS را در یک صف تأیید ذخیره می‌کند و در صورت فعال بودن این یکپارچگی‌ها، ممکن است متن مقاله را برای بازنویسی به OpenAI و لینک پست‌های منتشرشده را به تلگرام ارسال کند. فیدها و کلیدهای API تنظیم‌شده را بررسی کنید تا با سیاست حریم خصوصی سایت شما هم‌خوان باشند."
 
-#: wp-news-collector.php:86
+#: wp-news-collector.php:88
 msgid "Could not load more news. Please try again."
 msgstr "دریافت اخبار بیشتر ممکن نشد. لطفاً دوباره تلاش کنید."
 
@@ -28,16 +28,16 @@ msgstr "هر ۱۵ دقیقه"
 msgid "Every 3 Hours"
 msgstr "هر ۳ ساعت"
 
-#: wp-news-collector.php:84
+#: wp-news-collector.php:86
 #: includes/class-shortcode.php:75
 msgid "Load More News"
 msgstr "اخبار بیشتر"
 
-#: wp-news-collector.php:83
+#: wp-news-collector.php:85
 msgid "Loading..."
 msgstr "در حال بارگذاری..."
 
-#: wp-news-collector.php:85
+#: wp-news-collector.php:87
 msgid "No more news"
 msgstr "خبر دیگری نیست"
 
@@ -48,7 +48,3 @@ msgstr "پست دیگری موجود نیست."
 #: includes/class-shortcode.php:57
 msgid "No news found."
 msgstr "خبری یافت نشد."
-
-#: includes/class-publisher.php:64
-msgid "Source:"
-msgstr "منبع:"

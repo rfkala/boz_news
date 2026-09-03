@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -153,6 +153,17 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.6.0 =
+* Added: a post template. The body of every published post is assembled from
+  a template with placeholders for the article, title, source, date, image and
+  tags, instead of the hardcoded "body then source line". Empty placeholders
+  leave no debris behind.
+* Added: publication pacing. Approving twenty items used to put twenty posts
+  on the site in the same second; they can now be spaced by a configurable
+  interval, with the first still going out immediately.
+* Added: unit tests for both, including the batch-approval case where each
+  slot has to be computed from the previous one.
 
 = 1.5.0 =
 * Added: the edit screen is a real editor. WordPress's own TinyMCE with

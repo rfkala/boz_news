@@ -179,6 +179,28 @@ class WPNC_Settings {
 	}
 
 	/**
+	 * Sanitize the pacing interval in minutes.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return int
+	 */
+	public static function sanitize_stagger_minutes( $value ) {
+		$value   = absint( $value );
+		$clamped = max( 1, min( 1440, $value ) );
+
+		if ( $value !== $clamped ) {
+			self::notify(
+				'wpnc_stagger_clamped',
+				'Pacing must be between 1 minute and 24 hours; the value was adjusted.',
+				'فاصله انتشار باید بین ۱ دقیقه تا ۲۴ ساعت باشد؛ مقدار اصلاح شد.',
+				'warning'
+			);
+		}
+
+		return $clamped;
+	}
+
+	/**
 	 * Sanitize retention in days.
 	 *
 	 * @param mixed $value Raw value.
