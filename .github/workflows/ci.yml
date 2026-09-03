@@ -73,7 +73,9 @@ jobs:
         shell: bash
         run: |
           set +e
-          vendor/bin/phpunit --testdox > phpunit.out 2>&1
+          # Default output, not --testdox: it names the failing test and the
+          # assertion on lines this step can actually grep.
+          vendor/bin/phpunit > phpunit.out 2>&1
           status=$?
           cat phpunit.out
           set -e
@@ -81,7 +83,8 @@ jobs:
           if [ "$status" -ne 0 ]; then
             # Surface the actual failures as an annotation: job logs need a
             # token to read, annotations do not.
-            detail=$(grep -aE '^(There (was|were) [0-9]+|[0-9]+\)|Failed asserting|Expected|Actual|PHP (Fatal|Parse|Warning|Notice|Deprecated)|Error:|Tests:)' phpunit.out | head -40)
+            detail=$(grep -aA6 -E '^[0-9]+\) ' phpunit.out | head -50)
+            [ -z "$detail" ] && detail=$(grep -aE 'PHP (Fatal|Parse)|Error:|Tests:' phpunit.out | head -20)
             [ -z "$detail" ] && detail=$(tail -40 phpunit.out)
             echo "::error::PHPUnit failed (exit $status).%0A%0A${detail//$'\n'/%0A}"
             exit "$status"
