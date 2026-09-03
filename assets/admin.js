@@ -133,13 +133,33 @@ jQuery(function($) {
         );
     }
 
-    function renderEmpty($el, message, hint) {
+    /* An empty state that only says "nothing here" leaves you to work out what
+       to do about it. Where there is an obvious next step, it offers it. */
+    function renderEmpty($el, message, hint, action) {
         var $box = $('<div>').addClass('wpnc-state wpnc-state-empty');
         $('<p>').addClass('wpnc-state-title').text(message).appendTo($box);
         if (hint) {
             $('<p>').addClass('wpnc-state-hint').attr('dir', 'auto').text(hint).appendTo($box);
         }
+        if (action && action.href) {
+            $('<a>')
+                .addClass('button button-primary wpnc-state-action')
+                .attr('href', action.href)
+                .text(action.label)
+                .appendTo($box);
+        } else if (action) {
+            $('<button>')
+                .attr('type', 'button')
+                .addClass('button button-primary wpnc-state-action')
+                .text(action.label)
+                .on('click', action.run)
+                .appendTo($box);
+        }
         $el.empty().append($box);
+    }
+
+    function panelUrl(tab) {
+        return (wpnc_ajax.panel_url || '') + tab;
     }
 
     function renderError($el, error, onRetry) {
@@ -171,23 +191,58 @@ jQuery(function($) {
     }
 
     /* Transient banner for actions that do not own a region of the page. */
+    /* Toasts live in a fixed corner region rather than at the top of the tab.
+       Prepending to the content meant a message could land above the fold and
+       be scrolled past unseen - which for an error is the same as not showing
+       it at all. */
+    function toastHost() {
+        var $host = $('#wpnc-toasts');
+        if ($host.length) {
+            return $host;
+        }
+
+        var $wrap = $('.wpnc-wrap').first();
+        if (!$wrap.length) {
+            return $();
+        }
+
+        return $('<div>')
+            .attr({ id: 'wpnc-toasts', 'aria-live': 'polite' })
+            .addClass('wpnc-toasts')
+            .appendTo($wrap);
+    }
+
     function flash(message, type) {
-        var $host = $('.wpnc-tab-content').first();
+        var $host = toastHost();
         if (!$host.length) {
             return;
         }
 
-        $host.find('.wpnc-flash').remove();
         var $note = $('<div>')
             .addClass('wpnc-flash wpnc-flash-' + (type || 'ok'))
-            .attr({ role: 'status', dir: 'auto' })
-            .text(message)
-            .prependTo($host);
+            .attr({ role: 'status', dir: 'auto' });
 
+        $('<span>').addClass('wpnc-flash-text').text(message).appendTo($note);
+        $('<button>')
+            .attr({ type: 'button', 'aria-label': t('dismiss', 'Dismiss') })
+            .addClass('wpnc-flash-close')
+            .text('×')
+            .on('click', function() { $note.remove(); })
+            .appendTo($note);
+
+        $host.append($note);
+
+        // Errors wait to be read and dismissed; everything else is a receipt.
         if (type !== 'error') {
             window.setTimeout(function() {
                 $note.fadeOut(400, function() { $(this).remove(); });
-            }, 4000);
+            }, 4500);
+        }
+
+        // Never let receipts stack past a screenful.
+        var $all = $host.children('.wpnc-flash');
+        if ($all.length > 4) {
+            $all.slice(0, $all.length - 4).remove();
         }
     }
 
@@ -222,14 +277,29 @@ jQuery(function($) {
         return labels[key] || key;
     }
 
-    function emptyHintFor(status) {
+    function emptyStateFor(status) {
         if (queueState.search) {
-            return t('empty_search_hint', 'No item matches this search. Clear the search box to see the whole queue.');
+            return {
+                hint: t('empty_search_hint', 'No item matches this search. Clear the search box to see the whole queue.'),
+                action: {
+                    label: t('clear_search', 'Clear the search'),
+                    run: function() {
+                        queueState.search = '';
+                        queueState.page = 1;
+                        loadQueue();
+                    }
+                }
+            };
         }
+
         if (status === 'pending') {
-            return t('empty_pending_hint', 'Add RSS sources under Settings, then run Fetch Now from Logs & Tools.');
+            return {
+                hint: t('empty_pending_hint', 'Add RSS sources under Settings, then run Fetch Now from Logs & Tools.'),
+                action: { label: t('go_to_tools', 'Fetch now'), href: panelUrl('logs') }
+            };
         }
-        return t('empty_status_hint', 'Nothing has reached this status yet.');
+
+        return { hint: t('empty_status_hint', 'Nothing has reached this status yet.') };
     }
 
     function renderQueue(data) {
@@ -293,7 +363,7 @@ jQuery(function($) {
         }
 
         if (!items.length) {
-            renderEmptyQueue($app, emptyHintFor(queueState.status));
+            renderEmptyQueue($app, emptyStateFor(queueState.status));
             renderPagination($app, data);
             bindQueueEvents();
             syncExportLink();
@@ -330,9 +400,9 @@ jQuery(function($) {
         $link.attr('href', href);
     }
 
-    function renderEmptyQueue($app, hint) {
+    function renderEmptyQueue($app, state) {
         var $slot = $('<div>').appendTo($app);
-        renderEmpty($slot, t('no_pending', 'No pending news in the queue.'), hint);
+        renderEmpty($slot, t('no_pending', 'No pending news in the queue.'), state.hint, state.action);
     }
 
     function renderCard($grid, item, terminal) {

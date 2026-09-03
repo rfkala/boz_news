@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.8.0
+Stable tag: 1.9.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -154,6 +154,30 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.9.0 =
+* Changed: the panel header is a real app bar. The title, the section nav and
+  each tab's toolbar used to run together with nothing between them, and on a
+  wide screen the whole panel was stranded against one edge; every row now
+  sits on one measure and the bar stays put while you scroll.
+* Added: the header carries how many items are awaiting review, how many
+  failed, and when the next fetch is due - three things previously answerable
+  only by opening a tab and reading a paragraph.
+* Added: the moderation tab count, so the queue announces itself without being
+  visited.
+* Changed: the settings screen is one form by necessity, but no longer one
+  scroll. Its seventeen fields are grouped under named sections - sources,
+  filters, publishing, housekeeping, panel - with jump links, and Save follows
+  you down the page instead of sitting 900px below the field you changed.
+* Changed: the CSV export moved into the page header. It acts on the whole
+  view, and in its own strip between the tabs and the filters it exported it
+  looked like part of neither.
+* Changed: messages appear as toasts in the corner and errors wait to be
+  dismissed. Prepending them to the tab meant a message could land above the
+  fold and be scrolled past unseen.
+* Added: empty states offer the next step rather than only naming it.
+* Added: a visible focus ring on every control. The panel replaces wp-admin's
+  own styling, which meant it had removed one.
 
 = 1.8.0 =
 * Added: a live preview beside the editor, rendered server-side through the

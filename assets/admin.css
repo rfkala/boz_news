@@ -78,17 +78,145 @@
    Header
    ============================================================ */
 
-.wpnc-page-title {
+/* One measure for every row on the page. Without it the panel stretched to
+   whatever width the monitor happened to be, which left the title at one
+   edge and the tabs stranded beside it. */
+.wpnc-shell {
+    width: 100%;
+    max-width: 1440px;
+    margin-inline: auto;
+}
+
+/* The bar is full bleed - it cancels the wrap's own padding and re-applies
+   it inside, so the surface reaches both edges while its contents stay on
+   the measure. Sticky so the tabs and the counts stay reachable while
+   reading a long queue. */
+.wpnc-appbar {
+    position: sticky;
+    top: 32px;
+    z-index: 20;
+    margin-inline: -20px;
+    padding-inline: 20px;
+    background: var(--wpnc-surface);
+    border-bottom: 1px solid var(--wpnc-line);
+    box-shadow: 0 1px 0 rgba(16, 24, 40, .03);
+}
+
+.wpnc-appbar-inner {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    padding-block: 20px 16px;
+}
+
+.wpnc-brandmark {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.wpnc-brandmark-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+/* Scoped through .wpnc-wrap because this is the h1 and wp-admin styles
+   `.wrap h1` with its own size, padding and weight - a bare class loses. */
+.wpnc-wrap .wpnc-brandmark-name {
     margin: 0;
-    padding: 26px 0 18px;
-    font-size: 26px;
+    padding: 0;
+    font-size: 21px;
     font-weight: 800;
+    line-height: 1.2;
     letter-spacing: -.01em;
     color: var(--wpnc-ink);
 }
+
+/* Names the screen you are on. 'Logs & Tools' does not say what is on it. */
+.wpnc-wrap .wpnc-brandmark-sub {
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-appbar-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.wpnc-chips {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.wpnc-appbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* --- status chips --- */
+
+.wpnc-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-surface-2);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--wpnc-ink-3);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: border-color .15s ease, background .15s ease;
+}
+
+a.wpnc-chip:hover {
+    border-color: var(--wpnc-ink-4);
+    background: var(--wpnc-surface);
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-chip-label { font-weight: 500; }
+
+.wpnc-chip-value {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-chip-brand {
+    border-color: var(--wpnc-brand-glow);
+    background: var(--wpnc-brand-soft);
+}
+
+.wpnc-chip-brand .wpnc-chip-value { color: var(--wpnc-brand-strong); }
+
+.wpnc-chip-warn {
+    border-color: rgba(184, 134, 11, .3);
+    background: var(--wpnc-warn-soft);
+}
+
+.wpnc-chip-warn .wpnc-chip-value { color: var(--wpnc-warn); }
+
+.wpnc-chip-danger {
+    border-color: rgba(200, 51, 47, .3);
+    background: var(--wpnc-danger-soft);
+}
+
+.wpnc-chip-danger .wpnc-chip-value { color: var(--wpnc-danger); }
 
 .wpnc-title-crown {
     display: inline-flex;
@@ -105,47 +233,99 @@
     box-shadow: 0 4px 12px var(--wpnc-brand-glow);
 }
 
-/* --- tabs as a segmented control, not wp-admin folder tabs --- */
+/* --- section nav -------------------------------------------------------
+   An underline strip rather than the pill group that used to sit here. The
+   pills were their own box, so they collided with whatever toolbar the tab
+   below happened to start with; an underline belongs to the bar it sits in
+   and reads as navigation instead of a control. */
 
-.wpnc-wrap .nav-tab-wrapper {
+.wpnc-tabs {
     display: flex;
+    align-items: stretch;
     gap: 4px;
-    margin: 0 0 22px;
-    padding: 4px;
-    border: 1px solid var(--wpnc-line);
-    border-radius: var(--wpnc-r-pill);
-    background: var(--wpnc-surface);
-    box-shadow: var(--wpnc-sh-1);
-    width: fit-content;
-    max-width: 100%;
     overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
-.wpnc-wrap .nav-tab {
-    margin: 0;
-    padding: 8px 18px;
-    border: 0;
-    border-radius: var(--wpnc-r-pill);
-    background: transparent;
+.wpnc-tabs::-webkit-scrollbar { display: none; }
+
+.wpnc-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px 14px;
     font-size: 13.5px;
     font-weight: 600;
     line-height: 1.4;
     color: var(--wpnc-ink-3);
+    text-decoration: none;
     white-space: nowrap;
-    transition: background .15s ease, color .15s ease;
+    transition: color .15s ease;
 }
 
-.wpnc-wrap .nav-tab:hover {
-    background: var(--wpnc-surface-2);
-    color: var(--wpnc-ink);
+.wpnc-tab::after {
+    content: '';
+    position: absolute;
+    inset-inline: 8px;
+    bottom: 0;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+    background: transparent;
+    transition: background .15s ease;
 }
 
-.wpnc-wrap .nav-tab-active,
-.wpnc-wrap .nav-tab-active:hover,
-.wpnc-wrap .nav-tab-active:focus {
-    color: var(--wpnc-ink);
+.wpnc-tab:hover,
+.wpnc-tab:focus { color: var(--wpnc-ink); }
+
+.wpnc-tab:hover::after { background: var(--wpnc-line); }
+
+.wpnc-tab.is-active { color: var(--wpnc-ink); }
+
+.wpnc-tab.is-active::after {
+    background: linear-gradient(90deg, var(--wpnc-brand), var(--wpnc-brand-strong));
+}
+
+/* A number, not an icon: it says how much work is waiting, which is the one
+   thing worth carrying in a tab label. */
+.wpnc-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 21px;
+    height: 21px;
+    padding: 0 7px;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-line-soft);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-tab-count.is-live {
     background: var(--wpnc-brand-soft);
-    box-shadow: inset 0 0 0 1px var(--wpnc-brand-glow);
+    color: var(--wpnc-brand-strong);
+}
+
+/* Breathing room under the bar, so no tab's first element can ever look
+   glued to the nav again. */
+.wpnc-tab-content { padding-block-start: 26px; }
+
+/* --- focus ------------------------------------------------------------
+   The panel replaces wp-admin's controls, so it owes their focus ring back.
+   :focus-visible only, so a mouse click does not draw one. */
+.wpnc-wrap a:focus-visible,
+.wpnc-wrap button:focus-visible,
+.wpnc-wrap .button:focus-visible,
+.wpnc-wrap input:focus-visible,
+.wpnc-wrap select:focus-visible,
+.wpnc-wrap textarea:focus-visible,
+.wpnc-wrap [tabindex]:focus-visible {
+    outline: 2px solid var(--wpnc-brand-strong);
+    outline-offset: 2px;
+    border-radius: var(--wpnc-r-sm);
 }
 
 /* ============================================================
@@ -240,8 +420,14 @@
     color: var(--wpnc-ink);
 }
 
-.wpnc-tab-content > hr {
-    display: none;
+/* A toolbar already inside a panel does not need a second surface. Scoped
+   through .wpnc-wrap to outrank the band styling further down the file. */
+.wpnc-wrap .wpnc-panel .wpnc-tab-toolbar,
+.wpnc-wrap .wpnc-tools-panel .wpnc-tab-toolbar {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
 }
 
 .wpnc-tab-content > h3 {
@@ -785,6 +971,12 @@
     background: var(--wpnc-surface-2);
 }
 
+/* An empty state that names the next step and then makes you go find it is
+   half a message. */
+.wpnc-wrap .wpnc-state-action {
+    margin-top: 16px;
+}
+
 .wpnc-state-error {
     border-color: rgba(200, 51, 47, .35);
     border-inline-start-width: 4px;
@@ -859,7 +1051,41 @@
    Flash and inline messages
    ============================================================ */
 
+/* Fixed corner region. A message prepended to the tab could land above the
+   fold and be scrolled past unseen, which for an error is the same as never
+   showing it. */
+.wpnc-toasts {
+    position: fixed;
+    inset-block-end: 22px;
+    inset-inline-end: 22px;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(380px, calc(100vw - 44px));
+    pointer-events: none;
+}
+
+.wpnc-toasts .wpnc-flash {
+    margin: 0;
+    pointer-events: auto;
+    box-shadow: var(--wpnc-sh-3);
+    animation: wpnc-toast-in .22s ease-out;
+}
+
+@keyframes wpnc-toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wpnc-toasts .wpnc-flash { animation: none; }
+}
+
 .wpnc-flash {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
     margin: 0 0 var(--wpnc-gap);
     padding: 12px 16px;
     border: 1px solid var(--wpnc-line);
@@ -868,9 +1094,27 @@
     background: var(--wpnc-info-soft);
     font-size: 13px;
     font-weight: 600;
+    line-height: 1.6;
     color: var(--wpnc-ink-2);
     box-shadow: var(--wpnc-sh-1);
 }
+
+.wpnc-flash-text { flex: 1; min-width: 0; }
+
+.wpnc-flash-close {
+    flex: none;
+    margin-block-start: -2px;
+    margin-inline-end: -4px;
+    padding: 0 5px;
+    border: 0;
+    background: none;
+    font-size: 17px;
+    line-height: 1.3;
+    color: var(--wpnc-ink-4);
+    cursor: pointer;
+}
+
+.wpnc-flash-close:hover { color: var(--wpnc-ink); }
 
 .wpnc-flash-ok    { border-inline-start-color: var(--wpnc-ok);     background: var(--wpnc-ok-soft); }
 .wpnc-flash-warn  { border-inline-start-color: var(--wpnc-warn);   background: var(--wpnc-warn-soft); }
@@ -911,13 +1155,27 @@
    Fetch tools and progress
    ============================================================ */
 
-.wpnc-fetch-actions,
-.wpnc-tab-toolbar {
+.wpnc-fetch-actions {
     display: flex;
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
     margin: 0 0 14px;
+}
+
+/* A toolbar is a band, not a stray paragraph of buttons. Giving it a surface
+   of its own is what stops it reading as part of whatever sits above it. */
+.wpnc-wrap .wpnc-tab-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-1);
 }
 
 .wpnc-tab-toolbar label {
@@ -1144,6 +1402,81 @@
    Settings form
    ============================================================ */
 
+/* The settings screen has to be one form - it posts to options.php in a
+   single request - so it cannot be split into pages. Naming the sections and
+   offering jump links is the next best thing, and it is what turns a
+   seventeen-row scroll into something you can navigate. */
+.wpnc-settings-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 22px;
+}
+
+.wpnc-settings-nav a {
+    padding: 6px 13px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-surface);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--wpnc-ink-3);
+    text-decoration: none;
+    box-shadow: var(--wpnc-sh-1);
+    transition: color .15s ease, border-color .15s ease;
+}
+
+.wpnc-settings-nav a:hover {
+    border-color: var(--wpnc-brand);
+    color: var(--wpnc-ink);
+}
+
+.wpnc-settings-group {
+    margin: 0 0 28px;
+    /* The app bar is sticky, so a jump link would otherwise land the heading
+       underneath it. */
+    scroll-margin-block-start: 130px;
+}
+
+.wpnc-wrap .wpnc-settings-group-title {
+    margin: 0 0 4px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -.005em;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-settings-group-hint {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--wpnc-ink-3);
+}
+
+/* Save follows you down the form. Losing a screenful of settings because the
+   button was 900px below the field you changed is a real way to lose work. */
+.wpnc-save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin: 24px 0 0;
+    padding: 14px 18px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-lg);
+    background: var(--wpnc-surface);
+    box-shadow: var(--wpnc-sh-3);
+}
+
+.wpnc-save-hint {
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--wpnc-ink-3);
+}
+
 .wpnc-wrap form .form-table {
     margin-top: 0;
     background: var(--wpnc-surface);
@@ -1204,11 +1537,21 @@
 
     .wpnc-grid { grid-template-columns: 1fr; }
 
+    /* wp-admin's own bar stops being fixed here, so sticking to 32px would
+       leave the panel's bar floating over a gap. */
+    .wpnc-appbar {
+        position: static;
+        margin-inline: -10px;
+        padding-inline: 10px;
+    }
+
+    .wpnc-appbar-inner { padding-block: 16px 12px; }
+
     .wpnc-dash-head,
     .wpnc-queue-toolbar,
     .wpnc-bulk-actions,
     .wpnc-fetch-actions,
-    .wpnc-tab-toolbar,
+    .wpnc-wrap .wpnc-tab-toolbar,
     .wpnc-modal-actions {
         flex-direction: column;
         align-items: stretch;

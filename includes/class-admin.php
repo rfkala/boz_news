@@ -113,31 +113,57 @@ class WPNC_Admin {
 		$is_rtl     = ( 'en' !== get_option( 'wpnc_admin_lang', 'fa' ) );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
-		$tabs       = array(
-			'dashboard'  => wpnc__( 'Dashboard', 'داشبورد' ),
-			'moderation' => wpnc__( 'Moderation Queue', 'صف تأیید' ),
-			'settings'   => wpnc__( 'Settings', 'تنظیمات' ),
-			'logs'       => wpnc__( 'Logs & Tools', 'لاگ و ابزارها' ),
-		);
+		$tabs       = $this->tabs();
 
 		if ( ! isset( $tabs[ $active_tab ] ) ) {
 			$active_tab = 'dashboard';
 		}
+
+		$stats = $this->queue_counts();
 		?>
 		<div class="wrap wpnc-wrap<?php echo $is_rtl ? ' wpnc-rtl' : ''; ?>">
-			<h1 class="wpnc-page-title">
-				<span class="wpnc-title-crown">♛</span>
-				<?php echo esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ); ?>
-			</h1>
-			<h2 class="nav-tab-wrapper">
-				<?php foreach ( $tabs as $tab => $label ) : ?>
-					<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'boz-news', 'tab' => $tab ), admin_url( 'admin.php' ) ) ); ?>" class="nav-tab <?php echo $active_tab === $tab ? 'nav-tab-active' : ''; ?>">
-						<?php echo esc_html( $label ); ?>
-					</a>
-				<?php endforeach; ?>
-			</h2>
+			<div class="wpnc-appbar">
+				<div class="wpnc-shell wpnc-appbar-inner">
+					<div class="wpnc-brandmark">
+						<span class="wpnc-title-crown" aria-hidden="true">♛</span>
+						<div class="wpnc-brandmark-text">
+							<h1 class="wpnc-brandmark-name"><?php echo esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ); ?></h1>
+							<p class="wpnc-brandmark-sub"><?php echo esc_html( $tabs[ $active_tab ]['sub'] ); ?></p>
+						</div>
+					</div>
+					<div class="wpnc-appbar-meta">
+						<div class="wpnc-chips">
+							<?php $this->render_header_chips( $stats ); ?>
+						</div>
+						<?php if ( 'moderation' === $active_tab ) : ?>
+							<div class="wpnc-appbar-actions">
+								<?php $this->render_export_link(); ?>
+							</div>
+						<?php endif; ?>
+					</div>
+				</div>
 
-			<div class="wpnc-tab-content">
+				<nav class="wpnc-shell wpnc-tabs" aria-label="<?php echo esc_attr( wpnc__( 'Boz News sections', 'بخش‌های بُز نیوز' ) ); ?>">
+					<?php foreach ( $tabs as $tab => $meta ) : ?>
+						<?php
+						$is_active = ( $active_tab === $tab );
+						$count     = isset( $meta['count'] ) ? (int) $stats[ $meta['count'] ] : 0;
+						?>
+						<a
+							href="<?php echo esc_url( $this->tab_url( $tab ) ); ?>"
+							class="wpnc-tab<?php echo $is_active ? ' is-active' : ''; ?>"
+							<?php echo $is_active ? 'aria-current="page"' : ''; ?>
+						>
+							<span class="wpnc-tab-label"><?php echo esc_html( $meta['label'] ); ?></span>
+							<?php if ( isset( $meta['count'] ) && $count > 0 ) : ?>
+								<span class="wpnc-tab-count is-live"><?php echo esc_html( number_format_i18n( $count ) ); ?></span>
+							<?php endif; ?>
+						</a>
+					<?php endforeach; ?>
+				</nav>
+			</div>
+
+			<div class="wpnc-shell wpnc-tab-content">
 				<?php
 				if ( 'dashboard' === $active_tab ) {
 					$this->render_dashboard_tab();
@@ -152,6 +178,176 @@ class WPNC_Admin {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * The four sections, with the one-line description each one shows in the
+	 * header.
+	 *
+	 * The description is not decoration: the panel has four screens and their
+	 * names alone ('Logs & Tools') do not say what is on them.
+	 *
+	 * @return array
+	 */
+	private function tabs() {
+		return array(
+			'dashboard'  => array(
+				'label' => wpnc__( 'Dashboard', 'داشبورد' ),
+				'sub'   => wpnc__( 'What the collector has been doing', 'کارنامهٔ جمع‌آورندهٔ خبر' ),
+			),
+			'moderation' => array(
+				'label' => wpnc__( 'Moderation Queue', 'صف تأیید' ),
+				'sub'   => wpnc__( 'Read, edit and approve before anything is published', 'خواندن، ویرایش و تأیید پیش از انتشار' ),
+				'count' => 'pending',
+			),
+			'settings'   => array(
+				'label' => wpnc__( 'Settings', 'تنظیمات' ),
+				'sub'   => wpnc__( 'Sources, filters, publishing and AI', 'منابع، فیلترها، انتشار و هوش مصنوعی' ),
+			),
+			'logs'       => array(
+				'label' => wpnc__( 'Logs & Tools', 'لاگ و ابزارها' ),
+				'sub'   => wpnc__( 'Fetch now, check source health, read the log', 'دریافت فوری، بررسی سلامت منابع، خواندن لاگ' ),
+			),
+		);
+	}
+
+	/**
+	 * Link to one section of the panel.
+	 *
+	 * @param string $tab   Tab key.
+	 * @param array  $extra Extra query arguments.
+	 * @return string
+	 */
+	private function tab_url( $tab, $extra = array() ) {
+		return add_query_arg(
+			array_merge(
+				array(
+					'page' => 'boz-news',
+					'tab'  => $tab,
+				),
+				$extra
+			),
+			admin_url( 'admin.php' )
+		);
+	}
+
+	/**
+	 * Queue counts by status, never fatal.
+	 *
+	 * The header reads these on every page load, so a missing table has to
+	 * degrade to zeroes rather than take the whole panel down with it.
+	 *
+	 * @return array
+	 */
+	private function queue_counts() {
+		$empty = array(
+			'approved' => 0,
+			'pending'  => 0,
+			'rejected' => 0,
+			'error'    => 0,
+		);
+
+		$repository = new WPNC_Queue_Repository();
+		$stats      = $repository->get_stats();
+
+		return is_array( $stats ) ? array_merge( $empty, $stats ) : $empty;
+	}
+
+	/**
+	 * The header's status chips.
+	 *
+	 * Two questions were previously answerable only by opening a tab and
+	 * reading a paragraph: how much is waiting for me, and when does it fetch
+	 * again. Both belong where they are visible from every screen.
+	 *
+	 * @param array $stats Queue counts by status.
+	 */
+	private function render_header_chips( $stats ) {
+		$chips = array();
+
+		$chips[] = array(
+			'tone'  => $stats['pending'] > 0 ? 'brand' : 'muted',
+			'label' => wpnc__( 'Awaiting review', 'در انتظار بررسی' ),
+			'value' => number_format_i18n( $stats['pending'] ),
+			'href'  => $this->tab_url( 'moderation' ),
+		);
+
+		if ( $stats['error'] > 0 ) {
+			$chips[] = array(
+				'tone'  => 'danger',
+				'label' => wpnc__( 'Failed', 'ناموفق' ),
+				'value' => number_format_i18n( $stats['error'] ),
+				'href'  => $this->tab_url( 'moderation', array( 'status' => 'error' ) ),
+			);
+		}
+
+		$chips[] = $this->next_fetch_chip();
+
+		foreach ( $chips as $chip ) {
+			$class = 'wpnc-chip wpnc-chip-' . $chip['tone'];
+			$inner = sprintf(
+				'<span class="wpnc-chip-label">%s</span><span class="wpnc-chip-value">%s</span>',
+				esc_html( $chip['label'] ),
+				esc_html( $chip['value'] )
+			);
+
+			if ( empty( $chip['href'] ) ) {
+				printf( '<span class="%s">%s</span>', esc_attr( $class ), wp_kses_post( $inner ) );
+				continue;
+			}
+
+			printf(
+				'<a class="%s" href="%s">%s</a>',
+				esc_attr( $class ),
+				esc_url( $chip['href'] ),
+				wp_kses_post( $inner )
+			);
+		}
+	}
+
+	/**
+	 * The countdown chip, which also has to admit when there is no countdown.
+	 *
+	 * @return array
+	 */
+	private function next_fetch_chip() {
+		$label = wpnc__( 'Next fetch', 'دریافت بعدی' );
+
+		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			return array(
+				'tone'  => 'warn',
+				'label' => $label,
+				'value' => wpnc__( 'cron off', 'کران خاموش' ),
+				'href'  => $this->tab_url( 'logs' ),
+			);
+		}
+
+		$next = wp_next_scheduled( 'wpnc_fetch_news_event' );
+
+		if ( ! $next ) {
+			return array(
+				'tone'  => 'warn',
+				'label' => $label,
+				'value' => wpnc__( 'not scheduled', 'زمان‌بندی نشده' ),
+				'href'  => $this->tab_url( 'logs' ),
+			);
+		}
+
+		if ( $next <= time() ) {
+			return array(
+				'tone'  => 'muted',
+				'label' => $label,
+				'value' => wpnc__( 'due now', 'همین حالا' ),
+				'href'  => $this->tab_url( 'logs' ),
+			);
+		}
+
+		return array(
+			'tone'  => 'muted',
+			'label' => $label,
+			'value' => human_time_diff( time(), $next ),
+			'href'  => $this->tab_url( 'logs' ),
+		);
 	}
 
 	/**
@@ -222,19 +418,13 @@ class WPNC_Admin {
 		$stagger_pending = $stagger_on ? WPNC_Scheduler::pending_count() : 0;
 		$log_retention   = absint( get_option( 'wpnc_log_retention_days', WPNC_Settings::DEFAULT_LOG_RETENTION ) );
 		?>
+		<?php $this->render_settings_nav(); ?>
 		<form method="post" action="options.php">
 			<?php settings_fields( 'wpnc_settings_group' ); ?>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><label for="wpnc_admin_lang"><?php wpnc_e( 'Interface Language', 'زبان رابط کاربری' ); ?></label></th>
-					<td>
-						<select id="wpnc_admin_lang" name="wpnc_admin_lang">
-							<option value="fa" <?php selected( $admin_lang, 'fa' ); ?>>فارسی</option>
-							<option value="en" <?php selected( $admin_lang, 'en' ); ?>>English</option>
-						</select>
-						<p class="description"><?php wpnc_e( 'Select the language for this plugin\'s admin panel.', 'زبان نمایش پنل مدیریت این افزونه را انتخاب کنید.' ); ?></p>
-					</td>
-				</tr>
+			<section id="wpnc-set-sources" class="wpnc-settings-group">
+				<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Sources & fetching', 'منابع و دریافت' ); ?></h3>
+				<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Where the news comes from and how often it is collected.', 'خبرها از کجا می‌آیند و هر چند وقت یک‌بار جمع‌آوری می‌شوند.' ); ?></p>
+				<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="wpnc_rss_links"><?php wpnc_e( 'RSS/Atom Sources', 'منابع RSS/Atom' ); ?></label></th>
 					<td>
@@ -272,6 +462,34 @@ class WPNC_Admin {
 						<?php wpnc_e( 'seconds', 'ثانیه' ); ?>
 					</td>
 				</tr>
+				</table>
+			</section>
+
+			<section id="wpnc-set-filters" class="wpnc-settings-group">
+				<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Filters', 'فیلترها' ); ?></h3>
+				<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Decide what never reaches the queue in the first place.', 'تعیین می‌کند چه چیزی از اساس وارد صف نشود.' ); ?></p>
+				<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="wpnc_include_words"><?php wpnc_e( 'Must Include Words', 'باید شامل کلمات' ); ?></label></th>
+					<td>
+						<input id="wpnc_include_words" type="text" name="wpnc_include_words" value="<?php echo esc_attr( get_option( 'wpnc_include_words', '' ) ); ?>" class="large-text" dir="auto" />
+						<p class="description"><?php wpnc_e( 'Comma separated. An item is kept if the title or description contains any one of these. Leave empty to keep everything.', 'با کاما جدا کنید. خبری نگه داشته می‌شود که عنوان یا توضیحاتش دست‌کم یکی از این کلمات را داشته باشد. برای نگه داشتن همه، خالی بگذارید.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_exclude_words"><?php wpnc_e( 'Exclude Words', 'کلمات مستثنا' ); ?></label></th>
+					<td>
+						<input id="wpnc_exclude_words" type="text" name="wpnc_exclude_words" value="<?php echo esc_attr( get_option( 'wpnc_exclude_words', '' ) ); ?>" class="large-text" dir="auto" />
+						<p class="description"><?php wpnc_e( 'Comma separated. Any match drops the item, and this wins over the include list. Matching is case-insensitive and matches inside words.', 'با کاما جدا کنید. هر تطابق باعث حذف خبر می‌شود و بر فهرست بالا اولویت دارد. تطابق به حروف کوچک و بزرگ حساس نیست و داخل کلمات هم بررسی می‌شود.' ); ?></p>
+					</td>
+				</tr>
+				</table>
+			</section>
+
+			<section id="wpnc-set-publishing" class="wpnc-settings-group">
+				<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Publishing', 'انتشار' ); ?></h3>
+				<p class="wpnc-settings-group-hint"><?php wpnc_e( 'What an approved item turns into, and how fast it goes out.', 'یک آیتم تأییدشده به چه چیزی تبدیل می‌شود و با چه سرعتی منتشر می‌گردد.' ); ?></p>
+				<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="wpnc_target_post_type"><?php wpnc_e( 'Target Post Type', 'نوع پست هدف' ); ?></label></th>
 					<td>
@@ -306,6 +524,41 @@ class WPNC_Admin {
 							<option value="private" <?php selected( $post_status, 'private' ); ?>><?php wpnc_e( 'Private', 'خصوصی' ); ?></option>
 						</select>
 						<p class="description"><?php wpnc_e( 'Approved items are created with this status. Choose Draft to review each item in the post editor before it goes live.', 'آیتم‌های تأییدشده با این وضعیت ساخته می‌شوند. برای بازبینی هر خبر در ویرایشگر پیش از انتشار، «پیش‌نویس» را انتخاب کنید.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_post_author"><?php wpnc_e( 'Post Author', 'نویسنده پست' ); ?></label></th>
+					<td>
+						<?php
+						wp_dropdown_users(
+							array(
+								'id'               => 'wpnc_post_author',
+								'name'             => 'wpnc_post_author',
+								'selected'         => $post_author,
+								'show_option_none' => wpnc__( 'First administrator', 'اولین مدیر' ),
+								'option_none_value' => 0,
+								'capability'       => array( 'edit_posts' ),
+							)
+						);
+						?>
+						<p class="description"><?php wpnc_e( 'Scheduled imports have no logged-in user, so they are attributed to this author.', 'دریافت زمان‌بندی‌شده کاربر واردشده ندارد، پس پست‌ها به نام این نویسنده ثبت می‌شوند.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php wpnc_e( 'Publishing', 'انتشار' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" id="wpnc_auto_publish" name="wpnc_auto_publish" value="1" <?php checked( $auto_publish, 1 ); ?> />
+							<?php wpnc_e( 'Publish directly without moderation queue', 'انتشار مستقیم بدون صف تأیید' ); ?>
+						</label>
+						<p class="description wpnc-warning-text">
+							<?php wpnc_e( 'With this on, every matching item goes straight to your site on the next scheduled run, with no review and no undo. The queue tabs will stay empty.', 'با فعال بودن این گزینه، هر خبر منطبق در اجرای زمان‌بندی بعدی مستقیماً روی سایت منتشر می‌شود؛ بدون بازبینی و بدون امکان بازگشت. صف تأیید خالی می‌ماند.' ); ?>
+						</p>
+						<label>
+							<input type="checkbox" name="wpnc_extract_full_text" value="1" <?php checked( get_option( 'wpnc_extract_full_text', 0 ), 1 ); ?> />
+							<?php wpnc_e( 'Attempt full-text extraction from article pages', 'استخراج متن کامل از صفحه مقاله' ); ?>
+						</label>
+						<p class="description"><?php wpnc_e( 'Fetches each article page and keeps its paragraphs as plain text. Images and links inside the article are not preserved.', 'صفحه هر مقاله را دریافت و پاراگراف‌هایش را به‌صورت متن ساده نگه می‌دارد. تصاویر و لینک‌های داخل مقاله حفظ نمی‌شوند.' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -347,58 +600,16 @@ class WPNC_Admin {
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="wpnc_post_author"><?php wpnc_e( 'Post Author', 'نویسنده پست' ); ?></label></th>
-					<td>
-						<?php
-						wp_dropdown_users(
-							array(
-								'id'               => 'wpnc_post_author',
-								'name'             => 'wpnc_post_author',
-								'selected'         => $post_author,
-								'show_option_none' => wpnc__( 'First administrator', 'اولین مدیر' ),
-								'option_none_value' => 0,
-								'capability'       => array( 'edit_posts' ),
-							)
-						);
-						?>
-						<p class="description"><?php wpnc_e( 'Scheduled imports have no logged-in user, so they are attributed to this author.', 'دریافت زمان‌بندی‌شده کاربر واردشده ندارد، پس پست‌ها به نام این نویسنده ثبت می‌شوند.' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><?php wpnc_e( 'Publishing', 'انتشار' ); ?></th>
-					<td>
-						<label>
-							<input type="checkbox" id="wpnc_auto_publish" name="wpnc_auto_publish" value="1" <?php checked( $auto_publish, 1 ); ?> />
-							<?php wpnc_e( 'Publish directly without moderation queue', 'انتشار مستقیم بدون صف تأیید' ); ?>
-						</label>
-						<p class="description wpnc-warning-text">
-							<?php wpnc_e( 'With this on, every matching item goes straight to your site on the next scheduled run, with no review and no undo. The queue tabs will stay empty.', 'با فعال بودن این گزینه، هر خبر منطبق در اجرای زمان‌بندی بعدی مستقیماً روی سایت منتشر می‌شود؛ بدون بازبینی و بدون امکان بازگشت. صف تأیید خالی می‌ماند.' ); ?>
-						</p>
-						<label>
-							<input type="checkbox" name="wpnc_extract_full_text" value="1" <?php checked( get_option( 'wpnc_extract_full_text', 0 ), 1 ); ?> />
-							<?php wpnc_e( 'Attempt full-text extraction from article pages', 'استخراج متن کامل از صفحه مقاله' ); ?>
-						</label>
-						<p class="description"><?php wpnc_e( 'Fetches each article page and keeps its paragraphs as plain text. Images and links inside the article are not preserved.', 'صفحه هر مقاله را دریافت و پاراگراف‌هایش را به‌صورت متن ساده نگه می‌دارد. تصاویر و لینک‌های داخل مقاله حفظ نمی‌شوند.' ); ?></p>
-					</td>
-				</tr>
-				<tr>
 					<th scope="row"><label for="wpnc_default_image"><?php wpnc_e( 'Fallback Image URL', 'آدرس تصویر پیش‌فرض' ); ?></label></th>
 					<td><input id="wpnc_default_image" type="url" name="wpnc_default_image" value="<?php echo esc_url( get_option( 'wpnc_default_image', '' ) ); ?>" class="large-text" dir="ltr" /></td>
 				</tr>
-				<tr>
-					<th scope="row"><label for="wpnc_include_words"><?php wpnc_e( 'Must Include Words', 'باید شامل کلمات' ); ?></label></th>
-					<td>
-						<input id="wpnc_include_words" type="text" name="wpnc_include_words" value="<?php echo esc_attr( get_option( 'wpnc_include_words', '' ) ); ?>" class="large-text" dir="auto" />
-						<p class="description"><?php wpnc_e( 'Comma separated. An item is kept if the title or description contains any one of these. Leave empty to keep everything.', 'با کاما جدا کنید. خبری نگه داشته می‌شود که عنوان یا توضیحاتش دست‌کم یکی از این کلمات را داشته باشد. برای نگه داشتن همه، خالی بگذارید.' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="wpnc_exclude_words"><?php wpnc_e( 'Exclude Words', 'کلمات مستثنا' ); ?></label></th>
-					<td>
-						<input id="wpnc_exclude_words" type="text" name="wpnc_exclude_words" value="<?php echo esc_attr( get_option( 'wpnc_exclude_words', '' ) ); ?>" class="large-text" dir="auto" />
-						<p class="description"><?php wpnc_e( 'Comma separated. Any match drops the item, and this wins over the include list. Matching is case-insensitive and matches inside words.', 'با کاما جدا کنید. هر تطابق باعث حذف خبر می‌شود و بر فهرست بالا اولویت دارد. تطابق به حروف کوچک و بزرگ حساس نیست و داخل کلمات هم بررسی می‌شود.' ); ?></p>
-					</td>
-				</tr>
+				</table>
+			</section>
+
+			<section id="wpnc-set-housekeeping" class="wpnc-settings-group">
+				<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Housekeeping', 'نگهداری' ); ?></h3>
+				<p class="wpnc-settings-group-hint"><?php wpnc_e( 'How long processed items and log lines are kept before deletion.', 'آیتم‌های پردازش‌شده و خطوط لاگ چه مدت پیش از حذف نگه داشته می‌شوند.' ); ?></p>
+				<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="wpnc_queue_retention_days"><?php wpnc_e( 'Keep Processed Items', 'نگهداری آیتم‌های پردازش‌شده' ); ?></label></th>
 					<td>
@@ -414,10 +625,29 @@ class WPNC_Admin {
 						<?php wpnc_e( 'days', 'روز' ); ?>
 					</td>
 				</tr>
-			</table>
+				</table>
+			</section>
 
-			<hr>
-			<h3><?php wpnc_e( 'AI Assistant', 'دستیار هوش مصنوعی' ); ?></h3>
+			<section id="wpnc-set-general" class="wpnc-settings-group">
+				<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Panel', 'پنل' ); ?></h3>
+				<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Settings for this admin panel itself.', 'تنظیمات مربوط به خود همین پنل مدیریت.' ); ?></p>
+				<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="wpnc_admin_lang"><?php wpnc_e( 'Interface Language', 'زبان رابط کاربری' ); ?></label></th>
+					<td>
+						<select id="wpnc_admin_lang" name="wpnc_admin_lang">
+							<option value="fa" <?php selected( $admin_lang, 'fa' ); ?>>فارسی</option>
+							<option value="en" <?php selected( $admin_lang, 'en' ); ?>>English</option>
+						</select>
+						<p class="description"><?php wpnc_e( 'Select the language for this plugin\'s admin panel.', 'زبان نمایش پنل مدیریت این افزونه را انتخاب کنید.' ); ?></p>
+					</td>
+				</tr>
+				</table>
+			</section>
+
+			<section id="wpnc-set-ai" class="wpnc-settings-group">
+			<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'AI Assistant', 'دستیار هوش مصنوعی' ); ?></h3>
+			<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Which model rewrites an article, and the keys it rotates through.', 'کدام مدل خبر را بازنویسی می‌کند و کلیدهایی که به‌نوبت مصرف می‌شوند.' ); ?></p>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="wpnc_ai_provider"><?php wpnc_e( 'Provider', 'ارائه‌دهنده' ); ?></label></th>
@@ -527,8 +757,11 @@ class WPNC_Admin {
 				</tr>
 			</table>
 
-			<hr>
-			<h3><?php wpnc_e( 'Telegram Auto-Post', 'ارسال خودکار به تلگرام' ); ?></h3>
+			</section>
+
+			<section id="wpnc-set-telegram" class="wpnc-settings-group">
+			<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Telegram Auto-Post', 'ارسال خودکار به تلگرام' ); ?></h3>
+			<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Optional. Mirror every published item to a Telegram chat or channel.', 'اختیاری. هر خبر منتشرشده را در یک چت یا کانال تلگرام هم بازنشر می‌کند.' ); ?></p>
 			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><label for="wpnc_telegram_token"><?php wpnc_e( 'Telegram Bot Token', 'توکن ربات تلگرام' ); ?></label></th>
@@ -548,8 +781,39 @@ class WPNC_Admin {
 				</tr>
 			</table>
 
-			<?php submit_button( wpnc__( 'Save Settings', 'ذخیره تنظیمات' ) ); ?>
+			</section>
+
+			<div class="wpnc-save-bar">
+				<?php submit_button( wpnc__( 'Save Settings', 'ذخیره تنظیمات' ), 'primary', 'submit', false ); ?>
+				<span class="wpnc-save-hint"><?php wpnc_e( 'Nothing on this screen takes effect until it is saved.', 'هیچ‌کدام از تنظیمات این صفحه تا زمانی که ذخیره نشوند اعمال نمی‌شوند.' ); ?></span>
+			</div>
 		</form>
+		<?php
+	}
+
+	/**
+	 * Jump links across the settings sections.
+	 *
+	 * The screen is one long form by necessity - it posts to options.php in a
+	 * single request - so the only way to make it navigable is to say up front
+	 * what is on it and let people jump.
+	 */
+	private function render_settings_nav() {
+		$sections = array(
+			'wpnc-set-sources'      => wpnc__( 'Sources & fetching', 'منابع و دریافت' ),
+			'wpnc-set-filters'      => wpnc__( 'Filters', 'فیلترها' ),
+			'wpnc-set-publishing'   => wpnc__( 'Publishing', 'انتشار' ),
+			'wpnc-set-housekeeping' => wpnc__( 'Housekeeping', 'نگهداری' ),
+			'wpnc-set-general'      => wpnc__( 'Panel', 'پنل' ),
+			'wpnc-set-ai'           => wpnc__( 'AI Assistant', 'دستیار هوش مصنوعی' ),
+			'wpnc-set-telegram'     => wpnc__( 'Telegram Auto-Post', 'ارسال خودکار به تلگرام' ),
+		);
+		?>
+		<nav class="wpnc-settings-nav" aria-label="<?php echo esc_attr( wpnc__( 'Settings sections', 'بخش‌های تنظیمات' ) ); ?>">
+			<?php foreach ( $sections as $anchor => $label ) : ?>
+				<a href="#<?php echo esc_attr( $anchor ); ?>"><?php echo esc_html( $label ); ?></a>
+			<?php endforeach; ?>
+		</nav>
 		<?php
 	}
 
@@ -615,6 +879,22 @@ class WPNC_Admin {
 	}
 
 	private function render_moderation_tab() {
+		?>
+		<div id="wpnc-moderation-app"></div>
+		<?php
+	}
+
+	/**
+	 * The CSV export link.
+	 *
+	 * It lives in the page header rather than above the queue: it acts on the
+	 * whole view, and sitting in its own strip between the tabs and the
+	 * filters it exports made it look like part of neither.
+	 *
+	 * Kept outside #wpnc-moderation-app because the queue redraws that whole
+	 * element, and syncExportLink() has to find this anchor afterwards.
+	 */
+	private function render_export_link() {
 		$export_url = wp_nonce_url(
 			add_query_arg(
 				array(
@@ -627,12 +907,9 @@ class WPNC_Admin {
 			'wpnc_nonce'
 		);
 		?>
-		<p class="wpnc-tab-toolbar">
-			<a class="button" id="wpnc-export-queue" href="<?php echo esc_url( $export_url ); ?>">
-				<?php wpnc_e( 'Export this view (CSV)', 'خروجی این نما (CSV)' ); ?>
-			</a>
-		</p>
-		<div id="wpnc-moderation-app"></div>
+		<a class="button" id="wpnc-export-queue" href="<?php echo esc_url( $export_url ); ?>">
+			<?php wpnc_e( 'Export this view (CSV)', 'خروجی این نما (CSV)' ); ?>
+		</a>
 		<?php
 	}
 
@@ -771,24 +1048,29 @@ class WPNC_Admin {
 				</div>
 			<?php endif; ?>
 		</div>
-		<hr>
-		<h3><?php wpnc_e( 'Source Health', 'وضعیت منابع' ); ?></h3>
-		<?php $this->render_source_health(); ?>
-		<hr>
-		<h3><?php wpnc_e( 'Queue Statistics', 'آمار صف' ); ?></h3>
-		<div id="wpnc-stats-summary"></div>
-		<hr>
-		<h3><?php wpnc_e( 'Recent Logs', 'لاگ‌های اخیر' ); ?></h3>
-		<p class="wpnc-tab-toolbar">
-			<label for="wpnc-log-level"><?php wpnc_e( 'Level:', 'سطح:' ); ?></label>
-			<select id="wpnc-log-level">
-				<option value=""><?php wpnc_e( 'All', 'همه' ); ?></option>
-				<option value="error"><?php wpnc_e( 'Errors only', 'فقط خطاها' ); ?></option>
-				<option value="warning"><?php wpnc_e( 'Warnings only', 'فقط هشدارها' ); ?></option>
-				<option value="info"><?php wpnc_e( 'Info only', 'فقط اطلاعات' ); ?></option>
-			</select>
-		</p>
-		<div id="wpnc-logs-app"></div>
+		<div class="wpnc-panel">
+			<h3><?php wpnc_e( 'Source Health', 'وضعیت منابع' ); ?></h3>
+			<?php $this->render_source_health(); ?>
+		</div>
+
+		<div class="wpnc-panel">
+			<h3><?php wpnc_e( 'Queue Statistics', 'آمار صف' ); ?></h3>
+			<div id="wpnc-stats-summary"></div>
+		</div>
+
+		<div class="wpnc-panel">
+			<h3><?php wpnc_e( 'Recent Logs', 'لاگ‌های اخیر' ); ?></h3>
+			<p class="wpnc-tab-toolbar">
+				<label for="wpnc-log-level"><?php wpnc_e( 'Level:', 'سطح:' ); ?></label>
+				<select id="wpnc-log-level">
+					<option value=""><?php wpnc_e( 'All', 'همه' ); ?></option>
+					<option value="error"><?php wpnc_e( 'Errors only', 'فقط خطاها' ); ?></option>
+					<option value="warning"><?php wpnc_e( 'Warnings only', 'فقط هشدارها' ); ?></option>
+					<option value="info"><?php wpnc_e( 'Info only', 'فقط اطلاعات' ); ?></option>
+				</select>
+			</p>
+			<div id="wpnc-logs-app"></div>
+		</div>
 		<?php
 	}
 

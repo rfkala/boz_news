@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.8.0
+ * Version: 1.9.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.8.0' );
+define( 'WPNC_VERSION', '1.9.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -118,6 +118,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			'nonce'          => wp_create_nonce( 'wpnc_admin_nonce' ),
 			'lang'           => get_option( 'wpnc_admin_lang', 'fa' ),
 			'post_edit_base' => admin_url( 'post.php?action=edit&post=' ),
+			// So an empty state can offer the thing that would fill it, rather
+			// than only naming it.
+			'panel_url'      => admin_url( 'admin.php?page=boz-news&tab=' ),
 			'ai_enabled'     => WPNC_AI_Rewriter::is_configured(),
 			'ai_actions'     => WPNC_AI_Rewriter::actions(),
 			'i18n'           => array(
@@ -225,6 +228,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'published_lc'           => 'published',
 				'skipped_lc'             => 'skipped',
 				'errors_lc'              => 'errors',
+				'dismiss'                => 'Dismiss',
+				'go_to_tools'            => 'Fetch now',
+				'clear_search'           => 'Clear the search',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -331,6 +337,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'published_lc'           => 'منتشرشده',
 				'skipped_lc'             => 'رد شده',
 				'errors_lc'              => 'خطا',
+				'dismiss'                => 'بستن',
+				'go_to_tools'            => 'دریافت فوری',
+				'clear_search'           => 'پاک کردن جستجو',
 			),
 		)
 	);
