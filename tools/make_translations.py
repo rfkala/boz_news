@@ -33,7 +33,6 @@ TRANSLATIONS = {
     'Could not load more news. Please try again.': 'دریافت اخبار بیشتر ممکن نشد. لطفاً دوباره تلاش کنید.',
     'No news found.': 'خبری یافت نشد.',
     'No more posts available.': 'پست دیگری موجود نیست.',
-    'Source:': 'منبع:',
 
     # Cron schedule names, shown by WordPress and other plugins.
     'Every 15 Minutes': 'هر ۱۵ دقیقه',

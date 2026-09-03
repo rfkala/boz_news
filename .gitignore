@@ -26,3 +26,5 @@ phpunit.phar
 # Release archives built by tools/build-zip.py
 dist/
 phpunit.out
+gen.out
+diff.out

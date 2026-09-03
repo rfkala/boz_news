@@ -22,11 +22,19 @@ jobs:
       - name: Translation files are up to date with the source
         shell: bash
         run: |
-          python tools/make_translations.py
+          # The generator exits non-zero when a catalogue entry no longer
+          # matches any string in the source. Report that rather than dying
+          # at the line and leaving "exit code 1" as the only clue.
+          if ! python tools/make_translations.py > gen.out 2>&1; then
+            cat gen.out
+            echo "::error::tools/make_translations.py failed. $(tr '\n' ' ' < gen.out | head -c 800)"
+            exit 1
+          fi
+          cat gen.out
+
           if ! git diff --quiet languages/; then
-            diff=$(git diff -- languages/ | head -60)
-            # Annotations survive without auth; job logs do not.
-            echo "::error::languages/ is stale. Run python tools/make_translations.py.%0A%0A${diff//$'\n'/%0A}"
+            git diff -- languages/ | head -60 > diff.out
+            echo "::error::languages/ is stale. Run: python tools/make_translations.py -- $(tr '\n' ' ' < diff.out | head -c 800)"
             exit 1
           fi
 

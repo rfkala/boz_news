@@ -38,6 +38,9 @@ CHECKS = [
     ('Translations',
      ['check_translations.py'],
      'the generated .mo parses and returns what the .po promises'),
+    ('Catalogue',
+     ['make_translations.py'],
+     'every catalogue entry still matches a string in the source'),
 ]
 
 
