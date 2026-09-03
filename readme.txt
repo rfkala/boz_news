@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -154,6 +154,17 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.8.0 =
+* Added: a live preview beside the editor, rendered server-side through the
+  same template the publisher uses, so it shows the real published result
+  rather than an approximation.
+* Added: word count and reading time, counted in a way that works for Persian.
+* Fixed: dismissing the edit modal discarded unsaved work without asking. An
+  AI run can cost money and replace the whole article, and Cancel, the
+  backdrop and Escape all threw it away silently. All three now confirm, and
+  leaving the page mid-edit warns.
+* Added: Ctrl+Enter (Cmd+Enter) saves from anywhere in the modal.
 
 = 1.7.0 =
 * Added: choose the AI provider - OpenAI, Groq, Google Gemini or Anthropic

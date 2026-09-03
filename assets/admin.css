@@ -1259,7 +1259,7 @@
    ============================================================ */
 
 .wpnc-modal-content.is-wide {
-    width: 880px;
+    width: 1180px;
 }
 
 .wpnc-modal-head {
@@ -1499,4 +1499,125 @@
 @media screen and (max-width: 782px) {
     .wpnc-key-row input { flex-basis: 100%; }
     .wpnc-keys-actions .button { width: 100%; text-align: center; }
+}
+
+/* ============================================================
+   Split editor and live preview
+   ============================================================ */
+
+.wpnc-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.wpnc-split-edit,
+.wpnc-split-preview {
+    min-width: 0;
+}
+
+.wpnc-preview-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.wpnc-preview-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-preview-counts {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--wpnc-ink-4);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Reads as a page rather than another form field, so the difference between
+   "what I am editing" and "what will be published" is visible at a glance. */
+.wpnc-preview-paper {
+    max-height: 58vh;
+    overflow-y: auto;
+    padding: 22px 24px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface);
+    box-shadow: inset 0 1px 3px rgba(16, 24, 40, .04);
+}
+
+.wpnc-preview-title {
+    margin: 0 0 14px;
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1.5;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-preview-title:empty {
+    display: none;
+}
+
+.wpnc-preview-body {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-preview-body p {
+    margin: 0 0 1em;
+}
+
+.wpnc-preview-body h2 { font-size: 17px; margin: 1.4em 0 .5em; color: var(--wpnc-ink); }
+.wpnc-preview-body h3 { font-size: 15px; margin: 1.3em 0 .5em; color: var(--wpnc-ink); }
+
+.wpnc-preview-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: var(--wpnc-r-sm);
+}
+
+.wpnc-preview-body figure {
+    margin: 0 0 1em;
+}
+
+.wpnc-preview-body blockquote {
+    margin: 0 0 1em;
+    padding-inline-start: 14px;
+    border-inline-start: 3px solid var(--wpnc-brand);
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-preview-body ul,
+.wpnc-preview-body ol {
+    margin: 0 0 1em;
+    padding-inline-start: 22px;
+}
+
+.wpnc-preview-body a {
+    color: var(--wpnc-brand-strong);
+}
+
+.wpnc-preview-body .wpnc-source-link {
+    margin-top: 1.5em;
+    padding-top: .8em;
+    border-top: 1px solid var(--wpnc-line-soft);
+    font-size: 13px;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-preview-error {
+    margin: 0;
+    color: var(--wpnc-danger);
+    font-size: 13px;
+}
+
+/* One column below the width where two would each be too narrow to read. */
+@media screen and (max-width: 1100px) {
+    .wpnc-split { grid-template-columns: minmax(0, 1fr); }
+    .wpnc-preview-paper { max-height: 320px; }
 }

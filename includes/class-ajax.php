@@ -46,6 +46,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
 		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
+		add_action( 'wp_ajax_wpnc_preview_item', array( $this, 'preview_item' ) );
 		add_action( 'wp_ajax_wpnc_get_dashboard', array( $this, 'get_dashboard' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
@@ -586,6 +587,57 @@ class WPNC_Ajax {
 			array(
 				'content' => $result['content'],
 				'message' => wpnc__( 'The assistant returned a new version.', 'دستیار نسخه جدیدی برگرداند.' ),
+			)
+		);
+	}
+
+	/**
+	 * Render what this item would look like once published.
+	 *
+	 * Goes through WPNC_Template exactly as the publisher does, so the
+	 * template, the source line and the tidy-up of empty placeholders are all
+	 * the real ones rather than an approximation built in the browser.
+	 */
+	public function preview_item() {
+		$this->check_admin_request();
+
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		// The editor's current text, not what is stored: previewing the saved
+		// copy would ignore everything done since the modal opened.
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$content = isset( $_POST['content'] ) ? wp_kses( wp_unslash( $_POST['content'] ), WPNC_AI_Rewriter::allowed_html() ) : '';
+		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+		$tags    = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
+
+		$publisher = new WPNC_Publisher();
+		$body      = $publisher->build_content(
+			array(
+				'content'     => $content,
+				'title'       => $title,
+				'source_name' => $item->source_name,
+				'main_link'   => $item->main_link,
+				'pub_date'    => $item->pub_date,
+				'image_url'   => $item->image_url,
+				'tags'        => $tags,
+			)
+		);
+
+		$plain = wp_strip_all_tags( $content );
+
+		wp_send_json_success(
+			array(
+				'title' => $title,
+				'html'  => $body,
+				'stats' => array(
+					'words'   => WPNC_Template::word_count( $plain ),
+					'minutes' => WPNC_Template::reading_minutes( $plain ),
+				),
 			)
 		);
 	}

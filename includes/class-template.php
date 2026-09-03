@@ -113,6 +113,43 @@ class WPNC_Template {
 	}
 
 	/**
+	 * Count words in a way that does not collapse Persian to zero.
+	 *
+	 * str_word_count() only understands Latin letters, so it returns 0 for an
+	 * entire Persian article - which would have made the editor's counter
+	 * useless on exactly the content this plugin exists for.
+	 *
+	 * @param string $text Plain text.
+	 * @return int
+	 */
+	public static function word_count( $text ) {
+		$text = trim( preg_replace( '/\s+/u', ' ', (string) $text ) );
+
+		if ( '' === $text ) {
+			return 0;
+		}
+
+		return count( preg_split( '/\s+/u', $text ) );
+	}
+
+	/**
+	 * Rough reading time in minutes, floored at one.
+	 *
+	 * @param string $text Plain text.
+	 * @param int    $wpm  Words per minute.
+	 * @return int
+	 */
+	public static function reading_minutes( $text, $wpm = 200 ) {
+		$words = self::word_count( $text );
+
+		if ( 0 === $words ) {
+			return 0;
+		}
+
+		return max( 1, (int) ceil( $words / max( 1, absint( $wpm ) ) ) );
+	}
+
+	/**
 	 * Placeholder names a template actually uses.
 	 *
 	 * @param string $template Template string.

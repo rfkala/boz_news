@@ -149,7 +149,31 @@ class WPNC_Publisher {
 	 * @param array $parts Item values.
 	 * @return string
 	 */
-	private function build_content( $parts ) {
+	/**
+	 * Assemble the post body for one item.
+	 *
+	 * Public because the preview endpoint renders through this. A preview
+	 * that assembled the body separately would drift from what is actually
+	 * published, and a preview that lies is worse than none.
+	 *
+	 * @param array $parts content, title, source_name, main_link, pub_date,
+	 *                     image_url, tags.
+	 * @return string
+	 */
+	public function build_content( $parts ) {
+		$parts = array_merge(
+			array(
+				'content'     => '',
+				'title'       => '',
+				'source_name' => '',
+				'main_link'   => '',
+				'pub_date'    => '',
+				'image_url'   => '',
+				'tags'        => '',
+			),
+			(array) $parts
+		);
+
 		$link_text = $parts['source_name'] ? $parts['source_name'] : $parts['main_link'];
 
 		$image = '';

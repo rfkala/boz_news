@@ -418,6 +418,23 @@ jQuery(function($) {
 
     var EDITOR_ID = 'wpnc-edit-desc';
     var editorHistory = [];
+    var editorBaseline = null;
+    var previewTimer = null;
+
+    /* Compared against the editor to decide whether dismissing would throw
+       work away. Cheap, and it never reports a false positive the way a
+       "dirty" flag set on every keystroke would. */
+    function editorSnapshot() {
+        return JSON.stringify([
+            $('#wpnc-edit-title').val() || '',
+            editorGet(),
+            $('#wpnc-edit-tags').val() || ''
+        ]);
+    }
+
+    function editorDirty() {
+        return editorBaseline !== null && editorSnapshot() !== editorBaseline;
+    }
 
     function editorAvailable() {
         return !!(window.wp && wp.editor && typeof wp.editor.initialize === 'function');
@@ -458,6 +475,7 @@ jQuery(function($) {
         }
         editorSet(editorHistory.pop());
         $('#wpnc-editor-undo').prop('disabled', !editorHistory.length);
+        refreshPreview();
     }
 
     function editorStatus(message, type) {
@@ -470,6 +488,49 @@ jQuery(function($) {
             .attr('dir', 'auto')
             .text(message)
             .show();
+    }
+
+    function updateCounts(stats) {
+        if (!stats) {
+            return;
+        }
+        $('#wpnc-editor-counts').text(
+            stats.words + ' ' + t('words', 'words') +
+            (stats.minutes ? '  ·  ' + stats.minutes + ' ' + t('read_minutes', 'min read') : '')
+        );
+    }
+
+    function refreshPreview() {
+        var $pane = $('#wpnc-preview-body');
+        if (!$pane.length || !$('#wpnc-edit-modal').is(':visible')) {
+            return;
+        }
+
+        request('wpnc_preview_item', {
+            id: $('#wpnc-edit-id').val(),
+            title: $('#wpnc-edit-title').val(),
+            content: editorGet(),
+            tags: $('#wpnc-edit-tags').val()
+        })
+            .done(function(data) {
+                $('#wpnc-preview-title').text(data.title || '');
+                // Server-rendered through the same template the publisher
+                // uses, and already passed through wp_kses there.
+                $pane.html(data.html || '');
+                updateCounts(data.stats);
+            })
+            .fail(function(error) {
+                $pane.empty().append(
+                    $('<p>').addClass('wpnc-preview-error').attr('dir', 'auto').text(error.message)
+                );
+            });
+    }
+
+    /* Debounced: the preview is a server round trip, so it follows typing
+       rather than racing it. */
+    function schedulePreview() {
+        window.clearTimeout(previewTimer);
+        previewTimer = window.setTimeout(refreshPreview, 700);
     }
 
     function renderAiStrip($parent) {
@@ -537,7 +598,21 @@ jQuery(function($) {
         labelledField($content, 'wpnc-edit-title', t('field_title', 'Title'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
 
-        var $descField = $('<div>').addClass('wpnc-field').appendTo($content);
+
+        var $split = $('<div>').addClass('wpnc-split').appendTo($content);
+        var $left = $('<div>').addClass('wpnc-split-edit').appendTo($split);
+        var $right = $('<div>').addClass('wpnc-split-preview').appendTo($split);
+
+        $('<div>').addClass('wpnc-preview-head')
+            .append($('<span>').addClass('wpnc-preview-label').text(t('preview', 'Preview')))
+            .append($('<span>').attr('id', 'wpnc-editor-counts').addClass('wpnc-preview-counts'))
+            .appendTo($right);
+
+        var $paper = $('<div>').addClass('wpnc-preview-paper').appendTo($right);
+        $('<h3>').attr({ id: 'wpnc-preview-title', dir: 'auto' }).addClass('wpnc-preview-title').appendTo($paper);
+        $('<div>').attr({ id: 'wpnc-preview-body', dir: 'auto' }).addClass('wpnc-preview-body').appendTo($paper);
+
+        var $descField = $('<div>').addClass('wpnc-field').appendTo($left);
         var $descHead = $('<div>').addClass('wpnc-field-head').appendTo($descField);
         $('<label>').attr('for', EDITOR_ID).text(t('field_description', 'Description')).appendTo($descHead);
 
@@ -557,7 +632,7 @@ jQuery(function($) {
 
         renderAiStrip($descField);
 
-        labelledField($content, 'wpnc-edit-tags', t('field_tags', 'Tags (comma separated)'),
+        labelledField($left, 'wpnc-edit-tags', t('field_tags', 'Tags (comma separated)'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
 
         $('<p>').addClass('wpnc-modal-actions')
@@ -608,13 +683,37 @@ jQuery(function($) {
         }
 
         $('#wpnc-edit-title').trigger('focus');
+
+        // Baseline after the editor is populated, so simply opening and
+        // closing is never treated as a change.
+        window.setTimeout(function() {
+            editorBaseline = editorSnapshot();
+            refreshPreview();
+        }, 250);
+
+        $('#wpnc-edit-title, #wpnc-edit-tags').off('input.wpncpreview').on('input.wpncpreview', schedulePreview);
     }
 
-    function closeModal() {
+    /**
+     * Dismiss the modal.
+     *
+     * An AI run can cost money and replace the whole article, and there were
+     * three ways to throw that away without being asked: Cancel, the
+     * backdrop, and Escape.
+     */
+    function closeModal(force) {
+        if (!force && editorDirty()) {
+            if (!window.confirm(t('confirm_discard', 'Discard the changes you made to this item?'))) {
+                return;
+            }
+        }
+
+        window.clearTimeout(previewTimer);
         if (editorAvailable()) {
             wp.editor.remove(EDITOR_ID);
         }
         editorHistory = [];
+        editorBaseline = null;
         $('#wpnc-edit-modal').hide();
     }
 
@@ -740,6 +839,7 @@ jQuery(function($) {
                 editorPush();
                 editorSet(data.content);
                 editorStatus(data.message, 'ok');
+                refreshPreview();
             })
             .fail(function(error) {
                 editorStatus(error.message, 'error');
@@ -773,6 +873,7 @@ jQuery(function($) {
                 editorPush();
                 editorSet(data.content);
                 editorStatus(data.message + ' ' + t('ai_undo_hint', 'Use Undo to go back.'), 'ok');
+                refreshPreview();
             })
             .fail(function(error) {
                 editorStatus(error.message, 'error');
@@ -804,7 +905,8 @@ jQuery(function($) {
             tags: $('#wpnc-edit-tags').val()
         })
             .done(function(data) {
-                closeModal();
+                editorBaseline = null;
+                closeModal(true);
                 flash((data && data.message) || t('saved', 'Saved.'), 'ok');
                 loadQueue();
             })
@@ -1656,8 +1758,26 @@ jQuery(function($) {
     }
 
     $(document).on('keydown', function(event) {
-        if (event.key === 'Escape' && $('#wpnc-edit-modal').is(':visible')) {
+        if (!$('#wpnc-edit-modal').is(':visible')) {
+            return;
+        }
+
+        if (event.key === 'Escape') {
             closeModal();
+            return;
+        }
+
+        // The modal has no form, so Enter does nothing on its own.
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+            event.preventDefault();
+            $('#wpnc-save-edit').trigger('click');
+        }
+    });
+
+    // Leaving the page mid-edit deserves the browser's own warning.
+    $(window).on('beforeunload', function() {
+        if ($('#wpnc-edit-modal').is(':visible') && editorDirty()) {
+            return t('confirm_discard', 'Discard the changes you made to this item?');
         }
     });
 

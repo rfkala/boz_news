@@ -106,6 +106,30 @@ class TemplateTest extends TestCase {
 		$this->assertSame( $html, WPNC_Template::tidy( $html ) );
 	}
 
+	public function test_word_count_handles_persian() {
+		// str_word_count() only understands Latin letters and returns 0 for
+		// this, which would have made the editor's counter read zero on
+		// exactly the content this plugin exists for.
+		$this->assertSame( 4, WPNC_Template::word_count( 'خبر مهم درباره بازار' ) );
+	}
+
+	public function test_word_count_handles_latin_and_mixed_text() {
+		$this->assertSame( 3, WPNC_Template::word_count( 'one two three' ) );
+		$this->assertSame( 4, WPNC_Template::word_count( 'خبر about بازار today' ) );
+	}
+
+	public function test_word_count_ignores_surrounding_and_repeated_whitespace() {
+		$this->assertSame( 2, WPNC_Template::word_count( "  one\n\n   two  " ) );
+		$this->assertSame( 0, WPNC_Template::word_count( '   ' ) );
+		$this->assertSame( 0, WPNC_Template::word_count( '' ) );
+	}
+
+	public function test_reading_time_rounds_up_and_never_reports_zero_for_real_text() {
+		$this->assertSame( 0, WPNC_Template::reading_minutes( '' ) );
+		$this->assertSame( 1, WPNC_Template::reading_minutes( 'a few words here' ) );
+		$this->assertSame( 2, WPNC_Template::reading_minutes( implode( ' ', array_fill( 0, 250, 'word' ) ) ) );
+	}
+
 	public function test_used_lists_the_placeholders_a_template_references() {
 		$this->assertSame(
 			array( 'content', 'source_link' ),

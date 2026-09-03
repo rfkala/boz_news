@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.7.0' );
+define( 'WPNC_VERSION', '1.8.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -202,6 +202,10 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'remove'                 => 'Remove',
 				'key_placeholder'        => 'Paste a new key',
 				'confirm_remove_key'     => 'Remove this key?',
+				'preview'                => 'Preview',
+				'words'                  => 'words',
+				'read_minutes'           => 'min read',
+				'confirm_discard'        => 'Discard the changes you made to this item?',
 				'error_network'          => 'Could not reach the server. Check your connection and try again.',
 				'error_server'           => 'The server returned an error. Check Logs & Tools for details.',
 				'error_forbidden'        => 'Your session expired or you lack permission. Reload the page and sign in again.',
@@ -304,6 +308,10 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'remove'                 => 'حذف',
 				'key_placeholder'        => 'کلید جدید را اینجا بچسبانید',
 				'confirm_remove_key'     => 'این کلید حذف شود؟',
+				'preview'                => 'پیش‌نمایش',
+				'words'                  => 'کلمه',
+				'read_minutes'           => 'دقیقه مطالعه',
+				'confirm_discard'        => 'تغییراتی که روی این خبر داده‌اید دور ریخته شود؟',
 				'error_network'          => 'ارتباط با سرور برقرار نشد. اتصال خود را بررسی و دوباره تلاش کنید.',
 				'error_server'           => 'سرور خطا برگرداند. برای جزئیات به تب لاگ و ابزارها مراجعه کنید.',
 				'error_forbidden'        => 'نشست شما منقضی شده یا دسترسی ندارید. صفحه را تازه کنید و دوباره وارد شوید.',
