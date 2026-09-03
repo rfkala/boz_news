@@ -1496,6 +1496,74 @@ jQuery(function($) {
     }
 
     /* ==========================================================
+       AI provider settings
+
+       New rows carry a placeholder id; the server swaps it for a stable one
+       on save. A row left blank keeps whatever key is already stored under
+       its id, which is what lets the field show a mask instead of a secret.
+       ========================================================== */
+
+    function bindProviderSettings() {
+        var $select = $('#wpnc_ai_provider');
+        if (!$select.length) {
+            return;
+        }
+
+        function showActive() {
+            var active = $select.val();
+            $('.wpnc-provider').each(function() {
+                var $block = $(this);
+                $block.prop('hidden', $block.data('provider') !== active);
+            });
+        }
+
+        $select.on('change', showActive);
+        showActive();
+
+        var added = 0;
+
+        $('.wpnc-key-add').on('click', function() {
+            var provider = $(this).data('provider');
+            var $list = $('.wpnc-keys[data-provider="' + provider + '"]');
+
+            added++;
+            var $row = $('<div>').addClass('wpnc-key-row').appendTo($list);
+
+            $('<input>')
+                .attr({
+                    type: 'password',
+                    name: 'wpnc_ai_keys[' + provider + '][new' + added + ']',
+                    autocomplete: 'off',
+                    dir: 'ltr',
+                    placeholder: t('key_placeholder', 'Paste a new key')
+                })
+                .addClass('regular-text')
+                .appendTo($row);
+
+            $('<button>')
+                .attr('type', 'button')
+                .addClass('button button-small wpnc-key-remove')
+                .text(t('remove', 'Remove'))
+                .appendTo($row);
+
+            $row.find('input').trigger('focus');
+        });
+
+        // A removed row simply is not submitted, and the server treats an
+        // absent id as deleted.
+        $(document).on('click', '.wpnc-key-remove', function() {
+            var $row = $(this).closest('.wpnc-key-row');
+            var stored = $row.find('input').attr('placeholder');
+
+            if (stored && !window.confirm(t('confirm_remove_key', 'Remove this key?'))) {
+                return;
+            }
+
+            $row.remove();
+        });
+    }
+
+    /* ==========================================================
        Source health actions
        ========================================================== */
 
@@ -1599,6 +1667,7 @@ jQuery(function($) {
     loadStats();
     loadLogs();
     loadDashboard();
+    bindProviderSettings();
     bindFetchTool();
     bindFetchTool({
         button: '#wpnc-dash-fetch',

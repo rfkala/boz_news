@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.6.1
+Stable tag: 1.7.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -39,7 +39,8 @@ Key features:
 * Duplicate detection by source URL, GUID, and stored post meta.
 * Optional full-text extraction and image sideloading, with request size and
   timeout limits.
-* Optional OpenAI rewrite, translation, and tag generation.
+* AI assistant backed by OpenAI, Groq, Google Gemini or Anthropic Claude,
+  with several keys per provider and automatic rotation when one runs out.
 * Optional Telegram notification after publishing.
 * CSV export of any queue view.
 * Shortcode `[news_bulletin]` for the front end.
@@ -153,6 +154,19 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.7.0 =
+* Added: choose the AI provider - OpenAI, Groq, Google Gemini or Anthropic
+  Claude. Each has its own model setting, and keys for the ones you are not
+  using stay saved so switching back needs no re-entry.
+* Added: several API keys per provider. They are tried in order; a key that
+  reports no credit or a rate limit is set aside for half an hour and the next
+  one takes over, so a spent balance no longer stops the assistant.
+* Added: unit tests for all four wire formats and for the rotation order.
+* Changed: an existing OpenAI key and model are migrated into the new pool on
+  upgrade, so nothing has to be re-entered.
+* Changed: assistant errors name the provider and repeat its own explanation
+  instead of reducing it to a status code.
 
 = 1.6.1 =
 * Fixed: publication pacing did not pace. Every item in an approved batch was

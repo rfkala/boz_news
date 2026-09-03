@@ -187,9 +187,21 @@ function esc_url( $url ) {
 	return esc_url_raw( $url );
 }
 
+function add_query_arg( $key, $value, $url ) {
+	$glue = false === strpos( $url, '?' ) ? '?' : '&';
+
+	return $url . $glue . $key . '=' . $value;
+}
+
+function wp_json_encode( $data ) {
+	return json_encode( $data );
+}
+
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';

@@ -223,6 +223,121 @@ class WPNC_Settings {
 	}
 
 	/**
+	 * Sanitize the chosen AI provider.
+	 *
+	 * @param string $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_ai_provider( $value ) {
+		$value = sanitize_key( $value );
+
+		if ( WPNC_AI_Providers::exists( $value ) ) {
+			return $value;
+		}
+
+		self::notify(
+			'wpnc_bad_provider',
+			'Unknown AI provider; kept OpenAI.',
+			'ارائه‌دهنده هوش مصنوعی ناشناخته بود؛ OpenAI نگه داشته شد.',
+			'warning'
+		);
+
+		return 'openai';
+	}
+
+	/**
+	 * Sanitize the per-provider model names.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array
+	 */
+	public static function sanitize_ai_models( $value ) {
+		$clean = array();
+
+		if ( ! is_array( $value ) ) {
+			return $clean;
+		}
+
+		foreach ( WPNC_AI_Providers::slugs() as $slug ) {
+			$model = isset( $value[ $slug ] ) ? sanitize_text_field( $value[ $slug ] ) : '';
+			if ( '' !== $model ) {
+				$clean[ $slug ] = $model;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Sanitize the API key pool.
+	 *
+	 * Rows are keyed by a stable id, not by position. An empty value means
+	 * "keep the key already stored under this id", which is what lets the
+	 * form show a mask instead of the secret. A row the browser did not
+	 * submit was removed, so it is dropped.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array
+	 */
+	public static function sanitize_ai_keys( $value ) {
+		$existing = WPNC_AI_Keys::all();
+		$clean    = array();
+		$added    = 0;
+
+		if ( ! is_array( $value ) ) {
+			return $existing;
+		}
+
+		foreach ( WPNC_AI_Providers::slugs() as $slug ) {
+			$clean[ $slug ] = array();
+
+			if ( ! isset( $value[ $slug ] ) || ! is_array( $value[ $slug ] ) ) {
+				continue;
+			}
+
+			foreach ( $value[ $slug ] as $id => $submitted ) {
+				$id        = sanitize_key( $id );
+				$submitted = trim( (string) $submitted );
+
+				if ( '' === $submitted ) {
+					// Blank means unchanged, so carry the stored key over.
+					if ( isset( $existing[ $slug ][ $id ] ) ) {
+						$clean[ $slug ][ $id ] = $existing[ $slug ][ $id ];
+					}
+					continue;
+				}
+
+				// A key the browser rendered as a mask must never be saved
+				// back as the literal mask.
+				if ( false !== strpos( $submitted, '******' ) ) {
+					if ( isset( $existing[ $slug ][ $id ] ) ) {
+						$clean[ $slug ][ $id ] = $existing[ $slug ][ $id ];
+					}
+					continue;
+				}
+
+				$key = sanitize_text_field( $submitted );
+				if ( '' === $key ) {
+					continue;
+				}
+
+				// New rows arrive with a placeholder id from the browser.
+				$store_id             = ( '' === $id || 0 === strpos( $id, 'new' ) ) ? WPNC_AI_Keys::new_id() : $id;
+				$clean[ $slug ][ $store_id ] = $key;
+				$added++;
+			}
+		}
+
+		if ( $added > 0 ) {
+			// A key that was replaced because it ran out should get another
+			// chance immediately rather than waiting out its rest period.
+			WPNC_AI_Keys::wake();
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * Allowed cron intervals.
 	 *
 	 * @return array

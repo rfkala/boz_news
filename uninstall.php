@@ -33,8 +33,10 @@ $options = array(
 	'wpnc_request_timeout',
 	'wpnc_queue_retention_days',
 	'wpnc_log_retention_days',
-	'wpnc_openai_api_key',
-	'wpnc_openai_model',
+	'wpnc_ai_provider',
+	'wpnc_ai_models',
+	'wpnc_ai_keys',
+	'wpnc_ai_key_state',
 	'wpnc_auto_rewrite',
 	'wpnc_target_language',
 	'wpnc_telegram_token',
@@ -48,9 +50,11 @@ $options = array(
 	'wpnc_schema_version',
 	'wpnc_schema_error',
 
-	// Removed in 1.3.0; deleted so upgraded sites do not leave rows behind.
+	// Removed in earlier versions; deleted so upgraded sites leave no rows.
 	'wpnc_admin_notify',
 	'wpnc_source_rules',
+	'wpnc_openai_api_key',
+	'wpnc_openai_model',
 );
 
 foreach ( $options as $option ) {

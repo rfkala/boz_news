@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.2.0';
+	const SCHEMA_VERSION = '1.3.0';
 
 	/**
 	 * Option that records a failed table creation so the admin can be told.
@@ -91,6 +91,10 @@ class WPNC_DB {
 				$this->migrate_datetimes_to_utc( $version );
 			}
 
+			if ( version_compare( $version, '1.3.0', '<' ) ) {
+				$this->migrate_ai_key_to_pool();
+			}
+
 			update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
 		} finally {
 			delete_transient( self::UPGRADE_LOCK );
@@ -159,6 +163,42 @@ class WPNC_DB {
 				'log_rows'       => $log_rows,
 			)
 		);
+	}
+
+	/**
+	 * Move the single OpenAI key into the multi-provider pool.
+	 *
+	 * Runs for fresh installs too: activate() stamps the current schema
+	 * version, but a site upgrading from any earlier build has a key in the
+	 * old option that must not be lost when the settings screen stops
+	 * rendering that field.
+	 */
+	private function migrate_ai_key_to_pool() {
+		$legacy = trim( (string) get_option( 'wpnc_openai_api_key', '' ) );
+		if ( '' === $legacy ) {
+			return;
+		}
+
+		$keys = WPNC_AI_Keys::all();
+		if ( ! empty( $keys['openai'] ) ) {
+			// Already migrated, or keys added by hand since.
+			return;
+		}
+
+		$keys['openai'][ WPNC_AI_Keys::new_id() ] = $legacy;
+		WPNC_AI_Keys::save( $keys );
+
+		$model = trim( (string) get_option( 'wpnc_openai_model', '' ) );
+		if ( '' !== $model ) {
+			$models = get_option( 'wpnc_ai_models', array() );
+			$models = is_array( $models ) ? $models : array();
+			if ( empty( $models['openai'] ) ) {
+				$models['openai'] = $model;
+				update_option( 'wpnc_ai_models', $models, false );
+			}
+		}
+
+		update_option( 'wpnc_ai_provider', 'openai' );
 	}
 
 	/**

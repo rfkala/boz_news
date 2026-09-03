@@ -1436,3 +1436,67 @@
     padding: 1px 5px;
     font-size: 11.5px;
 }
+
+/* ============================================================
+   AI provider keys
+   ============================================================ */
+
+.wpnc-provider[hidden] {
+    display: none;
+}
+
+.wpnc-keys {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.wpnc-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.wpnc-key-row input {
+    flex: 1 1 320px;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+}
+
+/* A key standing down still counts as configured, so it is dimmed rather
+   than hidden - otherwise a pool of resting keys looks like an empty one. */
+.wpnc-key-row.is-resting input {
+    background: var(--wpnc-surface-2);
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-key-flag {
+    padding: 3px 10px;
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-warn-soft);
+    color: var(--wpnc-warn);
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.wpnc-keys-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 12px 0 6px;
+}
+
+.wpnc-keys-link {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--wpnc-brand-strong);
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-key-row input { flex-basis: 100%; }
+    .wpnc-keys-actions .button { width: 100%; text-align: center; }
+}

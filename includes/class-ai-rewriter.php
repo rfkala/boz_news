@@ -211,8 +211,11 @@ class WPNC_AI_Rewriter {
 
 		if ( ! is_array( $parsed ) || empty( $parsed['title'] ) || empty( $parsed['description'] ) ) {
 			return new WP_Error(
-				'wpnc_openai_invalid_json',
-				wpnc__( 'OpenAI did not return a valid rewrite payload.', 'پاسخ اوپن‌ای‌آی قابل استفاده نبود.' )
+				'wpnc_ai_invalid_json',
+				wpnc__(
+					'The assistant did not return a usable rewrite.',
+					'دستیار پاسخ قابل استفاده‌ای برنگرداند.'
+				)
 			);
 		}
 
@@ -224,97 +227,165 @@ class WPNC_AI_Rewriter {
 	}
 
 	/**
-	 * Whether an API key is configured.
+	 * The provider the panel is set to use.
+	 *
+	 * @return string
+	 */
+	public static function provider() {
+		$slug = sanitize_key( get_option( 'wpnc_ai_provider', 'openai' ) );
+
+		return WPNC_AI_Providers::exists( $slug ) ? $slug : 'openai';
+	}
+
+	/**
+	 * Model for the active provider, falling back to that provider's default
+	 * rather than to another provider's - a Groq model name sent to Anthropic
+	 * fails in a way that reads like a broken key.
+	 *
+	 * @param string $slug Provider slug.
+	 * @return string
+	 */
+	public static function model( $slug = '' ) {
+		$slug     = '' === $slug ? self::provider() : $slug;
+		$provider = WPNC_AI_Providers::get( $slug );
+		$models   = get_option( 'wpnc_ai_models', array() );
+		$model    = is_array( $models ) && isset( $models[ $slug ] ) ? trim( (string) $models[ $slug ] ) : '';
+
+		return '' !== $model ? $model : $provider['default_model'];
+	}
+
+	/**
+	 * Whether the active provider has at least one key to try.
 	 *
 	 * @return bool
 	 */
 	public static function is_configured() {
-		return '' !== trim( (string) get_option( 'wpnc_openai_api_key', '' ) );
+		return WPNC_AI_Keys::has_keys( self::provider() );
 	}
 
 	/**
-	 * One place that talks to OpenAI.
+	 * Send a chat completion, trying each of the provider's keys in turn.
 	 *
 	 * @param array      $messages        Chat messages.
 	 * @param float      $temperature     Sampling temperature.
-	 * @param array|null $response_format Optional response_format payload.
+	 * @param array|null $response_format Retained for callers that want JSON.
 	 * @return string|WP_Error Message content.
 	 */
 	private function call( $messages, $temperature = 0.5, $response_format = null ) {
-		$api_key = trim( (string) get_option( 'wpnc_openai_api_key', '' ) );
-		if ( '' === $api_key ) {
+		$slug     = self::provider();
+		$provider = WPNC_AI_Providers::get( $slug );
+		$model    = self::model( $slug );
+		$keys     = WPNC_AI_Keys::for_provider( $slug );
+		$order    = WPNC_AI_Keys::order( $slug );
+
+		if ( empty( $order ) ) {
 			return new WP_Error(
-				'wpnc_openai_missing_key',
-				wpnc__( 'OpenAI API key is missing.', 'کلید API اوپن‌ای‌آی وارد نشده است.' )
+				'wpnc_ai_missing_key',
+				sprintf(
+					/* translators: %s: provider name */
+					wpnc__(
+						'No API key is set for %s. Add one under Settings.',
+						'برای %s کلیدی تنظیم نشده است. در تنظیمات یک کلید اضافه کنید.'
+					),
+					$provider['label']
+				)
 			);
 		}
 
-		$body = array(
-			'model'       => sanitize_text_field( get_option( 'wpnc_openai_model', 'gpt-4o-mini' ) ),
-			'messages'    => $messages,
+		$options = array(
 			'temperature' => $temperature,
+			'json'        => is_array( $response_format ),
 		);
 
-		if ( is_array( $response_format ) ) {
-			$body['response_format'] = $response_format;
+		$last_error = null;
+
+		foreach ( $order as $id ) {
+			if ( ! isset( $keys[ $id ] ) ) {
+				continue;
+			}
+
+			$request = WPNC_AI_Providers::build_request( $slug, $keys[ $id ], $model, $messages, $options );
+
+			$response = wp_remote_post(
+				$request['url'],
+				array(
+					'headers' => $request['headers'],
+					'body'    => $request['body'],
+					'timeout' => WPNC_Settings::get_timeout( 45 ),
+				)
+			);
+
+			if ( is_wp_error( $response ) ) {
+				// A transport failure is the network, not the key, so do not
+				// stand the key down for it.
+				$last_error = $response;
+				continue;
+			}
+
+			$status = wp_remote_retrieve_response_code( $response );
+			$data   = json_decode( wp_remote_retrieve_body( $response ), true );
+
+			if ( 200 === $status ) {
+				$content = WPNC_AI_Providers::read_content( $slug, $data );
+
+				if ( '' === trim( $content ) ) {
+					$last_error = new WP_Error(
+						'wpnc_ai_empty',
+						sprintf(
+							/* translators: %s: provider name */
+							wpnc__( '%s returned an empty response.', '%s پاسخ خالی برگرداند.' ),
+							$provider['label']
+						)
+					);
+					continue;
+				}
+
+				WPNC_AI_Keys::mark_working( $slug, $id );
+
+				return $content;
+			}
+
+			$detail  = WPNC_AI_Providers::read_error( $slug, $data );
+			$message = sprintf(
+				/* translators: 1: provider name, 2: HTTP status, 3: provider message */
+				wpnc__( '%1$s returned HTTP %2$d: %3$s', '%1$s کد HTTP %2$d برگرداند: %3$s' ),
+				$provider['label'],
+				$status,
+				'' !== $detail ? $detail : wpnc__( 'no further detail', 'بدون توضیح بیشتر' )
+			);
+
+			$last_error = new WP_Error( 'wpnc_ai_http_error', $message );
+
+			if ( WPNC_AI_Providers::should_rotate( $status, $detail ) ) {
+				WPNC_AI_Keys::mark_resting( $slug, $id, $detail );
+				continue;
+			}
+
+			// A request the provider rejected on its merits would be rejected
+			// the same way by every other key, so stop here.
+			return $last_error;
 		}
 
-		$response = wp_remote_post(
-			'https://api.openai.com/v1/chat/completions',
-			array(
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
-					'Content-Type'  => 'application/json',
-				),
-				'body'    => wp_json_encode( $body ),
-				'timeout' => WPNC_Settings::get_timeout( 45 ),
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$code = wp_remote_retrieve_response_code( $response );
-		$raw  = wp_remote_retrieve_body( $response );
-
-		if ( 200 !== $code ) {
-			// The API explains refusals and quota problems in the body; passing
-			// that through is the difference between a fixable message and
-			// "HTTP 429".
-			$decoded = json_decode( $raw, true );
-			$detail  = isset( $decoded['error']['message'] ) ? (string) $decoded['error']['message'] : '';
-
+		if ( $last_error instanceof WP_Error ) {
 			return new WP_Error(
-				'wpnc_openai_http_error',
-				'' !== $detail
-					? sprintf(
-						/* translators: 1: HTTP status, 2: message from OpenAI */
-						wpnc__( 'OpenAI returned HTTP %1$d: %2$s', 'اوپن‌ای‌آی کد HTTP %1$d برگرداند: %2$s' ),
-						$code,
-						$detail
-					)
-					: sprintf(
-						/* translators: %d: HTTP status */
-						wpnc__( 'OpenAI returned HTTP %d.', 'اوپن‌ای‌آی کد HTTP %d برگرداند.' ),
-						$code
-					)
+				$last_error->get_error_code(),
+				sprintf(
+					/* translators: 1: key count, 2: provider name, 3: last error */
+					wpnc__(
+						'All %1$d keys for %2$s failed. Last error: %3$s',
+						'هر %1$d کلید %2$s ناموفق بود. آخرین خطا: %3$s'
+					),
+					count( $order ),
+					$provider['label'],
+					$last_error->get_error_message()
+				)
 			);
 		}
 
-		$data    = json_decode( $raw, true );
-		$content = isset( $data['choices'][0]['message']['content'] )
-			? (string) $data['choices'][0]['message']['content']
-			: '';
-
-		if ( '' === trim( $content ) ) {
-			return new WP_Error(
-				'wpnc_openai_empty',
-				wpnc__( 'OpenAI returned an empty response.', 'اوپن‌ای‌آی پاسخ خالی برگرداند.' )
-			);
-		}
-
-		return $content;
+		return new WP_Error(
+			'wpnc_ai_failed',
+			wpnc__( 'The assistant could not be reached.', 'دسترسی به دستیار ممکن نشد.' )
+		);
 	}
 
 	/**

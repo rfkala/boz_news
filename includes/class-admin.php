@@ -92,8 +92,9 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_request_timeout', array( 'WPNC_Settings', 'sanitize_timeout' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_queue_retention_days', array( 'WPNC_Settings', 'sanitize_retention' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_log_retention_days', array( 'WPNC_Settings', 'sanitize_retention' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_openai_api_key', array( $this, 'sanitize_openai_key' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_openai_model', 'sanitize_text_field' );
+		register_setting( 'wpnc_settings_group', 'wpnc_ai_provider', array( 'WPNC_Settings', 'sanitize_ai_provider' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_ai_models', array( 'WPNC_Settings', 'sanitize_ai_models' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_ai_keys', array( 'WPNC_Settings', 'sanitize_ai_keys' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_rewrite', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_target_language', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_telegram_token', array( $this, 'sanitize_telegram_token' ) );
@@ -205,11 +206,12 @@ class WPNC_Admin {
 		$interval        = get_option( 'wpnc_interval', 'hourly' );
 		$target_pt       = WPNC_Settings::get_target_post_type();
 		$default_cat     = absint( get_option( 'wpnc_default_category', 0 ) );
-		$has_openai      = '' !== (string) get_option( 'wpnc_openai_api_key', '' );
+		$ai_provider     = WPNC_AI_Rewriter::provider();
+		$ai_models       = get_option( 'wpnc_ai_models', array() );
+		$ai_models       = is_array( $ai_models ) ? $ai_models : array();
 		$has_telegram    = '' !== (string) get_option( 'wpnc_telegram_token', '' );
 		$max_items       = absint( get_option( 'wpnc_max_items_per_feed', 20 ) );
 		$timeout         = absint( get_option( 'wpnc_request_timeout', WPNC_Settings::DEFAULT_TIMEOUT ) );
-		$openai_model    = get_option( 'wpnc_openai_model', 'gpt-4o-mini' );
 		$admin_lang      = get_option( 'wpnc_admin_lang', 'fa' );
 		$post_status     = WPNC_Settings::sanitize_post_status( get_option( 'wpnc_post_status', 'publish' ) );
 		$post_author     = absint( get_option( 'wpnc_post_author', 0 ) );
@@ -415,24 +417,100 @@ class WPNC_Admin {
 			</table>
 
 			<hr>
-			<h3><?php wpnc_e( 'AI Rewrite (OpenAI)', 'بازنویسی هوش مصنوعی (OpenAI)' ); ?></h3>
+			<h3><?php wpnc_e( 'AI Assistant', 'دستیار هوش مصنوعی' ); ?></h3>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="wpnc_openai_api_key"><?php wpnc_e( 'OpenAI API Key', 'کلید API اوپن‌ای‌آی' ); ?></label></th>
+					<th scope="row"><label for="wpnc_ai_provider"><?php wpnc_e( 'Provider', 'ارائه‌دهنده' ); ?></label></th>
 					<td>
-						<input id="wpnc_openai_api_key" type="password" name="wpnc_openai_api_key" value=""
-							placeholder="<?php echo esc_attr( $has_openai ? wpnc__( 'Saved — enter a new key to replace.', 'ذخیره شده — کلید جدید وارد کنید تا جایگزین شود.' ) : '' ); ?>"
-							class="regular-text" autocomplete="off" dir="ltr" />
-						<p class="description"><?php wpnc_e( 'Leave blank to keep the saved key. Enter __delete__ to remove it.', 'برای حفظ کلید فعلی خالی بگذارید. برای حذف __delete__ وارد کنید.' ); ?></p>
+						<select id="wpnc_ai_provider" name="wpnc_ai_provider">
+							<?php foreach ( WPNC_AI_Providers::all() as $slug => $provider ) : ?>
+								<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $ai_provider, $slug ); ?>>
+									<?php echo esc_html( $provider['label'] ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php wpnc_e( 'Only the selected provider is used. Keys for the others stay saved, so you can switch back without re-entering them.', 'فقط ارائه‌دهنده انتخاب‌شده استفاده می‌شود. کلیدهای بقیه ذخیره می‌مانند تا بدون وارد کردن دوباره بتوانید برگردید.' ); ?></p>
 					</td>
 				</tr>
-				<tr>
-					<th scope="row"><label for="wpnc_openai_model"><?php wpnc_e( 'OpenAI Model', 'مدل OpenAI' ); ?></label></th>
-					<td>
-						<input id="wpnc_openai_model" type="text" name="wpnc_openai_model" value="<?php echo esc_attr( $openai_model ); ?>" class="regular-text" dir="ltr" />
-						<p class="description"><?php wpnc_e( 'A model name that does not exist makes every rewrite fail silently; the original text is kept and the reason is recorded in the logs.', 'نام مدل نادرست باعث می‌شود هر بازنویسی بی‌صدا شکست بخورد؛ متن اصلی حفظ می‌شود و دلیل در لاگ‌ها ثبت می‌گردد.' ); ?></p>
-					</td>
-				</tr>
+			</table>
+
+			<?php foreach ( WPNC_AI_Providers::all() as $slug => $provider ) : ?>
+				<?php $status = WPNC_AI_Keys::status( $slug ); ?>
+				<div class="wpnc-provider" data-provider="<?php echo esc_attr( $slug ); ?>" <?php echo $ai_provider === $slug ? '' : 'hidden'; ?>>
+					<table class="form-table" role="presentation">
+						<tr>
+							<th scope="row">
+								<label for="wpnc_ai_model_<?php echo esc_attr( $slug ); ?>"><?php wpnc_e( 'Model', 'مدل' ); ?></label>
+							</th>
+							<td>
+								<input id="wpnc_ai_model_<?php echo esc_attr( $slug ); ?>"
+									type="text"
+									name="wpnc_ai_models[<?php echo esc_attr( $slug ); ?>]"
+									value="<?php echo esc_attr( isset( $ai_models[ $slug ] ) ? $ai_models[ $slug ] : '' ); ?>"
+									placeholder="<?php echo esc_attr( $provider['default_model'] ); ?>"
+									class="regular-text" dir="ltr" />
+								<p class="description">
+									<?php
+									printf(
+										/* translators: %s: default model name */
+										esc_html( wpnc__( 'Leave blank to use %s.', 'برای استفاده از %s خالی بگذارید.' ) ),
+										'<code>' . esc_html( $provider['default_model'] ) . '</code>'
+									);
+									?>
+									<?php wpnc_e( 'A model name that does not exist makes every request fail; the reason is recorded in the logs.', 'نام مدل نادرست باعث می‌شود هر درخواست شکست بخورد؛ دلیل در لاگ‌ها ثبت می‌شود.' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php wpnc_e( 'API Keys', 'کلیدهای API' ); ?></th>
+							<td>
+								<div class="wpnc-keys" data-provider="<?php echo esc_attr( $slug ); ?>">
+									<?php foreach ( $status as $id => $info ) : ?>
+										<div class="wpnc-key-row<?php echo $info['resting'] ? ' is-resting' : ''; ?>">
+											<input type="password"
+												name="wpnc_ai_keys[<?php echo esc_attr( $slug ); ?>][<?php echo esc_attr( $id ); ?>]"
+												value=""
+												placeholder="<?php echo esc_attr( $info['masked'] ); ?>"
+												class="regular-text" autocomplete="off" dir="ltr" />
+											<?php if ( $info['resting'] ) : ?>
+												<span class="wpnc-key-flag" title="<?php echo esc_attr( $info['reason'] ); ?>">
+													<?php
+													printf(
+														/* translators: %s: human readable duration */
+														esc_html( wpnc__( 'resting, retries in %s', 'موقتاً کنار گذاشته شده، تلاش بعدی تا %s دیگر' ) ),
+														esc_html( human_time_diff( time(), $info['until'] ) )
+													);
+													?>
+												</span>
+											<?php endif; ?>
+											<button type="button" class="button button-small wpnc-key-remove">
+												<?php wpnc_e( 'Remove', 'حذف' ); ?>
+											</button>
+										</div>
+									<?php endforeach; ?>
+								</div>
+
+								<p class="wpnc-keys-actions">
+									<button type="button" class="button wpnc-key-add" data-provider="<?php echo esc_attr( $slug ); ?>">
+										<?php wpnc_e( 'Add a key', 'افزودن کلید' ); ?>
+									</button>
+									<a href="<?php echo esc_url( $provider['keys_url'] ); ?>" target="_blank" rel="noopener noreferrer" class="wpnc-keys-link">
+										<?php wpnc_e( 'Where to get one', 'کلید را از کجا بگیرم' ); ?>
+									</a>
+								</p>
+
+								<p class="description">
+									<?php wpnc_e( 'Keys are tried in order. When one reports no credit or a rate limit, the next is used and the spent one is set aside for half an hour.', 'کلیدها به ترتیب امتحان می‌شوند. وقتی یکی اعتبار نداشته باشد یا به محدودیت نرخ بخورد، کلید بعدی استفاده می‌شود و کلید تمام‌شده نیم ساعت کنار گذاشته می‌شود.' ); ?>
+									<br>
+									<?php wpnc_e( 'An existing key shows only its first and last characters. Leave a row blank to keep it, or press Remove to delete it.', 'از کلید ذخیره‌شده فقط چند نویسه اول و آخر نمایش داده می‌شود. برای حفظ آن، خانه را خالی بگذارید؛ برای حذف، «حذف» را بزنید.' ); ?>
+								</p>
+							</td>
+						</tr>
+					</table>
+				</div>
+			<?php endforeach; ?>
+
+			<table class="form-table" role="presentation">
 				<tr>
 					<th scope="row"><?php wpnc_e( 'AI Options', 'تنظیمات AI' ); ?></th>
 					<td>
@@ -440,6 +518,7 @@ class WPNC_Admin {
 							<input type="checkbox" name="wpnc_auto_rewrite" value="1" <?php checked( get_option( 'wpnc_auto_rewrite', 0 ), 1 ); ?> />
 							<?php wpnc_e( 'Rewrite title & description, generate tags before queue/publish', 'بازنویسی عنوان و توضیحات، تولید تگ قبل از صف/انتشار' ); ?>
 						</label>
+						<p class="description wpnc-warning-text"><?php wpnc_e( 'This calls the provider once per imported item, which costs money on every fetch. The editor buttons cost nothing until you press them.', 'این گزینه برای هر خبر واردشده یک درخواست می‌فرستد، یعنی هر دریافت هزینه دارد. دکمه‌های داخل ویرایشگر تا وقتی نزنید هزینه‌ای ندارند.' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -893,10 +972,6 @@ class WPNC_Admin {
 		}
 
 		return implode( "\n", $lines );
-	}
-
-	public function sanitize_openai_key( $value ) {
-		return WPNC_Settings::sanitize_secret( $value, 'wpnc_openai_api_key' );
 	}
 
 	public function sanitize_telegram_token( $value ) {

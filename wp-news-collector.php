@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.6.1
+ * Version: 1.7.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.6.1' );
+define( 'WPNC_VERSION', '1.7.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -27,6 +27,8 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-telegram.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
@@ -197,6 +199,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'ai_instruction_label'   => 'What should the assistant change?',
 				'ai_placeholder'         => 'e.g. add a short intro paragraph explaining the background',
 				'ai_disabled'            => 'Add an OpenAI API key under Settings to use the assistant.',
+				'remove'                 => 'Remove',
+				'key_placeholder'        => 'Paste a new key',
+				'confirm_remove_key'     => 'Remove this key?',
 				'error_network'          => 'Could not reach the server. Check your connection and try again.',
 				'error_server'           => 'The server returned an error. Check Logs & Tools for details.',
 				'error_forbidden'        => 'Your session expired or you lack permission. Reload the page and sign in again.',
@@ -296,6 +301,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'ai_instruction_label'   => 'دستیار چه تغییری بدهد؟',
 				'ai_placeholder'         => 'مثلاً: یک پاراگراف مقدمه کوتاه دربارهٔ پیشینه اضافه کن',
 				'ai_disabled'            => 'برای استفاده از دستیار، کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید.',
+				'remove'                 => 'حذف',
+				'key_placeholder'        => 'کلید جدید را اینجا بچسبانید',
+				'confirm_remove_key'     => 'این کلید حذف شود؟',
 				'error_network'          => 'ارتباط با سرور برقرار نشد. اتصال خود را بررسی و دوباره تلاش کنید.',
 				'error_server'           => 'سرور خطا برگرداند. برای جزئیات به تب لاگ و ابزارها مراجعه کنید.',
 				'error_forbidden'        => 'نشست شما منقضی شده یا دسترسی ندارید. صفحه را تازه کنید و دوباره وارد شوید.',
