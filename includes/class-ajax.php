@@ -305,7 +305,7 @@ class WPNC_Ajax {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$raw_options = isset( $_POST['publish_options'] ) ? wp_unslash( $_POST['publish_options'] ) : array();
 
-		$this->queue->update_item(
+		$saved = $this->queue->update_item(
 			$id,
 			array(
 				'title'           => $title,
@@ -314,6 +314,30 @@ class WPNC_Ajax {
 				'publish_options' => WPNC_Publish_Options::sanitize( $raw_options ),
 			)
 		);
+
+		// Reporting success for a write that did not happen is the worst of
+		// both: the edit is gone and the editor has no reason to suspect it.
+		if ( is_wp_error( $saved ) ) {
+			$this->logger->log(
+				WPNC_Logger::LEVEL_ERROR,
+				wpnc__( 'Saving an edited queue item failed.', 'ذخیرهٔ ویرایش یک آیتم صف ناموفق بود.' ),
+				array(
+					'id'    => $id,
+					'error' => $saved->get_error_message(),
+				),
+				'queue'
+			);
+
+			$this->fail(
+				wpnc__(
+					'The changes could not be saved. The database rejected the update - see Logs & Tools for the reason.',
+					'تغییرات ذخیره نشد. پایگاه داده این به‌روزرسانی را نپذیرفت - دلیل آن در «لاگ‌ها و ابزارها» ثبت شده است.'
+				),
+				'wpnc_save_failed',
+				array(),
+				500
+			);
+		}
 
 		wp_send_json_success( array( 'message' => wpnc__( 'Item updated successfully.', 'تغییرات ذخیره شد.' ) ) );
 	}

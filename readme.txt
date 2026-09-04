@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.15.0
+Stable tag: 1.16.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -219,6 +219,24 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.16.0 =
+* Fixed: an edit that failed to save was reported as saved. The queue update
+  returned a bare false that the endpoint ignored, so the panel said "saved",
+  closed the editor, and the work was gone. The failure is now surfaced, and
+  the reason is written to the log.
+* Fixed: the schema check verified that the tables existed but never that
+  their columns did. dbDelta adds a column as quietly as it creates a table,
+  so a column it failed to add left the schema looking healthy while every
+  write touching it was rejected - which is how the save above could fail in
+  the first place. Columns are now verified, and one that is missing is added
+  directly rather than by asking dbDelta again.
+* Added: "Save and send" in the editor, next to Save. It saves first and only
+  sends if the save was confirmed, so the version that goes out is the one on
+  screen. With more than one destination ready, a selector beside it chooses
+  which.
+
+
 
 = 1.15.0 =
 * Fixed: a timed-out AI request was reported as every key failing, and tried

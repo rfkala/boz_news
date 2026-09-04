@@ -1395,7 +1395,20 @@ a.wpnc-chip:hover {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    align-items: center;
     margin: 22px 0 0;
+}
+
+/* Cancel sits apart from the two controls that commit something, so the
+   destructive one is not the neighbour of the one people press by habit. */
+.wpnc-modal-actions #wpnc-close-modal {
+    margin-inline-start: auto;
+}
+
+.wpnc-send-target {
+    min-height: 34px;
+    max-width: 190px;
+    border-radius: var(--wpnc-r-sm);
 }
 
 /* ============================================================

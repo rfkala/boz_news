@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.15.0
+ * Version: 1.16.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.15.0' );
+define( 'WPNC_VERSION', '1.16.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -315,6 +315,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'read_minutes'           => 'min read',
 				'send_to'                => 'Send to',
 				'send_all'               => 'All',
+				'save_and_send'          => 'Save and send',
+				'approved'               => 'Approved.',
 				'channel_ready'          => 'Tested and ready',
 				'channel_untested'       => 'Not tested yet',
 				'destination'            => 'Destination',
@@ -442,6 +444,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'read_minutes'           => 'دقیقه مطالعه',
 				'send_to'                => 'ارسال به',
 				'send_all'               => 'همه',
+				'save_and_send'          => 'ذخیره و ارسال',
+				'approved'               => 'ارسال شد.',
 				'channel_ready'          => 'تست‌شده و آماده',
 				'channel_untested'       => 'هنوز تست نشده',
 				'destination'            => 'مقصد',

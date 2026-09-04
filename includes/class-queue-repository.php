@@ -172,7 +172,20 @@ class WPNC_Queue_Repository {
 			array( '%d' )
 		);
 
-		return false !== $updated;
+		// A rejected UPDATE - a column the schema upgrade never added, most
+		// often - used to come back as a plain false that the caller reported
+		// as success, so an edit could vanish while the panel said it had
+		// been saved. Carry the reason out instead.
+		if ( false === $updated ) {
+			return new WP_Error(
+				'wpnc_queue_update_failed',
+				'' !== (string) $wpdb->last_error
+					? (string) $wpdb->last_error
+					: 'The database rejected the update without saying why.'
+			);
+		}
+
+		return true;
 	}
 
 	/**

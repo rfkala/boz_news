@@ -12,6 +12,34 @@ class WPNC_DB {
 	const SCHEMA_VERSION = '1.4.0';
 
 	/**
+	 * Columns the queue table must have for the plugin to write to it.
+	 *
+	 * Listed so a column dbDelta silently failed to add is caught here rather
+	 * than as an edit that reports success and disappears.
+	 */
+	const QUEUE_COLUMNS = array(
+		'id',
+		'source_name',
+		'feed_url',
+		'source_key',
+		'guid',
+		'title',
+		'description',
+		'main_link',
+		'image_url',
+		'pub_date',
+		'status',
+		'category_id',
+		'tags',
+		'publish_options',
+		'post_id',
+		'error_message',
+		'created_at',
+		'updated_at',
+		'processed_at',
+	);
+
+	/**
 	 * Option that records a failed table creation so the admin can be told.
 	 */
 	const HEALTH_OPTION = 'wpnc_schema_error';
@@ -261,11 +289,28 @@ class WPNC_DB {
 		dbDelta( $queue_sql );
 		dbDelta( $logs_sql );
 
+		// dbDelta declines to add a column often enough - a table it cannot
+		// parse, a collation mismatch, an ALTER it decides against - and it
+		// says nothing when it does. Retrying it would only fail the same
+		// way, so add what is missing directly.
+		$this->add_missing_queue_columns( $queue_table );
+
 		// dbDelta never reports failure, so verify instead of assuming.
 		$missing = array();
 		foreach ( array( $queue_table, $logs_table ) as $table ) {
 			if ( ! $this->table_exists( $table ) ) {
 				$missing[] = $table;
+			}
+		}
+
+		// Checking the tables exist was not enough. dbDelta adds columns to
+		// an existing table just as quietly as it creates one, so a column it
+		// failed to add left the schema looking healthy while every write
+		// touching that column was rejected - which is how an edit could be
+		// reported as saved and not be there.
+		if ( empty( $missing ) ) {
+			foreach ( $this->missing_columns( $queue_table, self::QUEUE_COLUMNS ) as $column ) {
+				$missing[] = $queue_table . '.' . $column;
 			}
 		}
 
@@ -286,6 +331,61 @@ class WPNC_DB {
 	 * @param string $table Fully qualified table name.
 	 * @return bool
 	 */
+	/**
+	 * Add any column a migration was supposed to introduce and did not.
+	 *
+	 * Only columns added after the original schema are listed: the rest come
+	 * with CREATE TABLE, and a table missing those is not repairable one
+	 * column at a time.
+	 *
+	 * @param string $table Queue table name.
+	 * @return void
+	 */
+	private function add_missing_queue_columns( $table ) {
+		global $wpdb;
+
+		if ( ! $this->table_exists( $table ) ) {
+			return;
+		}
+
+		$added_later = array(
+			'publish_options' => 'text NULL',
+		);
+
+		$missing = $this->missing_columns( $table, array_keys( $added_later ) );
+
+		foreach ( $missing as $column ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$wpdb->query( "ALTER TABLE `$table` ADD COLUMN `$column` " . $added_later[ $column ] );
+
+			if ( '' !== (string) $wpdb->last_error ) {
+				update_option( self::HEALTH_OPTION, $table . '.' . $column . ': ' . $wpdb->last_error );
+			}
+		}
+	}
+
+	/**
+	 * Which of the given columns the table does not have.
+	 *
+	 * @param string $table   Table name.
+	 * @param array  $columns Column names that must be present.
+	 * @return array Missing column names.
+	 */
+	private function missing_columns( $table, $columns ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$found = $wpdb->get_col( "SHOW COLUMNS FROM `$table`" );
+
+		if ( ! is_array( $found ) || empty( $found ) ) {
+			// Unreadable rather than incomplete; table_exists() has already
+			// spoken for whether it is there at all.
+			return array();
+		}
+
+		return array_values( array_diff( $columns, $found ) );
+	}
+
 	private function table_exists( $table ) {
 		global $wpdb;
 

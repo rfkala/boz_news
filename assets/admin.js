@@ -961,8 +961,30 @@ jQuery(function($) {
 
         renderAdvanced($left);
 
-        $('<p>').addClass('wpnc-modal-actions')
-            .append($('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-save-edit').text(t('save', 'Save')))
+        var $actions = $('<p>').addClass('wpnc-modal-actions')
+            .append($('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-save-edit').text(t('save', 'Save')));
+
+        // Sending from inside the editor always saves first. Approving the
+        // stored copy while unsaved edits sat on screen would publish the
+        // version the editor had just finished replacing.
+        var ready = readyChannels();
+
+        if (ready.length) {
+            $actions.append($('<button>').attr('type', 'button').addClass('button wpnc-save-send').attr('id', 'wpnc-save-send').text(t('save_and_send', 'Save and send')));
+
+            if (ready.length > 1) {
+                var $target = $('<select>').attr('id', 'wpnc-send-target').addClass('wpnc-send-target');
+
+                $.each(ready, function(index, channel) {
+                    $('<option>').attr('value', channel.slug).text(channel.label).appendTo($target);
+                });
+
+                $('<option>').attr('value', 'all').text(t('send_all', 'All')).appendTo($target);
+                $actions.append($target);
+            }
+        }
+
+        $actions
             .append($('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-close-modal').text(t('cancel', 'Cancel')))
             .appendTo($content);
 
@@ -1126,7 +1148,10 @@ jQuery(function($) {
             }
         });
 
-        $('#wpnc-save-edit').off('click').on('click', saveEdit);
+        $('#wpnc-save-edit').off('click').on('click', function() {
+            saveEdit($(this));
+        });
+        $('#wpnc-save-send').off('click').on('click', saveAndSend);
         $('#wpnc-load-full-text').off('click').on('click', loadFullText);
         $('#wpnc-editor-undo').off('click').on('click', editorUndo);
         $('.wpnc-ai-run').off('click').on('click', function() {
@@ -1258,10 +1283,19 @@ jQuery(function($) {
             });
     }
 
-    function saveEdit() {
-        var $button = $(this);
+    /**
+     * Save the open item.
+     *
+     * @param {jQuery}   $button The control that was pressed.
+     * @param {Function} [then]  Called with the item id once the save has
+     *                           been confirmed by the server. When given, the
+     *                           modal stays open and the queue is not
+     *                           reloaded - that is the caller's to do.
+     */
+    function saveEdit($button, then) {
         var $error = $('#wpnc-edit-error');
         var title = $.trim($('#wpnc-edit-title').val());
+        var id = $('#wpnc-edit-id').val();
 
         $error.hide().empty();
 
@@ -1273,7 +1307,7 @@ jQuery(function($) {
 
         setBusy($button, true);
         request('wpnc_edit_item', {
-            id: $('#wpnc-edit-id').val(),
+            id: id,
             title: title,
             description: editorGet(),
             tags: $('#wpnc-edit-tags').val(),
@@ -1281,6 +1315,12 @@ jQuery(function($) {
         })
             .done(function(data) {
                 editorBaseline = null;
+
+                if (then) {
+                    then(id);
+                    return;
+                }
+
                 closeModal(true);
                 flash((data && data.message) || t('saved', 'Saved.'), 'ok');
                 loadQueue();
@@ -1293,6 +1333,39 @@ jQuery(function($) {
             .always(function() {
                 setBusy($button, false);
             });
+    }
+
+    /**
+     * Save, then send - in that order, and only if the save was confirmed.
+     *
+     * Sending a version that failed to save is the one outcome worth ruling
+     * out here, so the send never runs on its own.
+     */
+    function saveAndSend() {
+        var $button = $(this);
+        var $error = $('#wpnc-edit-error');
+        var $target = $('#wpnc-send-target');
+        var channels = $target.length ? $target.val() : 'site';
+
+        saveEdit($button, function(id) {
+            setBusy($button, true);
+
+            request('wpnc_approve_item', { id: id, channels: channels })
+                .done(function(data) {
+                    closeModal(true);
+                    flash((data && data.message) || t('approved', 'Approved.'), 'ok');
+                    loadQueue();
+                    loadDashboard();
+                })
+                .fail(function(error) {
+                    // The edit is safely stored, so say what happened and
+                    // leave the modal open rather than discarding anything.
+                    $error.text(error.message).show();
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
     }
 
     function actionOne($button, action, extra) {
