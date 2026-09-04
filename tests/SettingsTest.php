@@ -230,6 +230,36 @@ class SettingsTest extends TestCase {
 		$this->assertSame( array(), $clean );
 	}
 
+	private function resting_groq_key() {
+		update_option( 'wpnc_ai_keys', array( 'groq' => array( 'k1' => 'gsk_secret_value' ) ) );
+		WPNC_AI_Keys::mark_resting( 'groq', 'k1', 'Forbidden' );
+
+		$status = WPNC_AI_Keys::status( 'groq' );
+		$this->assertTrue( $status['k1']['resting'], 'precondition: the key should start out resting' );
+	}
+
+	public function test_changing_a_base_url_wakes_that_provider_s_resting_keys() {
+		// The refusal that sends someone to this field is exactly the one
+		// that put every key to rest, so leaving them asleep would make the
+		// fix look like it had not worked for another half hour.
+		$this->resting_groq_key();
+
+		WPNC_Settings::sanitize_ai_base_urls( array( 'groq' => 'https://gateway.example.com/v1' ) );
+
+		$status = WPNC_AI_Keys::status( 'groq' );
+		$this->assertFalse( $status['k1']['resting'] );
+	}
+
+	public function test_saving_an_unchanged_base_url_leaves_the_rest_period_alone() {
+		$this->resting_groq_key();
+		update_option( 'wpnc_ai_base_urls', array( 'groq' => 'https://gateway.example.com/v1' ) );
+
+		WPNC_Settings::sanitize_ai_base_urls( array( 'groq' => 'https://gateway.example.com/v1' ) );
+
+		$status = WPNC_AI_Keys::status( 'groq' );
+		$this->assertTrue( $status['k1']['resting'], 'a genuinely spent key should still serve out its rest' );
+	}
+
 	public function test_a_provider_that_does_not_exist_cannot_smuggle_in_a_base_url() {
 		$clean = WPNC_Settings::sanitize_ai_base_urls( array( 'nope' => 'https://evil.example.com/v1' ) );
 

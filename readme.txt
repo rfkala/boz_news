@@ -192,6 +192,9 @@ Regenerate translation files after changing any `__()` string:
   API key travels with it.
 * Added: "OpenAI-compatible endpoint" as a fifth provider, for services that
   speak the OpenAI chat-completions format under their own address.
+* Fixed: changing a provider's Base URL wakes its resting keys. The refusal
+  that sends you to that field is the same one that put them to rest, so the
+  fix would otherwise have looked like it had not worked for half an hour.
 
 = 1.9.0 =
 * Changed: the panel header is a real app bar. The title, the section nav and

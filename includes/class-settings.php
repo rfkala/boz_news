@@ -303,6 +303,21 @@ class WPNC_Settings {
 			$clean[ $slug ] = untrailingslashit( $url );
 		}
 
+		// Changing where a provider is called is how someone recovers from a
+		// refusal that put every key to rest. Leaving them asleep would mean
+		// the fix appears not to work for another half hour.
+		$previous = get_option( 'wpnc_ai_base_urls', array() );
+		$previous = is_array( $previous ) ? $previous : array();
+
+		foreach ( WPNC_AI_Providers::slugs() as $slug ) {
+			$was = isset( $previous[ $slug ] ) ? $previous[ $slug ] : '';
+			$now = isset( $clean[ $slug ] ) ? $clean[ $slug ] : '';
+
+			if ( $was !== $now ) {
+				WPNC_AI_Keys::wake( $slug );
+			}
+		}
+
 		return $clean;
 	}
 
