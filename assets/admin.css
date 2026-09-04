@@ -1758,6 +1758,97 @@ a.wpnc-chip:hover {
     .wpnc-field-tools .button { flex: 1; }
 }
 
+/* ============================================================
+   Suggestions
+
+   Headlines and tags arrive as things to choose from, sitting under the
+   field they would fill. Nothing is written until Apply is pressed.
+   ============================================================ */
+
+.wpnc-suggest {
+    margin: 8px 0 14px;
+    padding: 12px 14px;
+    border: 1px solid var(--wpnc-brand-glow);
+    border-radius: var(--wpnc-r-sm);
+    background: var(--wpnc-brand-soft);
+}
+
+.wpnc-suggest-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.wpnc-suggest-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--wpnc-brand-strong);
+}
+
+.wpnc-suggest-dismiss {
+    padding: 0 6px;
+    border: 0;
+    background: none;
+    font-size: 18px;
+    line-height: 1;
+    color: var(--wpnc-ink-3);
+    cursor: pointer;
+}
+
+.wpnc-suggest-dismiss:hover { color: var(--wpnc-ink); }
+
+.wpnc-suggest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.wpnc-suggest-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: var(--wpnc-r-sm);
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--wpnc-ink);
+    cursor: pointer;
+}
+
+.wpnc-suggest-option:hover { background: var(--wpnc-surface); }
+
+.wpnc-suggest-option input {
+    margin: 4px 0 0;
+    flex: none;
+}
+
+.wpnc-suggest-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.wpnc-suggest-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-pill);
+    background: var(--wpnc-surface);
+    font-size: 12.5px;
+    color: var(--wpnc-ink-2);
+    cursor: pointer;
+}
+
+.wpnc-suggest-chip input { margin: 0; flex: none; }
+
+.wpnc-suggest-actions {
+    margin-top: 11px;
+}
+
 /* Placeholder reference under the template field. */
 .wpnc-placeholders {
     display: grid;

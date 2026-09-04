@@ -603,6 +603,108 @@ jQuery(function($) {
         previewTimer = window.setTimeout(refreshPreview, 700);
     }
 
+    /**
+     * Headline suggestions: pick one, then apply it to the Title field.
+     *
+     * Nothing is written until Apply is pressed - a suggestion replacing the
+     * headline the moment it arrived would be a change nobody asked for.
+     */
+    function renderTitleSuggestions(items) {
+        var $box = $('#wpnc-title-suggestions').empty().show();
+
+        $('<div>').addClass('wpnc-suggest-head')
+            .append($('<span>').addClass('wpnc-suggest-label').text(t('suggested_titles', 'Suggested headlines')))
+            .append($('<button>').attr({ type: 'button', id: 'wpnc-suggest-dismiss' })
+                .addClass('wpnc-suggest-dismiss')
+                .attr('aria-label', t('dismiss', 'Dismiss'))
+                .text('×'))
+            .appendTo($box);
+
+        var $list = $('<div>').addClass('wpnc-suggest-list').attr('role', 'radiogroup').appendTo($box);
+
+        $.each(items, function(index, title) {
+            var id = 'wpnc-title-option-' + index;
+            var $row = $('<label>').addClass('wpnc-suggest-option').attr('for', id).appendTo($list);
+
+            $('<input>').attr({
+                type: 'radio',
+                name: 'wpnc-title-option',
+                id: id,
+                value: title
+            }).prop('checked', 0 === index).appendTo($row);
+
+            $('<span>').attr('dir', 'auto').text(title).appendTo($row);
+        });
+
+        $('<div>').addClass('wpnc-suggest-actions')
+            .append($('<button>').attr({ type: 'button', id: 'wpnc-apply-title' })
+                .addClass('button button-small button-primary')
+                .text(t('apply_to_title', 'Apply to title')))
+            .appendTo($box);
+    }
+
+    /**
+     * Tag suggestions, shown beside the field they belong to.
+     */
+    function renderTagSuggestions(items) {
+        var $box = $('#wpnc-tag-suggestions').empty().show();
+
+        $('<div>').addClass('wpnc-suggest-head')
+            .append($('<span>').addClass('wpnc-suggest-label').text(t('suggested_tags', 'Suggested tags')))
+            .append($('<button>').attr({ type: 'button', id: 'wpnc-tagsuggest-dismiss' })
+                .addClass('wpnc-suggest-dismiss')
+                .attr('aria-label', t('dismiss', 'Dismiss'))
+                .text('×'))
+            .appendTo($box);
+
+        var $list = $('<div>').addClass('wpnc-suggest-chips').appendTo($box);
+
+        $.each(items, function(index, tag) {
+            var $chip = $('<label>').addClass('wpnc-suggest-chip').appendTo($list);
+            $('<input>').attr({ type: 'checkbox', value: tag }).prop('checked', true).appendTo($chip);
+            $('<span>').attr('dir', 'auto').text(tag).appendTo($chip);
+        });
+
+        $('<div>').addClass('wpnc-suggest-actions')
+            .append($('<button>').attr({ type: 'button', id: 'wpnc-apply-tags' })
+                .addClass('button button-small button-primary')
+                .text(t('apply_to_tags', 'Add to tags')))
+            .appendTo($box);
+    }
+
+    /**
+     * Merge the ticked suggestions into the tags field.
+     *
+     * Added rather than replaced, and de-duplicated case-insensitively, so
+     * applying twice does not double every tag.
+     */
+    function applyTagSuggestions() {
+        var $field = $('#wpnc-edit-tags');
+        var existing = ($field.val() || '').split(',');
+        var seen = {};
+        var out = [];
+
+        function push(value) {
+            value = $.trim(value);
+            if (!value) {
+                return;
+            }
+            var key = value.toLowerCase();
+            if (seen[key]) {
+                return;
+            }
+            seen[key] = true;
+            out.push(value);
+        }
+
+        $.each(existing, function(index, value) { push(value); });
+        $('#wpnc-tag-suggestions input:checked').each(function() { push($(this).val()); });
+
+        $field.val(out.join(', '));
+        $('#wpnc-tag-suggestions').hide();
+        schedulePreview();
+    }
+
     function renderAiStrip($parent) {
         var $strip = $('<div>').addClass('wpnc-ai').appendTo($parent);
 
@@ -668,6 +770,9 @@ jQuery(function($) {
         labelledField($content, 'wpnc-edit-title', t('field_title', 'Title'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
 
+        // Headline suggestions land here, under the field they would replace,
+        // rather than in the article body.
+        $('<div>').attr('id', 'wpnc-title-suggestions').addClass('wpnc-suggest').hide().appendTo($content);
 
         var $split = $('<div>').addClass('wpnc-split').appendTo($content);
         var $left = $('<div>').addClass('wpnc-split-edit').appendTo($split);
@@ -705,6 +810,8 @@ jQuery(function($) {
         labelledField($left, 'wpnc-edit-tags', t('field_tags', 'Tags (comma separated)'),
             $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
 
+        $('<div>').attr('id', 'wpnc-tag-suggestions').addClass('wpnc-suggest').hide().appendTo($left);
+
         $('<p>').addClass('wpnc-modal-actions')
             .append($('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-save-edit').text(t('save', 'Save')))
             .append($('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-close-modal').text(t('cancel', 'Cancel')))
@@ -723,6 +830,8 @@ jQuery(function($) {
         $('#wpnc-edit-tags').val(item.tags || '');
         $('#wpnc-edit-error').hide().empty();
         $('#wpnc-editor-undo').prop('disabled', true);
+        // Suggestions belong to the item that produced them.
+        $('#wpnc-title-suggestions, #wpnc-tag-suggestions').hide().empty();
         editorStatus('');
 
         var $source = $('#wpnc-edit-source');
@@ -865,6 +974,27 @@ jQuery(function($) {
             runAi($(this), $(this).data('action'));
         });
 
+        $(document).off('click.wpncsuggest').on('click.wpncsuggest', '#wpnc-apply-title', function() {
+            var chosen = $('input[name="wpnc-title-option"]:checked').val();
+
+            if (chosen) {
+                $('#wpnc-edit-title').val(chosen);
+                schedulePreview();
+            }
+
+            $('#wpnc-title-suggestions').hide();
+        });
+
+        $(document).on('click.wpncsuggest', '#wpnc-apply-tags', applyTagSuggestions);
+
+        $(document).on('click.wpncsuggest', '#wpnc-suggest-dismiss', function() {
+            $('#wpnc-title-suggestions').hide();
+        });
+
+        $(document).on('click.wpncsuggest', '#wpnc-tagsuggest-dismiss', function() {
+            $('#wpnc-tag-suggestions').hide();
+        });
+
         $('#wpnc-bulk-approve').off('click').on('click', function() {
             actionBulk($(this), 'wpnc_bulk_approve');
         });
@@ -940,6 +1070,21 @@ jQuery(function($) {
             instruction: instruction
         })
             .done(function(data) {
+                // Headlines and tags are suggestions to choose from. Writing
+                // them into the body is what this used to do, and it threw
+                // the article away to make room for a list of titles.
+                if (data.kind === 'titles') {
+                    renderTitleSuggestions(data.suggestions || []);
+                    editorStatus(data.message, 'ok');
+                    return;
+                }
+
+                if (data.kind === 'tags') {
+                    renderTagSuggestions(data.suggestions || []);
+                    editorStatus(data.message, 'ok');
+                    return;
+                }
+
                 editorPush();
                 editorSet(data.content);
                 editorStatus(data.message + ' ' + t('ai_undo_hint', 'Use Undo to go back.'), 'ok');

@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.11.0
+ * Version: 1.12.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.11.0' );
+define( 'WPNC_VERSION', '1.12.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -107,6 +107,12 @@ function wpnc_enqueue_admin_assets( $hook ) {
 	// Brings in TinyMCE and Quicktags so wp.editor.initialize() works on the
 	// textarea the moderation modal creates at runtime.
 	wp_enqueue_editor();
+
+	// And the media modal behind it. The editor is initialised with
+	// mediaButtons: true, which draws an Add Media button that opens
+	// wp.media - a global that only exists once this has run. Without it the
+	// button renders and does nothing at all when clicked.
+	wp_enqueue_media();
 
 	wp_enqueue_style( 'wpnc-admin-style', WPNC_PLUGIN_URL . 'assets/admin.css', array(), wpnc_asset_version( 'assets/admin.css' ) );
 	wp_enqueue_script( 'wpnc-admin-script', WPNC_PLUGIN_URL . 'assets/admin.js', array( 'jquery' ), wpnc_asset_version( 'assets/admin.js' ), true );
@@ -208,6 +214,11 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview'                => 'Preview',
 				'words'                  => 'words',
 				'read_minutes'           => 'min read',
+				'suggested_titles'       => 'Suggested headlines',
+				'suggested_tags'         => 'Suggested tags',
+				'apply_to_title'         => 'Apply to title',
+				'apply_to_tags'          => 'Add to tags',
+				'dismiss'                => 'Dismiss',
 				'confirm_discard'        => 'Discard the changes you made to this item?',
 				'error_network'          => 'Could not reach the server. Check your connection and try again.',
 				'error_server'           => 'The server returned an error. Check Logs & Tools for details.',
@@ -317,6 +328,11 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview'                => 'پیش‌نمایش',
 				'words'                  => 'کلمه',
 				'read_minutes'           => 'دقیقه مطالعه',
+				'suggested_titles'       => 'عنوان‌های پیشنهادی',
+				'suggested_tags'         => 'برچسب‌های پیشنهادی',
+				'apply_to_title'         => 'اعمال در عنوان',
+				'apply_to_tags'          => 'افزودن به برچسب‌ها',
+				'dismiss'                => 'بستن',
 				'confirm_discard'        => 'تغییراتی که روی این خبر داده‌اید دور ریخته شود؟',
 				'error_network'          => 'ارتباط با سرور برقرار نشد. اتصال خود را بررسی و دوباره تلاش کنید.',
 				'error_server'           => 'سرور خطا برگرداند. برای جزئیات به تب لاگ و ابزارها مراجعه کنید.',

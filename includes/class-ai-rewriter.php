@@ -123,6 +123,37 @@ class WPNC_AI_Rewriter {
 			);
 		}
 
+		$kind = self::action_kind( $action );
+
+		// Translating into the language it is already in burns a request to
+		// get the same text back, and the editor cannot tell that is what
+		// happened. Better to say so and spend nothing.
+		if ( 'translate' === $action ) {
+			if ( '' === $language ) {
+				return new WP_Error(
+					'wpnc_ai_no_target_language',
+					wpnc__(
+						'Set a target language under Settings before translating.',
+						'پیش از ترجمه، «زبان هدف» را در تنظیمات مشخص کنید.'
+					)
+				);
+			}
+
+			if ( self::already_in_language( $content, $language ) ) {
+				return new WP_Error(
+					'wpnc_ai_same_language',
+					sprintf(
+						/* translators: %s: target language name */
+						wpnc__(
+							'This text is already in %s, so there is nothing to translate.',
+							'این متن از قبل به زبان %s است و نیازی به ترجمه ندارد.'
+						),
+						$language
+					)
+				);
+			}
+		}
+
 		if ( 'custom' === $action ) {
 			if ( '' === $instruction ) {
 				return new WP_Error(
@@ -140,8 +171,17 @@ class WPNC_AI_Rewriter {
 			$user   = '';
 		}
 
-		$system .= ' Return only the resulting article body as simple HTML using p, h2, h3, ul, ol, li, blockquote, strong, em and a tags. '
-			. 'Do not wrap it in a code fence and do not add commentary.';
+		// The output instruction has to match what was asked for. Appending
+		// "return the article body" to a request for headlines is what made
+		// suggestions arrive as a replacement article.
+		if ( 'titles' === $kind ) {
+			$system .= ' Return only the headlines, one per line, with no numbering, bullets, quotes or commentary.';
+		} elseif ( 'tags' === $kind ) {
+			$system .= ' Return only the tags as a single comma separated line, with no numbering, bullets or commentary.';
+		} else {
+			$system .= ' Return only the resulting article body as simple HTML using p, h2, h3, ul, ol, li, blockquote, strong, em and a tags. '
+				. 'Do not wrap it in a code fence and do not add commentary.';
+		}
 
 		$prompt = '';
 		if ( '' !== $title ) {
@@ -170,10 +210,120 @@ class WPNC_AI_Rewriter {
 			return $result;
 		}
 
+		if ( 'body' !== $kind ) {
+			$suggestions = 'titles' === $kind ? self::parse_titles( $result ) : self::parse_tags( $result );
+
+			if ( empty( $suggestions ) ) {
+				return new WP_Error(
+					'wpnc_ai_no_suggestions',
+					wpnc__(
+						'The assistant did not return anything usable. Try again.',
+						'دستیار چیز قابل استفاده‌ای برنگرداند. دوباره تلاش کنید.'
+					)
+				);
+			}
+
+			return array(
+				'kind'        => $kind,
+				'suggestions' => $suggestions,
+				'action'      => $action,
+			);
+		}
+
 		return array(
+			'kind'    => 'body',
 			'content' => $this->clean_html( $result ),
 			'action'  => $action,
 		);
+	}
+
+	/**
+	 * What an action produces.
+	 *
+	 * Headlines and tags are suggestions to choose from, not a new article.
+	 * Treating them as one is how they used to end up replacing the body.
+	 *
+	 * @param string $action Action slug.
+	 * @return string body, titles or tags.
+	 */
+	public static function action_kind( $action ) {
+		$kinds = array(
+			'headline' => 'titles',
+			'tags'     => 'tags',
+		);
+
+		return isset( $kinds[ $action ] ) ? $kinds[ $action ] : 'body';
+	}
+
+	/**
+	 * Read a list of headlines out of whatever shape the model used.
+	 *
+	 * Models are asked for one per line and still return bullets, numbers or
+	 * a stray list element often enough that stripping them is cheaper than
+	 * re-prompting.
+	 *
+	 * @param string $text Model output.
+	 * @return array
+	 */
+	public static function parse_titles( $text ) {
+		$text  = wp_strip_all_tags( str_replace( array( '</li>', '</p>', '<br>', '<br/>', '<br />' ), "\n", (string) $text ) );
+		$lines = preg_split( '/\r\n|\r|\n/', $text );
+		$out   = array();
+
+		foreach ( $lines as $line ) {
+			$line = self::strip_list_marker( $line );
+
+			if ( '' === $line ) {
+				continue;
+			}
+
+			$out[] = $line;
+		}
+
+		return array_slice( array_values( array_unique( $out ) ), 0, 5 );
+	}
+
+	/**
+	 * Read a tag list out of the model's answer.
+	 *
+	 * Splits on both commas and newlines: the prompt asks for one comma
+	 * separated line and a model will sometimes answer with a list anyway.
+	 *
+	 * @param string $text Model output.
+	 * @return array
+	 */
+	public static function parse_tags( $text ) {
+		$text  = wp_strip_all_tags( str_replace( array( '</li>', '</p>', '<br>', '<br/>', '<br />' ), "\n", (string) $text ) );
+		$parts = preg_split( '/[,،\r\n]+/u', $text );
+		$out   = array();
+
+		foreach ( $parts as $part ) {
+			$part = self::strip_list_marker( $part );
+
+			// A tag long enough to be a sentence is the model explaining
+			// itself, not a tag.
+			if ( '' === $part || WPNC_Template::word_count( $part ) > 4 ) {
+				continue;
+			}
+
+			$out[] = $part;
+		}
+
+		return array_slice( array_values( array_unique( $out ) ), 0, 8 );
+	}
+
+	/**
+	 * Strip the bullet, number or quotes a model wrapped an item in.
+	 *
+	 * @param string $line One line of model output.
+	 * @return string
+	 */
+	private static function strip_list_marker( $line ) {
+		$line = trim( (string) $line );
+		$line = preg_replace( '/^\s*(?:[-*•–—]|\d+[.)])\s*/u', '', $line );
+		$line = trim( $line, " \t\n\r\0\x0B\"'«»“”‘’" );
+
+		return trim( $line );
 	}
 
 	/**
@@ -252,6 +402,104 @@ class WPNC_AI_Rewriter {
 		$model    = is_array( $models ) && isset( $models[ $slug ] ) ? trim( (string) $models[ $slug ] ) : '';
 
 		return '' !== $model ? $model : $provider['default_model'];
+	}
+
+	/**
+	 * The writing system a piece of text is predominantly in.
+	 *
+	 * Persian and Arabic share a script, and this plugin exists partly to
+	 * translate Arabic sources into Persian, so lumping them together would
+	 * refuse exactly the translation someone wanted. They are told apart by
+	 * the letters only one of them uses: pe, che, zhe, gaf, and the Persian
+	 * forms of kaf and ye, against the Arabic teh marbuta, kaf, yeh and alef
+	 * maksura.
+	 *
+	 * @param string $text Text, markup tolerated.
+	 * @return string persian, arabic, latin, cyrillic, or empty when there is
+	 *                not enough text to tell.
+	 */
+	public static function dominant_script( $text ) {
+		$text = wp_strip_all_tags( (string) $text );
+
+		$counts = array(
+			'arabic'   => preg_match_all( '/[\x{0600}-\x{06FF}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]/u', $text ),
+			'latin'    => preg_match_all( '/[A-Za-z\x{00C0}-\x{024F}]/u', $text ),
+			'cyrillic' => preg_match_all( '/[\x{0400}-\x{04FF}]/u', $text ),
+		);
+
+		arsort( $counts );
+		$script = key( $counts );
+		$top    = current( $counts );
+
+		// Too little to judge. A headline's worth of letters is enough; a
+		// stray word is not, and guessing from one would be worse than
+		// admitting the question is open.
+		if ( $top < 10 ) {
+			return '';
+		}
+
+		if ( 'arabic' !== $script ) {
+			return $script;
+		}
+
+		$persian = preg_match_all( '/[\x{067E}\x{0686}\x{0698}\x{06AF}\x{06A9}\x{06CC}]/u', $text );
+		$arabic  = preg_match_all( '/[\x{0629}\x{0643}\x{064A}\x{0649}]/u', $text );
+
+		return $persian >= $arabic ? 'persian' : 'arabic';
+	}
+
+	/**
+	 * The script a named language is written in.
+	 *
+	 * The target language is a free-text setting, so this accepts the names
+	 * people actually type, in either language.
+	 *
+	 * @param string $language Language name.
+	 * @return string persian, arabic, latin, cyrillic, or empty when unknown.
+	 */
+	public static function language_script( $language ) {
+		$language = strtolower( trim( (string) $language ) );
+
+		if ( '' === $language ) {
+			return '';
+		}
+
+		$map = array(
+			'persian'  => array( 'persian', 'farsi', 'parsi', 'fa', 'fa_ir', 'فارسی', 'پارسی' ),
+			'arabic'   => array( 'arabic', 'ar', 'عربی', 'العربية', 'عربي' ),
+			'cyrillic' => array( 'russian', 'ru', 'روسی', 'ukrainian', 'bulgarian', 'serbian' ),
+			'latin'    => array(
+				'english', 'en', 'انگلیسی', 'french', 'fr', 'فرانسوی', 'german', 'de', 'آلمانی',
+				'spanish', 'es', 'اسپانیایی', 'italian', 'it', 'ایتالیایی', 'portuguese', 'pt',
+				'dutch', 'turkish', 'tr', 'ترکی', 'azerbaijani', 'kurdish',
+			),
+		);
+
+		foreach ( $map as $script => $names ) {
+			if ( in_array( $language, $names, true ) ) {
+				return $script;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Whether translating this text would be a no-op.
+	 *
+	 * Deliberately answers false whenever it cannot tell - an unnecessary
+	 * translation costs one request, while a wrongly refused one costs the
+	 * editor the feature.
+	 *
+	 * @param string $text     Text to inspect.
+	 * @param string $language Target language name.
+	 * @return bool
+	 */
+	public static function already_in_language( $text, $language ) {
+		$target = self::language_script( $language );
+		$actual = self::dominant_script( $text );
+
+		return '' !== $target && '' !== $actual && $target === $actual;
 	}
 
 	/**

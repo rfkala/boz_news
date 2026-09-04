@@ -207,5 +207,6 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';

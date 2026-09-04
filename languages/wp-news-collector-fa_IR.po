@@ -8,11 +8,11 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:358
+#: wp-news-collector.php:374
 msgid "Boz News"
 msgstr "بُز نیوز"
 
-#: wp-news-collector.php:360
+#: wp-news-collector.php:376
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr "بُز نیوز آیتم‌های فید RSS را در یک صف تأیید ذخیره می‌کند و در صورت فعال بودن این یکپارچگی‌ها، ممکن است متن مقاله را برای بازنویسی به OpenAI و لینک پست‌های منتشرشده را به تلگرام ارسال کند. فیدها و کلیدهای API تنظیم‌شده را بررسی کنید تا با سیاست حریم خصوصی سایت شما هم‌خوان باشند."
 
@@ -41,7 +41,7 @@ msgstr "در حال بارگذاری..."
 msgid "No more news"
 msgstr "خبر دیگری نیست"
 
-#: includes/class-ajax.php:893
+#: includes/class-ajax.php:916
 msgid "No more posts available."
 msgstr "پست دیگری موجود نیست."
 

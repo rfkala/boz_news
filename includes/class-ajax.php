@@ -583,8 +583,31 @@ class WPNC_Ajax {
 			$this->fail( $result->get_error_message(), 'wpnc_ai_failed' );
 		}
 
+		$kind = isset( $result['kind'] ) ? $result['kind'] : 'body';
+
+		if ( 'titles' === $kind ) {
+			wp_send_json_success(
+				array(
+					'kind'        => 'titles',
+					'suggestions' => array_map( 'sanitize_text_field', $result['suggestions'] ),
+					'message'     => wpnc__( 'Pick a headline below.', 'یکی از عنوان‌های زیر را انتخاب کنید.' ),
+				)
+			);
+		}
+
+		if ( 'tags' === $kind ) {
+			wp_send_json_success(
+				array(
+					'kind'        => 'tags',
+					'suggestions' => array_map( 'sanitize_text_field', $result['suggestions'] ),
+					'message'     => wpnc__( 'Suggested tags are below.', 'برچسب‌های پیشنهادی در پایین آمده‌اند.' ),
+				)
+			);
+		}
+
 		wp_send_json_success(
 			array(
+				'kind'    => 'body',
 				'content' => $result['content'],
 				'message' => wpnc__( 'The assistant returned a new version.', 'دستیار نسخه جدیدی برگرداند.' ),
 			)

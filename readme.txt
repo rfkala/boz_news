@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.11.0
+Stable tag: 1.12.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -196,6 +196,24 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.12.0 =
+* Fixed: Suggest titles and Suggest tags replaced the article with their own
+  output. The prompt told the model to return an article body no matter what
+  was asked for, and the browser wrote whatever came back into the editor, so
+  asking for headlines destroyed the story to make room for a list of them.
+  Both now arrive as suggestions under the field they belong to - headlines as
+  a radio list under the title, tags as chips under the tag box - and nothing
+  is written until Apply is pressed.
+* Fixed: Add Media did nothing. The editor was started with its media button
+  enabled, but `wp_enqueue_media()` was never called, so the button opened a
+  modal that did not exist.
+* Added: translating into the language the text is already in is refused
+  before the request is sent, and says so. Persian and Arabic are told apart
+  by the letters unique to each, so translating an Arabic source into Persian
+  still works - which is the case that a script check alone would have broken.
+* Added: translating with no target language set says which setting to fill in
+  rather than quietly keeping the original language.
 
 = 1.11.0 =
 * Added: GapGPT as a provider. It fronts the other providers under its own
