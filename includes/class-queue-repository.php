@@ -140,16 +140,35 @@ class WPNC_Queue_Repository {
 	public function update_item( $id, $data ) {
 		global $wpdb;
 
+		$fields = array(
+			'title'       => sanitize_text_field( $data['title'] ?? '' ),
+			'description' => wp_kses_post( $data['description'] ?? '' ),
+			'tags'        => sanitize_text_field( $data['tags'] ?? '' ),
+			'updated_at'  => WPNC_Time::now(),
+		);
+		$format = array( '%s', '%s', '%s', '%s' );
+
+		// Only written when the caller actually passed it, so a caller that
+		// knows nothing about publishing options cannot blank an item's
+		// overrides as a side effect of saving a title.
+		if ( array_key_exists( 'publish_options', $data ) ) {
+			$options = WPNC_Publish_Options::sanitize( $data['publish_options'] );
+
+			$fields['publish_options'] = WPNC_Publish_Options::encode( $options );
+			$format[]                  = '%s';
+
+			// The category has had its own column since before overrides
+			// existed; keeping it there means the existing queries and the
+			// CSV export go on seeing it.
+			$fields['category_id'] = isset( $options['category_id'] ) ? absint( $options['category_id'] ) : 0;
+			$format[]              = '%d';
+		}
+
 		$updated = $wpdb->update(
 			$this->table_name(),
-			array(
-				'title'       => sanitize_text_field( $data['title'] ?? '' ),
-				'description' => wp_kses_post( $data['description'] ?? '' ),
-				'tags'        => sanitize_text_field( $data['tags'] ?? '' ),
-				'updated_at'  => WPNC_Time::now(),
-			),
+			$fields,
 			array( 'id' => absint( $id ) ),
-			array( '%s', '%s', '%s', '%s' ),
+			$format,
 			array( '%d' )
 		);
 
@@ -613,6 +632,7 @@ class WPNC_Queue_Repository {
 			'status'           => (string) $item->status,
 			'category_id'      => (int) $item->category_id,
 			'tags'             => (string) $item->tags,
+			'publish_options'  => WPNC_Publish_Options::decode( isset( $item->publish_options ) ? $item->publish_options : '' ),
 			'post_id'          => isset( $item->post_id ) ? (int) $item->post_id : 0,
 			'error_message'    => isset( $item->error_message ) ? (string) $item->error_message : '',
 		);

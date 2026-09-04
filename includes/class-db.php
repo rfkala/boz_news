@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.3.0';
+	const SCHEMA_VERSION = '1.4.0';
 
 	/**
 	 * Option that records a failed table creation so the admin can be told.
@@ -227,6 +227,7 @@ class WPNC_DB {
 			status varchar(50) DEFAULT 'pending' NOT NULL,
 			category_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			tags varchar(255) DEFAULT '' NOT NULL,
+			publish_options text NULL,
 			post_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			error_message text NULL,
 			created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,

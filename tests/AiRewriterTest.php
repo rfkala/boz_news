@@ -186,4 +186,47 @@ class AiRewriterTest extends TestCase {
 		$this->assertSame( array(), WPNC_AI_Rewriter::parse_titles( "\n\n   \n" ) );
 		$this->assertSame( array(), WPNC_AI_Rewriter::parse_tags( ' , , ' ) );
 	}
+
+	/* ----------------------------------------------------------------
+	   Structure the assistant is allowed to produce
+	   ---------------------------------------------------------------- */
+
+	public function test_structural_tags_survive_the_filter() {
+		// "Put these in a table" was impossible to satisfy: the model's
+		// answer came back correct and wp_kses then flattened it to running
+		// text, so the instruction looked like it had been ignored.
+		$allowed = WPNC_AI_Rewriter::allowed_html();
+
+		foreach ( array( 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption', 'pre', 'code', 'dl', 'dt', 'dd' ) as $tag ) {
+			$this->assertArrayHasKey( $tag, $allowed, $tag . ' would be stripped from the answer' );
+		}
+	}
+
+	public function test_table_cells_may_span() {
+		$allowed = WPNC_AI_Rewriter::allowed_html();
+
+		$this->assertArrayHasKey( 'colspan', $allowed['td'] );
+		$this->assertArrayHasKey( 'rowspan', $allowed['td'] );
+		$this->assertArrayHasKey( 'scope', $allowed['th'] );
+	}
+
+	public function test_nothing_that_executes_is_allowed_in() {
+		$allowed = WPNC_AI_Rewriter::allowed_html();
+
+		foreach ( array( 'script', 'style', 'iframe', 'object', 'embed', 'form', 'input' ) as $tag ) {
+			$this->assertArrayNotHasKey( $tag, $allowed, $tag . ' must never come back from a model' );
+		}
+
+		// Nor an event handler smuggled onto something that is allowed.
+		foreach ( $allowed as $tag => $attrs ) {
+			foreach ( array_keys( (array) $attrs ) as $attr ) {
+				$this->assertStringStartsNotWith( 'on', $attr, $tag . ' allows the event handler ' . $attr );
+			}
+		}
+	}
+
+	public function test_add_structure_is_offered_as_an_action() {
+		$this->assertArrayHasKey( 'format', WPNC_AI_Rewriter::actions() );
+		$this->assertSame( 'body', WPNC_AI_Rewriter::action_kind( 'format' ), 'it rewrites the article, so it replaces the body' );
+	}
 }

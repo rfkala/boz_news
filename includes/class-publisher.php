@@ -48,10 +48,24 @@ class WPNC_Publisher {
 	public function publish( $item, $post_type = '', $channels = null ) {
 		$item = (array) $item;
 
-		$post_type = $post_type ? sanitize_key( $post_type ) : WPNC_Settings::get_target_post_type();
-		$cat_id    = absint( $item['category_id'] ?? 0 );
+		// The item's own answers where it has them, the settings otherwise.
+		// An explicit argument still wins over both, since that is a caller
+		// saying "this run, this type" rather than a stored preference.
+		$options = WPNC_Publish_Options::merge(
+			WPNC_Publish_Options::decode( $item['publish_options'] ?? '' ),
+			WPNC_Publish_Options::defaults()
+		);
+
+		$post_type = $post_type ? sanitize_key( $post_type ) : $options['post_type'];
+		if ( ! post_type_exists( $post_type ) ) {
+			$post_type = WPNC_Settings::get_target_post_type();
+		}
+
+		// category_id has its own column and predates overrides, so it stays
+		// the source of truth when the row carries one.
+		$cat_id = absint( $item['category_id'] ?? 0 );
 		if ( ! $cat_id ) {
-			$cat_id = absint( get_option( 'wpnc_default_category', 0 ) );
+			$cat_id = absint( $options['category_id'] );
 		}
 
 		$title       = sanitize_text_field( $item['title'] ?? '' );
@@ -76,14 +90,14 @@ class WPNC_Publisher {
 			)
 		);
 
-		$schedule = $this->schedule_for( $pub_date );
+		$schedule = $this->schedule_for( $pub_date, $options['post_status'] );
 
 		$post_id = wp_insert_post(
 			array(
 				'post_title'    => wp_strip_all_tags( $title ),
 				'post_content'  => $content,
 				'post_status'   => $schedule['status'],
-				'post_author'   => $this->get_post_author(),
+				'post_author'   => $this->get_post_author( $options['post_author'] ),
 				'post_date_gmt' => $schedule['date_gmt'],
 				'post_type'     => $post_type,
 			),
@@ -278,10 +292,11 @@ class WPNC_Publisher {
 	 * date is still the truth about when the story happened.
 	 *
 	 * @param string $pub_date Original publication date, UTC.
+	 * @param string $status   Resolved post status.
 	 * @return array { status, date_gmt }
 	 */
-	private function schedule_for( $pub_date ) {
-		$status = $this->get_post_status();
+	private function schedule_for( $pub_date, $status = '' ) {
+		$status = '' !== $status ? $status : $this->get_post_status();
 
 		if ( 'publish' !== $status || ! WPNC_Scheduler::is_enabled() ) {
 			return array(
@@ -318,9 +333,18 @@ class WPNC_Publisher {
 	 * Cron has no current user, so fall back to the configured author rather
 	 * than silently attributing every scheduled import to user 1.
 	 *
+	 * @param int $chosen Author picked for this item, 0 to decide here.
 	 * @return int
 	 */
-	private function get_post_author() {
+	private function get_post_author( $chosen = 0 ) {
+		// An author chosen for this item is a deliberate act and outranks
+		// whoever happens to be clicking Approve, which is otherwise the
+		// sensible default for a manual publish.
+		$chosen = absint( $chosen );
+		if ( $chosen && get_userdata( $chosen ) ) {
+			return $chosen;
+		}
+
 		$user_id = get_current_user_id();
 		if ( $user_id ) {
 			return $user_id;

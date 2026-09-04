@@ -2163,3 +2163,63 @@ a.wpnc-chip:hover {
     .wpnc-split { grid-template-columns: minmax(0, 1fr); }
     .wpnc-preview-paper { max-height: 320px; }
 }
+
+/* ============================================================
+   Advanced publishing overrides
+   ============================================================ */
+
+/* Collapsed by default: four fields that are usually right already should
+   not compete with the article for attention. */
+.wpnc-advanced {
+    margin: 16px 0 0;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-advanced > summary {
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--wpnc-ink-2);
+    cursor: pointer;
+    list-style: none;
+}
+
+.wpnc-advanced > summary::-webkit-details-marker { display: none; }
+
+/* Own marker, so it points the right way in both directions rather than
+   inheriting a left-pointing triangle into an RTL panel. */
+.wpnc-advanced > summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1em;
+    margin-inline-end: 6px;
+    font-weight: 700;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-advanced[open] > summary::before { content: "\2212"; }
+
+.wpnc-advanced > summary:hover { color: var(--wpnc-ink); }
+
+.wpnc-advanced > .description {
+    margin: 0;
+    padding: 0 14px;
+    font-size: 12.5px;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    padding: 12px 14px 16px;
+}
+
+.wpnc-advanced-grid .wpnc-field { margin: 0; }
+
+.wpnc-advanced-grid select.wpnc-override {
+    width: 100%;
+    max-width: 100%;
+}

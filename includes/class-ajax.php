@@ -302,12 +302,16 @@ class WPNC_Ajax {
 			);
 		}
 
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$raw_options = isset( $_POST['publish_options'] ) ? wp_unslash( $_POST['publish_options'] ) : array();
+
 		$this->queue->update_item(
 			$id,
 			array(
-				'title'       => $title,
-				'description' => $description,
-				'tags'        => $tags,
+				'title'           => $title,
+				'description'     => $description,
+				'tags'            => $tags,
+				'publish_options' => WPNC_Publish_Options::sanitize( $raw_options ),
 			)
 		);
 

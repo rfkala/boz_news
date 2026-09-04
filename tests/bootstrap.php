@@ -212,3 +212,4 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';

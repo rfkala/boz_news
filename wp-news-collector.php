@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.13.0
+ * Version: 1.14.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.13.0' );
+define( 'WPNC_VERSION', '1.14.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -24,6 +24,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-logger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';
@@ -96,6 +97,84 @@ function wpnc_register_frontend_assets() {
 add_action( 'wp_enqueue_scripts', 'wpnc_register_frontend_assets' );
 
 /**
+ * Post types an item may be published into.
+ *
+ * Public types only: publishing a news item into a hidden internal type is
+ * not something to offer by accident.
+ *
+ * @return array slug => label.
+ */
+function wpnc_admin_post_type_choices() {
+	$choices = array();
+
+	foreach ( get_post_types( array( 'public' => true ), 'objects' ) as $slug => $type ) {
+		if ( 'attachment' === $slug ) {
+			continue;
+		}
+
+		$choices[ $slug ] = $type->labels->singular_name;
+	}
+
+	return $choices;
+}
+
+/**
+ * Users who could be given a post.
+ *
+ * Capped, because a site with thousands of subscribers should not ship all of
+ * them to the browser on every page load. Anyone who can be an author has the
+ * capability; subscribers do not.
+ *
+ * @return array id => display name.
+ */
+function wpnc_admin_author_choices() {
+	$choices = array();
+
+	$users = get_users(
+		array(
+			'capability' => 'edit_posts',
+			'number'     => 100,
+			'orderby'    => 'display_name',
+			'fields'     => array( 'ID', 'display_name' ),
+		)
+	);
+
+	foreach ( $users as $user ) {
+		$choices[ (int) $user->ID ] = $user->display_name;
+	}
+
+	return $choices;
+}
+
+/**
+ * Categories an item may be filed under.
+ *
+ * @return array id => name.
+ */
+function wpnc_admin_category_choices() {
+	$choices = array();
+
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'category',
+			'hide_empty' => false,
+			'number'     => 200,
+			'orderby'    => 'name',
+		)
+	);
+
+	if ( is_wp_error( $terms ) ) {
+		return $choices;
+	}
+
+	foreach ( $terms as $term ) {
+		$choices[ (int) $term->term_id ] = $term->name;
+	}
+
+	return $choices;
+}
+
+/**
  * Enqueue admin assets on plugin pages.
  *
  * @param string $hook Admin hook.
@@ -132,6 +211,15 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			'ai_actions'     => WPNC_AI_Rewriter::actions(),
 			// Which destinations may be offered as a button, and why.
 			'channels'       => WPNC_Channels::status(),
+			// The settings an item may override at publish time, plus what
+			// it inherits when it overrides nothing.
+			'publish'        => array(
+				'defaults'   => WPNC_Publish_Options::defaults(),
+				'post_types' => wpnc_admin_post_type_choices(),
+				'statuses'   => WPNC_Publish_Options::statuses(),
+				'authors'    => wpnc_admin_author_choices(),
+				'categories' => wpnc_admin_category_choices(),
+			),
 			'i18n'           => array(
 				'loading'                => 'Loading...',
 				'processing'             => 'Processing...',
@@ -163,6 +251,14 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'field_title'            => 'Title',
 				'field_description'      => 'Description',
 				'field_tags'             => 'Tags (comma separated)',
+				'advanced'               => 'Advanced',
+				'advanced_hint'          => 'These start from Settings. Change one here and it applies to this item only.',
+				'inherit'                => 'Use the default',
+				'inherit_named'          => 'Default:',
+				'field_post_type'        => 'Post type',
+				'field_post_status'      => 'Status',
+				'field_post_author'      => 'Author',
+				'field_category'         => 'Category',
 				'title_required'         => 'Title is required.',
 				'save'                   => 'Save',
 				'cancel'                 => 'Cancel',
@@ -282,6 +378,14 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'field_title'            => 'عنوان',
 				'field_description'      => 'توضیحات',
 				'field_tags'             => 'برچسب‌ها (با کاما جدا کنید)',
+				'advanced'               => 'تنظیمات پیشرفته',
+				'advanced_hint'          => 'مقدار پیش‌فرض از تنظیمات می‌آید. هر کدام را اینجا تغییر دهید فقط روی همین خبر اثر دارد.',
+				'inherit'                => 'مطابق تنظیمات',
+				'inherit_named'          => 'پیش‌فرض:',
+				'field_post_type'        => 'نوع پست',
+				'field_post_status'      => 'وضعیت انتشار',
+				'field_post_author'      => 'نویسنده',
+				'field_category'         => 'دسته‌بندی',
 				'title_required'         => 'عنوان الزامی است.',
 				'save'                   => 'ذخیره',
 				'cancel'                 => 'انصراف',

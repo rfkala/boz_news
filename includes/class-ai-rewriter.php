@@ -43,6 +43,37 @@ class WPNC_AI_Rewriter {
 			'h2'         => array(),
 			'h3'         => array(),
 			'h4'         => array(),
+			'h5'         => array(),
+			'h6'         => array(),
+			'hr'         => array(),
+			'sub'        => array(),
+			'sup'        => array(),
+			// Structure the assistant can be asked for directly - "put these
+			// in a table", "tidy this list up". Without these the model's
+			// answer was stripped back to running text by wp_kses and the
+			// instruction appeared to have been ignored.
+			'table'      => array( 'class' => array() ),
+			'thead'      => array(),
+			'tbody'      => array(),
+			'tfoot'      => array(),
+			'tr'         => array(),
+			'th'         => array(
+				'colspan' => array(),
+				'rowspan' => array(),
+				'scope'   => array(),
+			),
+			'td'         => array(
+				'colspan' => array(),
+				'rowspan' => array(),
+			),
+			'caption'    => array(),
+			'dl'         => array(),
+			'dt'         => array(),
+			'dd'         => array(),
+			// A news item can quote a snippet, and running it together as a
+			// paragraph loses the one thing that made it readable.
+			'pre'        => array(),
+			'code'       => array(),
 			'figure'     => array( 'class' => array() ),
 			'figcaption' => array(),
 			'img'        => array(
@@ -67,6 +98,7 @@ class WPNC_AI_Rewriter {
 			'rewrite'   => wpnc__( 'Rewrite', 'بازنویسی' ),
 			'expand'    => wpnc__( 'Expand', 'گسترش' ),
 			'shorten'   => wpnc__( 'Shorten', 'کوتاه کردن' ),
+			'format'    => wpnc__( 'Add structure', 'ساختاردهی' ),
 			'translate' => wpnc__( 'Translate', 'ترجمه' ),
 			'headline'  => wpnc__( 'Suggest titles', 'پیشنهاد عنوان' ),
 			'tags'      => wpnc__( 'Suggest tags', 'پیشنهاد برچسب' ),
@@ -87,6 +119,10 @@ class WPNC_AI_Rewriter {
 			'rewrite'   => 'Rewrite the article so the wording is original and no sentence is copied, while every fact, name, number and quote stays exactly as given. Keep roughly the same length.',
 			'expand'    => 'Expand the article with more detail and context drawn only from what is already stated. Do not invent facts, names, numbers, quotes or sources.',
 			'shorten'   => 'Shorten the article to its essential points, keeping every key fact.',
+			'format'    => 'Give the article structure without changing its wording or its facts. '
+				. 'Break running text into sections with headings where the subject changes, turn a sequence of items into a list, '
+				. 'turn repeated fields of the same shape into a table with a header row, and put code or command output in a pre block. '
+				. 'Do not add, remove, reword or reorder any fact.',
 			'translate' => 'Translate the article faithfully. Do not summarise, add or remove anything.',
 			'headline'  => 'Suggest five alternative headlines for this article, as an unordered list. Output only the list.',
 			'tags'      => 'Extract up to eight short topical tags for this article. Output only a comma separated list, nothing else.',
@@ -179,8 +215,15 @@ class WPNC_AI_Rewriter {
 		} elseif ( 'tags' === $kind ) {
 			$system .= ' Return only the tags as a single comma separated line, with no numbering, bullets or commentary.';
 		} else {
-			$system .= ' Return only the resulting article body as simple HTML using p, h2, h3, ul, ol, li, blockquote, strong, em and a tags. '
-				. 'Do not wrap it in a code fence and do not add commentary.';
+			// The tag list is the vocabulary the instruction can be carried
+			// out in: asking for a table is pointless if the model has been
+			// told to answer in paragraphs and lists.
+			$system .= ' Return only the resulting article body as HTML, using any of: '
+				. 'p, h2, h3, h4, ul, ol, li, dl, dt, dd, table, thead, tbody, tr, th, td, caption, '
+				. 'blockquote, pre, code, hr, strong, em, a. '
+				. 'Where the instruction calls for structure - a table, a list, sections, tidied-up code - '
+				. 'use the tag that expresses it rather than describing it in prose. '
+				. 'Do not wrap the whole answer in a code fence and do not add commentary.';
 		}
 
 		$prompt = '';

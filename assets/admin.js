@@ -557,6 +557,65 @@ jQuery(function($) {
        Edit modal
        ========================================================== */
 
+    function publishConfig() {
+        return (wpnc_ajax.publish) || { defaults: {}, post_types: {}, statuses: {}, authors: {}, categories: {} };
+    }
+
+    /**
+     * A select whose blank option means "whatever the settings say".
+     *
+     * Naming the inherited value in that option matters: without it the field
+     * reads as empty rather than as inheriting, and the only way to find out
+     * what would actually happen is to go and read the settings.
+     */
+    function overrideSelect(id, choices, current, inherited) {
+        var $select = $('<select>').attr('id', id).addClass('wpnc-override');
+        var label = choices[inherited];
+
+        $('<option>').val('').text(
+            label ? t('inherit_named', 'Default:') + ' ' + label : t('inherit', 'Use the default')
+        ).appendTo($select);
+
+        Object.keys(choices).forEach(function(key) {
+            $('<option>').val(key).text(choices[key]).appendTo($select);
+        });
+
+        $select.val(current ? String(current) : '');
+
+        return $select;
+    }
+
+    function renderAdvanced($parent) {
+        var config = publishConfig();
+
+        var $box = $('<details>').addClass('wpnc-advanced').appendTo($parent);
+        $('<summary>').text(t('advanced', 'Advanced')).appendTo($box);
+
+        $('<p>').addClass('description').attr('dir', 'auto')
+            .text(t('advanced_hint', 'These start from Settings. Change one here and it applies to this item only.'))
+            .appendTo($box);
+
+        var $grid = $('<div>').addClass('wpnc-advanced-grid').appendTo($box);
+
+        labelledField($grid, 'wpnc-edit-post-type', t('field_post_type', 'Post type'),
+            overrideSelect('wpnc-edit-post-type', config.post_types, '', config.defaults.post_type));
+        labelledField($grid, 'wpnc-edit-post-status', t('field_post_status', 'Status'),
+            overrideSelect('wpnc-edit-post-status', config.statuses, '', config.defaults.post_status));
+        labelledField($grid, 'wpnc-edit-post-author', t('field_post_author', 'Author'),
+            overrideSelect('wpnc-edit-post-author', config.authors, '', config.defaults.post_author));
+        labelledField($grid, 'wpnc-edit-category', t('field_category', 'Category'),
+            overrideSelect('wpnc-edit-category', config.categories, '', config.defaults.category_id));
+    }
+
+    function publishOptions() {
+        return {
+            post_type: $('#wpnc-edit-post-type').val() || '',
+            post_status: $('#wpnc-edit-post-status').val() || '',
+            post_author: $('#wpnc-edit-post-author').val() || '',
+            category_id: $('#wpnc-edit-category').val() || ''
+        };
+    }
+
     function labelledField($parent, id, labelText, $field) {
         var $wrap = $('<p>').addClass('wpnc-field').appendTo($parent);
         $('<label>').attr('for', id).text(labelText).appendTo($wrap);
@@ -585,7 +644,8 @@ jQuery(function($) {
         return JSON.stringify([
             $('#wpnc-edit-title').val() || '',
             editorGet(),
-            $('#wpnc-edit-tags').val() || ''
+            $('#wpnc-edit-tags').val() || '',
+            publishOptions()
         ]);
     }
 
@@ -899,6 +959,8 @@ jQuery(function($) {
 
         $('<div>').attr('id', 'wpnc-tag-suggestions').addClass('wpnc-suggest').hide().appendTo($left);
 
+        renderAdvanced($left);
+
         $('<p>').addClass('wpnc-modal-actions')
             .append($('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-save-edit').text(t('save', 'Save')))
             .append($('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-close-modal').text(t('cancel', 'Cancel')))
@@ -915,6 +977,16 @@ jQuery(function($) {
         $('#wpnc-edit-id').val(item.id);
         $('#wpnc-edit-title').val(item.title || '');
         $('#wpnc-edit-tags').val(item.tags || '');
+
+        var overrides = item.publish_options || {};
+        $('#wpnc-edit-post-type').val(overrides.post_type || '');
+        $('#wpnc-edit-post-status').val(overrides.post_status || '');
+        $('#wpnc-edit-post-author').val(overrides.post_author ? String(overrides.post_author) : '');
+
+        // Seeded from the row's own column, not just from the overrides: a
+        // category can arrive from the source's mapping at fetch time, and
+        // showing this blank would have quietly cleared it on the next save.
+        $('#wpnc-edit-category').val(item.category_id ? String(item.category_id) : '');
         $('#wpnc-edit-error').hide().empty();
         $('#wpnc-editor-undo').prop('disabled', true);
         // Suggestions belong to the item that produced them.
@@ -1204,7 +1276,8 @@ jQuery(function($) {
             id: $('#wpnc-edit-id').val(),
             title: title,
             description: editorGet(),
-            tags: $('#wpnc-edit-tags').val()
+            tags: $('#wpnc-edit-tags').val(),
+            publish_options: publishOptions()
         })
             .done(function(data) {
                 editorBaseline = null;

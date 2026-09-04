@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.13.0
+Stable tag: 1.14.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -197,6 +197,22 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.14.0 =
+* Added: post type, status, author and category can be set per item, under
+  Advanced in the editor. The Settings values become defaults rather than
+  rules, so one piece can go out as a draft, or under a different author,
+  without changing a global setting and changing it back.
+* Note: an item only records where it disagrees. Leaving a field on "use the
+  default" means it keeps following Settings, so changing a setting later
+  still moves every item that never had an opinion.
+* Added: the assistant can be asked for structure - "put these in a table",
+  "tidy this up" - and a matching Add structure action. Tables, definition
+  lists, code blocks and h4-h6 now survive; previously the model returned
+  them correctly and they were stripped back to running text on the way in,
+  so the instruction looked as though it had been ignored.
+* Fixed: the category a source mapping assigned at fetch time is shown in the
+  editor rather than appearing blank, so saving an item no longer clears it.
 
 = 1.13.0 =
 * Added: approving an item now asks where to send it. The queue row carries a
