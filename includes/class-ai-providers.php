@@ -54,12 +54,21 @@ class WPNC_AI_Providers {
 			// own - only an entry.
 			//
 			// The documented host is api.gapgpt.app. That one is deliberately
-			// NOT the default: it did not answer at all from the server this
-			// plugin runs on (two attempts, 20s and 25s, no response), while
-			// the alternate host answered in 12s with a well-formed
-			// {"error":{"message":...}} body. Verified 2026-09-04. If you are
-			// tempted to "correct" this to the documented host, check that it
-			// answers from the server first.
+			// NOT the default: TCP connects to it fine and then the TLS
+			// handshake never completes, which is what SNI filtering looks
+			// like rather than an outage. The alternate host, which sits
+			// behind a CDN, answered 401 in 0.5-1.2s across five consecutive
+			// attempts with a well-formed {"error":{"message":...}} body -
+			// the shape read_error() already parses. Verified 2026-09-04 over
+			// IPv4.
+			//
+			// Over IPv4 specifically: the test machine had blackholed IPv6,
+			// which made both hosts look dead until the address family was
+			// forced. If this ever appears to stop working, check that before
+			// concluding the host is blocked.
+			//
+			// If you are tempted to "correct" this to the documented host,
+			// check that it completes a TLS handshake from the server first.
 			'gapgpt' => array(
 				'label'         => 'GapGPT',
 				'base'          => 'https://api.gapapi.com/v1',

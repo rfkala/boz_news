@@ -104,9 +104,10 @@ class AiProviderTest extends TestCase {
 	}
 
 	public function test_gapgpt_uses_the_host_that_answers_rather_than_the_documented_one() {
-		// api.gapgpt.app is the documented host and does not respond from the
-		// server this plugin runs on; the alternate does. Pinning it here so
-		// the choice is not quietly undone as a typo.
+		// api.gapgpt.app is the documented host; its TLS handshake does not
+		// complete from where this runs, while the alternate answers in about
+		// a second. Pinning it here so the choice is not quietly undone as a
+		// typo - see the comment on the provider for how to re-check.
 		$this->assertSame(
 			'https://api.gapapi.com/v1/chat/completions',
 			WPNC_AI_Providers::endpoint( 'gapgpt' )

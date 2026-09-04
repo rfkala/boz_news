@@ -139,6 +139,22 @@ Base URL sits under Settings, in the AI Assistant section, per provider. Only
 the address changes - the request format, the key rotation and the editor all
 behave the same.
 
+= AI requests hang for 30 seconds and then time out. Is the provider down? =
+
+Check IPv6 before concluding anything about the provider. If the server
+publishes an IPv6 route that does not actually work, every request tries that
+address first and stalls until the timeout, and the provider looks dead when
+it is answering perfectly over IPv4. It is worth ruling out first because it
+looks exactly like a block.
+
+Two symptoms tell them apart, from the server:
+
+* `curl -4 https://host/...` succeeds while plain `curl https://host/...`
+  hangs - that is the IPv6 route, not the provider.
+* The TCP connection succeeds and the TLS handshake never finishes - that is
+  the connection being filtered by hostname, and a different address for the
+  same service usually works. Set it in Base URL.
+
 = Are API keys displayed in the admin? =
 
 No. Saved OpenAI and Telegram secrets are never rendered back into the form.
@@ -186,9 +202,10 @@ Regenerate translation files after changing any `__()` string:
   address in the OpenAI format, so it needs no adapter - only an entry, a key
   and a model name.
 * Note: it is pointed at `api.gapapi.com`, not the documented
-  `api.gapgpt.app`. The documented host did not answer at all from the server
-  this was tested on, while the alternate answered normally. Either can be
-  set explicitly in Base URL.
+  `api.gapgpt.app`. On the machine this was tested from, the documented host
+  accepts a TCP connection and then never completes the TLS handshake, while
+  the alternate answers in about a second. Either can be set explicitly in
+  Base URL.
 
 = 1.10.0 =
 * Fixed: a provider refusing the server itself was reported as every key
