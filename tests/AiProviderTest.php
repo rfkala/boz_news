@@ -89,6 +89,30 @@ class AiProviderTest extends TestCase {
 		$this->assertSame( 'https://gateway.example.com/v1/chat/completions', $request['url'] );
 	}
 
+	public function test_gapgpt_speaks_the_openai_format_under_its_own_address() {
+		$request = WPNC_AI_Providers::build_request( 'gapgpt', 'KEY123', 'a-model', $this->messages() );
+		$body    = json_decode( $request['body'], true );
+
+		$this->assertSame( 'Bearer KEY123', $request['headers']['Authorization'] );
+		$this->assertArrayHasKey( 'messages', $body );
+		$this->assertStringEndsWith( '/chat/completions', $request['url'] );
+		$this->assertStringNotContainsString(
+			'api.openai.com',
+			$request['url'],
+			'a reseller must not be pointed at the provider it fronts'
+		);
+	}
+
+	public function test_gapgpt_uses_the_host_that_answers_rather_than_the_documented_one() {
+		// api.gapgpt.app is the documented host and does not respond from the
+		// server this plugin runs on; the alternate does. Pinning it here so
+		// the choice is not quietly undone as a typo.
+		$this->assertSame(
+			'https://api.gapapi.com/v1/chat/completions',
+			WPNC_AI_Providers::endpoint( 'gapgpt' )
+		);
+	}
+
 	public function test_a_custom_endpoint_has_no_address_until_one_is_given() {
 		$this->assertSame( '', WPNC_AI_Providers::endpoint( 'custom' ) );
 		$this->assertSame(

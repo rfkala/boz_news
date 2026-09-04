@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.10.0
+Stable tag: 1.11.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -39,8 +39,10 @@ Key features:
 * Duplicate detection by source URL, GUID, and stored post meta.
 * Optional full-text extraction and image sideloading, with request size and
   timeout limits.
-* AI assistant backed by OpenAI, Groq, Google Gemini or Anthropic Claude,
-  with several keys per provider and automatic rotation when one runs out.
+* AI assistant backed by OpenAI, Groq, Google Gemini, Anthropic Claude or
+  GapGPT, with several keys per provider and automatic rotation when one runs
+  out. Any other service speaking the OpenAI chat-completions format works
+  too, and every provider's address can be overridden.
 * Optional Telegram notification after publishing.
 * CSV export of any queue view.
 * Shortcode `[news_bulletin]` for the front end.
@@ -178,6 +180,15 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.11.0 =
+* Added: GapGPT as a provider. It fronts the other providers under its own
+  address in the OpenAI format, so it needs no adapter - only an entry, a key
+  and a model name.
+* Note: it is pointed at `api.gapapi.com`, not the documented
+  `api.gapgpt.app`. The documented host did not answer at all from the server
+  this was tested on, while the alternate answered normally. Either can be
+  set explicitly in Base URL.
 
 = 1.10.0 =
 * Fixed: a provider refusing the server itself was reported as every key

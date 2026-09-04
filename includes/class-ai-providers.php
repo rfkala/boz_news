@@ -49,6 +49,24 @@ class WPNC_AI_Providers {
 				'default_model' => 'claude-sonnet-4-5',
 				'keys_url'      => 'https://console.anthropic.com/settings/keys',
 			),
+			// A reseller that fronts the other providers under its own
+			// address, in the OpenAI format, so it needs no adapter of its
+			// own - only an entry.
+			//
+			// The documented host is api.gapgpt.app. That one is deliberately
+			// NOT the default: it did not answer at all from the server this
+			// plugin runs on (two attempts, 20s and 25s, no response), while
+			// the alternate host answered in 12s with a well-formed
+			// {"error":{"message":...}} body. Verified 2026-09-04. If you are
+			// tempted to "correct" this to the documented host, check that it
+			// answers from the server first.
+			'gapgpt' => array(
+				'label'         => 'GapGPT',
+				'base'          => 'https://api.gapapi.com/v1',
+				'path'          => '/chat/completions',
+				'default_model' => 'gpt-4o-mini',
+				'keys_url'      => 'https://gapgpt.app/platform-v2/docs/quickstart',
+			),
 			// Anything that speaks the OpenAI chat-completions format: a
 			// self-hosted model, a gateway, a reseller. It has no default
 			// base because there is nothing sensible to guess.
