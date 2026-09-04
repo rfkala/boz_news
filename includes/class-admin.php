@@ -94,6 +94,7 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_log_retention_days', array( 'WPNC_Settings', 'sanitize_retention' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_ai_provider', array( 'WPNC_Settings', 'sanitize_ai_provider' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_ai_models', array( 'WPNC_Settings', 'sanitize_ai_models' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_ai_base_urls', array( 'WPNC_Settings', 'sanitize_ai_base_urls' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_ai_keys', array( 'WPNC_Settings', 'sanitize_ai_keys' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_rewrite', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_target_language', 'sanitize_text_field' );
@@ -404,6 +405,7 @@ class WPNC_Admin {
 		$default_cat     = absint( get_option( 'wpnc_default_category', 0 ) );
 		$ai_provider     = WPNC_AI_Rewriter::provider();
 		$ai_models       = get_option( 'wpnc_ai_models', array() );
+		$ai_bases        = get_option( 'wpnc_ai_base_urls', array() );
 		$ai_models       = is_array( $ai_models ) ? $ai_models : array();
 		$has_telegram    = '' !== (string) get_option( 'wpnc_telegram_token', '' );
 		$max_items       = absint( get_option( 'wpnc_max_items_per_feed', 20 ) );
@@ -680,14 +682,41 @@ class WPNC_Admin {
 									placeholder="<?php echo esc_attr( $provider['default_model'] ); ?>"
 									class="regular-text" dir="ltr" />
 								<p class="description">
-									<?php
-									printf(
-										/* translators: %s: default model name */
-										esc_html( wpnc__( 'Leave blank to use %s.', 'برای استفاده از %s خالی بگذارید.' ) ),
-										'<code>' . esc_html( $provider['default_model'] ) . '</code>'
-									);
-									?>
+									<?php if ( '' !== $provider['default_model'] ) : ?>
+										<?php
+										printf(
+											/* translators: %s: default model name */
+											esc_html( wpnc__( 'Leave blank to use %s.', 'برای استفاده از %s خالی بگذارید.' ) ),
+											'<code>' . esc_html( $provider['default_model'] ) . '</code>'
+										);
+										?>
+									<?php else : ?>
+										<?php wpnc_e( 'Required: this endpoint has no default model to fall back on.', 'الزامی است: برای این درگاه مدل پیش‌فرضی وجود ندارد.' ); ?>
+									<?php endif; ?>
 									<?php wpnc_e( 'A model name that does not exist makes every request fail; the reason is recorded in the logs.', 'نام مدل نادرست باعث می‌شود هر درخواست شکست بخورد؛ دلیل در لاگ‌ها ثبت می‌شود.' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="wpnc_ai_base_<?php echo esc_attr( $slug ); ?>"><?php wpnc_e( 'Base URL', 'آدرس پایه (Base URL)' ); ?></label>
+							</th>
+							<td>
+								<input id="wpnc_ai_base_<?php echo esc_attr( $slug ); ?>"
+									type="url"
+									name="wpnc_ai_base_urls[<?php echo esc_attr( $slug ); ?>]"
+									value="<?php echo esc_attr( isset( $ai_bases[ $slug ] ) ? $ai_bases[ $slug ] : '' ); ?>"
+									placeholder="<?php echo esc_attr( '' !== $provider['base'] ? $provider['base'] : 'https://…/v1' ); ?>"
+									class="large-text" dir="ltr" />
+								<p class="description">
+									<?php if ( '' !== $provider['base'] ) : ?>
+										<?php wpnc_e( 'Leave blank to call the provider directly.', 'برای تماس مستقیم با ارائه‌دهنده، خالی بگذارید.' ); ?>
+									<?php endif; ?>
+									<?php wpnc_e( 'Set this when the provider will not answer your server - a whole region refused, or an outbound firewall. Point it at a gateway, a reseller, or a model running on this machine; the request format does not change.', 'وقتی ارائه‌دهنده به سرور شما پاسخ نمی‌دهد (مثلاً منطقه‌ای مسدود است یا فایروال خروجی دارید) این را پر کنید. می‌توانید آن را به یک درگاه واسط، یک فروشندهٔ داخلی، یا مدلی که روی همین سرور اجرا می‌شود وصل کنید؛ قالب درخواست تغییری نمی‌کند.' ); ?>
+									<br>
+									<?php wpnc_e( 'The path is added automatically, so give only the base — for example https://api.example.com/v1', 'مسیر به‌طور خودکار اضافه می‌شود، پس فقط آدرس پایه را بدهید — مثلاً https://api.example.com/v1' ); ?>
+									<br>
+									<?php wpnc_e( 'It must be https unless it is on this machine: your API key is sent with every request.', 'مگر روی همین دستگاه باشد، باید https باشد؛ کلید API با هر درخواست ارسال می‌شود.' ); ?>
 								</p>
 							</td>
 						</tr>
@@ -724,9 +753,11 @@ class WPNC_Admin {
 									<button type="button" class="button wpnc-key-add" data-provider="<?php echo esc_attr( $slug ); ?>">
 										<?php wpnc_e( 'Add a key', 'افزودن کلید' ); ?>
 									</button>
-									<a href="<?php echo esc_url( $provider['keys_url'] ); ?>" target="_blank" rel="noopener noreferrer" class="wpnc-keys-link">
-										<?php wpnc_e( 'Where to get one', 'کلید را از کجا بگیرم' ); ?>
-									</a>
+									<?php if ( '' !== $provider['keys_url'] ) : ?>
+										<a href="<?php echo esc_url( $provider['keys_url'] ); ?>" target="_blank" rel="noopener noreferrer" class="wpnc-keys-link">
+											<?php wpnc_e( 'Where to get one', 'کلید را از کجا بگیرم' ); ?>
+										</a>
+									<?php endif; ?>
 								</p>
 
 								<p class="description">

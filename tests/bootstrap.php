@@ -122,6 +122,10 @@ function esc_url_raw( $url ) {
 	return $url;
 }
 
+function untrailingslashit( $value ) {
+	return rtrim( (string) $value, '/\\' );
+}
+
 function wp_parse_url( $url, $component = -1 ) {
 	$parts = parse_url( $url );
 	if ( false === $parts ) {

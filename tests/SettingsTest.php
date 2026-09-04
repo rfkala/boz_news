@@ -186,4 +186,53 @@ class SettingsTest extends TestCase {
 		$this->assertSame( 0, WPNC_Settings::sanitize_checkbox( '0' ) );
 		$this->assertSame( 0, WPNC_Settings::sanitize_checkbox( null ) );
 	}
+
+	public function test_a_base_url_is_kept_per_provider_without_its_trailing_slash() {
+		$clean = WPNC_Settings::sanitize_ai_base_urls(
+			array(
+				'groq'   => 'https://gateway.example.com/v1/',
+				'openai' => 'https://other.example.com/v1',
+			)
+		);
+
+		$this->assertSame( 'https://gateway.example.com/v1', $clean['groq'] );
+		$this->assertSame( 'https://other.example.com/v1', $clean['openai'] );
+	}
+
+	public function test_a_blank_base_url_leaves_the_provider_on_its_own_address() {
+		$clean = WPNC_Settings::sanitize_ai_base_urls( array( 'groq' => '   ' ) );
+
+		$this->assertArrayNotHasKey( 'groq', $clean );
+	}
+
+	public function test_a_plaintext_base_url_off_this_machine_is_refused() {
+		// The API key is sent with every request, so http to somewhere else
+		// would put it on the wire in clear.
+		$clean = WPNC_Settings::sanitize_ai_base_urls( array( 'groq' => 'http://gateway.example.com/v1' ) );
+
+		$this->assertArrayNotHasKey( 'groq', $clean );
+	}
+
+	public function test_a_model_on_this_machine_may_be_plain_http() {
+		$clean = WPNC_Settings::sanitize_ai_base_urls( array( 'custom' => 'http://127.0.0.1:11434/v1' ) );
+
+		$this->assertSame( 'http://127.0.0.1:11434/v1', $clean['custom'] );
+	}
+
+	public function test_nonsense_is_not_saved_as_a_base_url() {
+		$clean = WPNC_Settings::sanitize_ai_base_urls(
+			array(
+				'groq'   => 'not a url',
+				'openai' => 'ftp://files.example.com',
+			)
+		);
+
+		$this->assertSame( array(), $clean );
+	}
+
+	public function test_a_provider_that_does_not_exist_cannot_smuggle_in_a_base_url() {
+		$clean = WPNC_Settings::sanitize_ai_base_urls( array( 'nope' => 'https://evil.example.com/v1' ) );
+
+		$this->assertArrayNotHasKey( 'nope', $clean );
+	}
 }

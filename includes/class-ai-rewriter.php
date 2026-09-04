@@ -255,6 +255,19 @@ class WPNC_AI_Rewriter {
 	}
 
 	/**
+	 * The configured address for a provider, if it has been overridden.
+	 *
+	 * @param string $slug Provider slug, empty for the active one.
+	 * @return string Empty to use the provider's own address.
+	 */
+	public static function base_url( $slug = '' ) {
+		$slug  = '' === $slug ? self::provider() : $slug;
+		$bases = get_option( 'wpnc_ai_base_urls', array() );
+
+		return is_array( $bases ) && isset( $bases[ $slug ] ) ? trim( (string) $bases[ $slug ] ) : '';
+	}
+
+	/**
 	 * Whether the active provider has at least one key to try.
 	 *
 	 * @return bool
@@ -292,9 +305,26 @@ class WPNC_AI_Rewriter {
 			);
 		}
 
+		$base = self::base_url( $slug );
+
+		if ( '' === WPNC_AI_Providers::endpoint( $slug, $base, $model ) ) {
+			return new WP_Error(
+				'wpnc_ai_no_endpoint',
+				sprintf(
+					/* translators: %s: provider name */
+					wpnc__(
+						'%s has no address to call. Set its Base URL under Settings.',
+						'برای %s آدرسی تعیین نشده است. در تنظیمات، Base URL آن را وارد کنید.'
+					),
+					$provider['label']
+				)
+			);
+		}
+
 		$options = array(
 			'temperature' => $temperature,
 			'json'        => is_array( $response_format ),
+			'base'        => $base,
 		);
 
 		$last_error = null;
@@ -345,7 +375,26 @@ class WPNC_AI_Rewriter {
 				return $content;
 			}
 
-			$detail  = WPNC_AI_Providers::read_error( $slug, $data );
+			$detail = WPNC_AI_Providers::read_error( $slug, $data );
+
+			// Not a key problem: the provider is refusing this server, and
+			// every remaining key would be refused identically. Say so, and
+			// leave the pool alone.
+			if ( WPNC_AI_Providers::is_location_block( $status, $detail ) ) {
+				return new WP_Error(
+					'wpnc_ai_location_blocked',
+					sprintf(
+						/* translators: 1: provider name, 2: provider message */
+						wpnc__(
+							'%1$s will not accept requests from this server (%2$s). Your keys are fine - the address is the problem. Point this provider at a reachable endpoint using Base URL under Settings, or choose one that answers from here.',
+							'%1$s درخواست‌های این سرور را نمی‌پذیرد (%2$s). کلیدها سالم‌اند؛ مشکل از آدرس است. در تنظیمات، Base URL این ارائه‌دهنده را به یک درگاه در دسترس تغییر دهید یا ارائه‌دهنده‌ای انتخاب کنید که از اینجا پاسخ می‌دهد.'
+						),
+						$provider['label'],
+						'' !== $detail ? $detail : sprintf( 'HTTP %d', $status )
+					)
+				);
+			}
+
 			$message = sprintf(
 				/* translators: 1: provider name, 2: HTTP status, 3: provider message */
 				wpnc__( '%1$s returned HTTP %2$d: %3$s', '%1$s کد HTTP %2$d برگرداند: %3$s' ),

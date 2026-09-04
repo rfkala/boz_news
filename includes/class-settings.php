@@ -251,6 +251,61 @@ class WPNC_Settings {
 	 * @param mixed $value Raw value.
 	 * @return array
 	 */
+	/**
+	 * Per-provider Base URL overrides.
+	 *
+	 * http is allowed only for a loopback address, which is how a model
+	 * running on the same machine is reached; anything leaving the server is
+	 * required to be https, since the API key travels with it.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return array
+	 */
+	public static function sanitize_ai_base_urls( $value ) {
+		$clean = array();
+
+		if ( ! is_array( $value ) ) {
+			return $clean;
+		}
+
+		foreach ( WPNC_AI_Providers::slugs() as $slug ) {
+			$url = isset( $value[ $slug ] ) ? trim( (string) $value[ $slug ] ) : '';
+
+			if ( '' === $url ) {
+				continue;
+			}
+
+			$url  = esc_url_raw( $url, array( 'http', 'https' ) );
+			$host = strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) );
+
+			if ( '' === $url || '' === $host ) {
+				self::notify(
+					'wpnc_ai_base_url_' . $slug,
+					'That Base URL is not a valid address, so it was not saved.',
+					'آن Base URL آدرس معتبری نیست و ذخیره نشد.'
+				);
+				continue;
+			}
+
+			$loopback = in_array( $host, array( 'localhost', '127.0.0.1', '::1' ), true );
+
+			if ( 'https' !== wp_parse_url( $url, PHP_URL_SCHEME ) && ! $loopback ) {
+				self::notify(
+					'wpnc_ai_base_url_' . $slug,
+					'A Base URL that leaves this server must use https - your API key travels with every request. It was not saved.',
+					'آدرسی که از این سرور خارج می‌شود باید https باشد؛ کلید API با هر درخواست ارسال می‌گردد. ذخیره نشد.'
+				);
+				continue;
+			}
+
+			// Trailing slashes are the commonest way to end up with a double
+			// slash in the path, and they carry no meaning here.
+			$clean[ $slug ] = untrailingslashit( $url );
+		}
+
+		return $clean;
+	}
+
 	public static function sanitize_ai_models( $value ) {
 		$clean = array();
 

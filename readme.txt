@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.9.0
+Stable tag: 1.10.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -113,6 +113,30 @@ The Settings tab shows the next scheduled run under Update Interval. If your
 site defines `DISABLE_WP_CRON`, it says so: scheduled fetches then only happen
 when a real cron job calls `wp-cron.php`.
 
+= The AI provider answers 403 Forbidden. Are my keys wrong? =
+
+Probably not. A 403 that says only "Forbidden" is usually the provider's edge
+network refusing your server's address before the request ever reaches the
+API - most often because the provider does not serve the region the server is
+in. Every key gets the same answer, so trying more of them proves nothing.
+
+The plugin recognises this case and stops on the first key instead of standing
+the whole pool down, and says so in the message.
+
+There are three ways out, in the order worth trying:
+
+1. Use a provider that answers from where your server is. Any service with an
+   OpenAI-compatible API works: choose "OpenAI-compatible endpoint" as the
+   provider and put its address in Base URL.
+2. Put a gateway you control between the plugin and the provider, and set
+   Base URL to the gateway.
+3. Run a model on the server itself and point Base URL at it. Anything
+   exposing an OpenAI-compatible `/chat/completions` will do.
+
+Base URL sits under Settings, in the AI Assistant section, per provider. Only
+the address changes - the request format, the key rotation and the editor all
+behave the same.
+
 = Are API keys displayed in the admin? =
 
 No. Saved OpenAI and Telegram secrets are never rendered back into the form.
@@ -154,6 +178,20 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.10.0 =
+* Fixed: a provider refusing the server itself was reported as every key
+  failing. A 403 aimed at where the request came from gets the same answer
+  from every key, so the plugin tried all of them, stood the whole pool down
+  for half an hour, and blamed the keys - which meant the pool was still
+  asleep once the routing was fixed. It now stops on the first key, rests
+  none of them, and says what is actually wrong.
+* Added: Base URL per provider. Point any provider at a gateway, a reseller,
+  or a model running on the server; the wire format, the key rotation and the
+  editor are unchanged. A URL that leaves the server must be https, since the
+  API key travels with it.
+* Added: "OpenAI-compatible endpoint" as a fifth provider, for services that
+  speak the OpenAI chat-completions format under their own address.
 
 = 1.9.0 =
 * Changed: the panel header is a real app bar. The title, the section nav and

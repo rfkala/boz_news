@@ -32,12 +32,84 @@ class AiProviderTest extends TestCase {
 
 	public function test_every_provider_is_declared_with_what_a_request_needs() {
 		foreach ( WPNC_AI_Providers::all() as $slug => $provider ) {
-			foreach ( array( 'label', 'endpoint', 'default_model', 'keys_url' ) as $field ) {
+			foreach ( array( 'label', 'base', 'path', 'default_model', 'keys_url' ) as $field ) {
 				$this->assertArrayHasKey( $field, $provider, $slug . ' is missing ' . $field );
-				$this->assertNotSame( '', $provider[ $field ], $slug . ' has an empty ' . $field );
 			}
-			$this->assertStringStartsWith( 'https://', $provider['endpoint'], $slug . ' must use TLS' );
+
+			$this->assertNotSame( '', $provider['label'], $slug . ' has no label' );
+			$this->assertNotSame( '', $provider['path'], $slug . ' has no path' );
+
+			if ( 'custom' === $slug ) {
+				// Deliberately blank: there is nothing sensible to guess, so
+				// the setting is required rather than defaulted.
+				$this->assertSame( '', $provider['base'] );
+				continue;
+			}
+
+			$this->assertStringStartsWith( 'https://', $provider['base'], $slug . ' must use TLS' );
+			$this->assertNotSame( '', $provider['default_model'], $slug . ' has no default model' );
+			$this->assertNotSame( '', $provider['keys_url'], $slug . ' does not say where to get a key' );
 		}
+	}
+
+	public function test_the_endpoint_is_the_base_plus_the_provider_s_path() {
+		$this->assertSame(
+			'https://api.groq.com/openai/v1/chat/completions',
+			WPNC_AI_Providers::endpoint( 'groq' )
+		);
+		$this->assertSame(
+			'https://generativelanguage.googleapis.com/v1beta/models/a-model:generateContent',
+			WPNC_AI_Providers::endpoint( 'gemini', '', 'a-model' )
+		);
+	}
+
+	public function test_a_base_url_override_replaces_the_host_and_keeps_the_path() {
+		$this->assertSame(
+			'https://gateway.example.com/v1/chat/completions',
+			WPNC_AI_Providers::endpoint( 'groq', 'https://gateway.example.com/v1' )
+		);
+
+		// A pasted URL very often carries a trailing slash, and a double
+		// slash in the path is a 404 on most gateways.
+		$this->assertSame(
+			'https://gateway.example.com/v1/chat/completions',
+			WPNC_AI_Providers::endpoint( 'groq', 'https://gateway.example.com/v1/' )
+		);
+	}
+
+	public function test_the_override_reaches_the_built_request() {
+		$request = WPNC_AI_Providers::build_request(
+			'openai',
+			'KEY123',
+			'a-model',
+			$this->messages(),
+			array( 'base' => 'https://gateway.example.com/v1' )
+		);
+
+		$this->assertSame( 'https://gateway.example.com/v1/chat/completions', $request['url'] );
+	}
+
+	public function test_a_custom_endpoint_has_no_address_until_one_is_given() {
+		$this->assertSame( '', WPNC_AI_Providers::endpoint( 'custom' ) );
+		$this->assertSame(
+			'https://ai.example.ir/v1/chat/completions',
+			WPNC_AI_Providers::endpoint( 'custom', 'https://ai.example.ir/v1' )
+		);
+	}
+
+	public function test_a_custom_endpoint_speaks_the_openai_format() {
+		$request = WPNC_AI_Providers::build_request(
+			'custom',
+			'KEY123',
+			'a-model',
+			$this->messages(),
+			array( 'base' => 'https://ai.example.ir/v1' )
+		);
+		$body = json_decode( $request['body'], true );
+
+		$this->assertSame( 'Bearer KEY123', $request['headers']['Authorization'] );
+		$this->assertArrayHasKey( 'messages', $body );
+		$this->assertSame( 'a-model', $body['model'] );
 	}
 
 	public function test_openai_and_groq_share_the_chat_completions_shape() {
@@ -174,8 +246,51 @@ class AiProviderTest extends TestCase {
 			'no credit'    => array( 402 ),
 			'rate limited' => array( 429 ),
 			'unauthorised' => array( 401 ),
-			'forbidden'    => array( 403 ),
 		);
+	}
+
+	/**
+	 * @dataProvider location_refusals
+	 */
+	public function test_a_refusal_aimed_at_the_server_does_not_burn_the_pool( $status, $detail ) {
+		$this->assertTrue(
+			WPNC_AI_Providers::is_location_block( $status, $detail ),
+			'not recognised as an access refusal: ' . $detail
+		);
+		$this->assertFalse(
+			WPNC_AI_Providers::should_rotate( $status, $detail ),
+			'every key would be refused the same way, and resting them all leaves the pool asleep once the routing is fixed'
+		);
+	}
+
+	public function location_refusals() {
+		return array(
+			// The shape this actually arrives in: an edge network answering
+			// before the API is reached, with nothing to read.
+			'bare forbidden'   => array( 403, 'Forbidden' ),
+			'nothing at all'   => array( 403, '' ),
+			'openai wording'   => array( 403, 'Country, region, or territory not supported' ),
+			'openai code'      => array( 403, 'unsupported_country_region_territory' ),
+			// Gemini answers 400 for the same thing.
+			'gemini wording'   => array( 400, 'User location is not supported for the API use.' ),
+			'generic region'   => array( 403, 'This service is not available in your region' ),
+		);
+	}
+
+	public function test_a_403_that_names_the_key_is_still_a_key_problem() {
+		// Some providers use 403 for a revoked key or a model the account
+		// cannot reach, and there the next key genuinely may work.
+		$this->assertFalse( WPNC_AI_Providers::is_location_block( 403, 'Invalid API key provided' ) );
+		$this->assertTrue( WPNC_AI_Providers::should_rotate( 403, 'Invalid API key provided' ) );
+
+		$this->assertFalse( WPNC_AI_Providers::is_location_block( 403, 'You do not have permission to use this model' ) );
+		$this->assertTrue( WPNC_AI_Providers::should_rotate( 403, 'You do not have permission to use this model' ) );
+	}
+
+	public function test_an_ordinary_failure_is_not_read_as_an_access_refusal() {
+		$this->assertFalse( WPNC_AI_Providers::is_location_block( 429, 'Rate limit reached' ) );
+		$this->assertFalse( WPNC_AI_Providers::is_location_block( 500, 'Internal server error' ) );
+		$this->assertFalse( WPNC_AI_Providers::is_location_block( 401, '' ) );
 	}
 
 	public function test_a_bad_request_does_not_burn_the_whole_pool() {

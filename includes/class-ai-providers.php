@@ -23,29 +23,75 @@ class WPNC_AI_Providers {
 		return array(
 			'openai' => array(
 				'label'         => 'OpenAI',
-				'endpoint'      => 'https://api.openai.com/v1/chat/completions',
+				'base'          => 'https://api.openai.com/v1',
+				'path'          => '/chat/completions',
 				'default_model' => 'gpt-4o-mini',
 				'keys_url'      => 'https://platform.openai.com/api-keys',
 			),
 			'groq'   => array(
 				'label'         => 'Groq',
-				'endpoint'      => 'https://api.groq.com/openai/v1/chat/completions',
+				'base'          => 'https://api.groq.com/openai/v1',
+				'path'          => '/chat/completions',
 				'default_model' => 'llama-3.3-70b-versatile',
 				'keys_url'      => 'https://console.groq.com/keys',
 			),
 			'gemini' => array(
 				'label'         => 'Google Gemini',
-				'endpoint'      => 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent',
+				'base'          => 'https://generativelanguage.googleapis.com/v1beta',
+				'path'          => '/models/{model}:generateContent',
 				'default_model' => 'gemini-2.0-flash',
 				'keys_url'      => 'https://aistudio.google.com/app/apikey',
 			),
 			'claude' => array(
 				'label'         => 'Anthropic Claude',
-				'endpoint'      => 'https://api.anthropic.com/v1/messages',
+				'base'          => 'https://api.anthropic.com/v1',
+				'path'          => '/messages',
 				'default_model' => 'claude-sonnet-4-5',
 				'keys_url'      => 'https://console.anthropic.com/settings/keys',
 			),
+			// Anything that speaks the OpenAI chat-completions format: a
+			// self-hosted model, a gateway, a reseller. It has no default
+			// base because there is nothing sensible to guess.
+			'custom' => array(
+				'label'         => wpnc__( 'OpenAI-compatible endpoint', 'درگاه سازگار با OpenAI' ),
+				'base'          => '',
+				'path'          => '/chat/completions',
+				'default_model' => '',
+				'keys_url'      => '',
+			),
 		);
+	}
+
+	/**
+	 * The URL a request goes to.
+	 *
+	 * The base is separated from the path so it can be overridden: a provider
+	 * that refuses the server's requests outright - a whole region blocked,
+	 * an egress firewall - is not reachable at its own address no matter how
+	 * many keys are tried, and pointing the same wire format at a gateway,
+	 * a reseller or a locally hosted model is the only thing that helps.
+	 *
+	 * @param string $slug     Provider slug.
+	 * @param string $base     Base URL override, empty to use the default.
+	 * @param string $model    Model name, substituted into providers that
+	 *                         carry it in the path.
+	 * @return string Empty when nothing supplies a base.
+	 */
+	public static function endpoint( $slug, $base = '', $model = '' ) {
+		$provider = self::get( $slug );
+		$base     = trim( (string) $base );
+
+		if ( '' === $base ) {
+			$base = $provider['base'];
+		}
+
+		if ( '' === $base ) {
+			return '';
+		}
+
+		$url = rtrim( $base, '/' ) . $provider['path'];
+
+		return str_replace( '{model}', rawurlencode( $model ), $url );
 	}
 
 	/**
@@ -86,16 +132,16 @@ class WPNC_AI_Providers {
 	 * @param string $key      API key.
 	 * @param string $model    Model name.
 	 * @param array  $messages Messages as role/content pairs.
-	 * @param array  $options  temperature, max_tokens, json.
+	 * @param array  $options  temperature, max_tokens, json, base.
 	 * @return array { url, headers, body } - body is already JSON encoded.
 	 */
 	public static function build_request( $slug, $key, $model, $messages, $options = array() ) {
-		$provider    = self::get( $slug );
 		$temperature = isset( $options['temperature'] ) ? (float) $options['temperature'] : 0.5;
 		$max_tokens  = isset( $options['max_tokens'] ) ? absint( $options['max_tokens'] ) : 4096;
 		$want_json   = ! empty( $options['json'] );
+		$base        = isset( $options['base'] ) ? $options['base'] : '';
 
-		$url     = str_replace( '{model}', rawurlencode( $model ), $provider['endpoint'] );
+		$url     = self::endpoint( $slug, $base, $model );
 		$headers = array( 'Content-Type' => 'application/json' );
 
 		if ( 'gemini' === $slug ) {
@@ -278,6 +324,66 @@ class WPNC_AI_Providers {
 	}
 
 	/**
+	 * Whether the provider refused the request because of where it came from.
+	 *
+	 * This is the difference between "your key is spent" and "we do not serve
+	 * this address", and the plugin used to report the second as the first:
+	 * every key was tried, every key was stood down for half an hour, and the
+	 * message blamed the keys. The keys were fine.
+	 *
+	 * The wording identifies it rather than the status code, because the four
+	 * providers disagree on the code - a 403 from one, a 400 from another -
+	 * but all of them name the location in the message.
+	 *
+	 * @param int    $status HTTP status.
+	 * @param string $detail Provider message.
+	 * @return bool
+	 */
+	public static function is_location_block( $status, $detail = '' ) {
+		$status = absint( $status );
+		$detail = strtolower( trim( (string) $detail ) );
+
+		// Explicit wording counts whatever the status is: Gemini answers 400
+		// for this while the others answer 403.
+		$phrases = array(
+			'country, region, or territory',
+			'unsupported_country',
+			'user location is not supported',
+			'location is not supported',
+			'not available in your',
+			'not supported in your',
+			'region is not supported',
+			'unavailable in your region',
+		);
+
+		foreach ( $phrases as $phrase ) {
+			if ( '' !== $detail && false !== strpos( $detail, $phrase ) ) {
+				return true;
+			}
+		}
+
+		if ( 403 !== $status ) {
+			return false;
+		}
+
+		// A 403 that names the credential or the account is a key problem,
+		// and the next key may well work. Everything else is about the
+		// caller rather than the credential - including the bare "Forbidden"
+		// an edge network returns before the API is reached at all, which is
+		// the shape this arrives in most often and the one that used to burn
+		// the whole pool.
+		$key_causes = array( 'key', 'token', 'quota', 'credit', 'billing', 'permission', 'scope', 'model', 'organization', 'suspended', 'deactivated' );
+
+		foreach ( $key_causes as $needle ) {
+			if ( '' !== $detail && false !== strpos( $detail, $needle ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Decide whether another key would do better than this one.
 	 *
 	 * Quota and rate limits are the whole reason the key pool exists, and a
@@ -291,6 +397,14 @@ class WPNC_AI_Providers {
 	 */
 	public static function should_rotate( $status, $detail = '' ) {
 		$status = absint( $status );
+
+		// A refusal aimed at where the request came from will be repeated for
+		// every key. Rotating through them proves nothing and stands the whole
+		// pool down for half an hour, so the pool is still asleep once the
+		// routing is fixed.
+		if ( self::is_location_block( $status, $detail ) ) {
+			return false;
+		}
 
 		if ( in_array( $status, array( 401, 402, 403, 429 ), true ) ) {
 			return true;
