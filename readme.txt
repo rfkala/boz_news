@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.14.0
+Stable tag: 1.15.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -196,7 +196,43 @@ Regenerate translation files after changing any `__()` string:
 
 `python tools/make_translations.py`
 
+= AI actions time out, but only the ones that rewrite the whole article =
+
+Generation sends nothing back until the whole answer is ready, so the time a
+request takes is set by how much text comes out. Add structure, Rewrite and
+Expand rebuild the entire article; Suggest titles returns a few lines. That is
+why the heavy ones can time out on a server where the light ones are fine.
+
+The plugin now reads the duration out of the transport error and says which of
+two situations it is:
+
+* Cut off well before the time it asked for - something on the server is
+  capping outbound requests (a host limit, a proxy, a security plugin).
+  Raising the plugin's own timeout will not help until that is lifted; ask the
+  host what the outbound cap is.
+* Ran the full time - the answer really did take that long. Work on a shorter
+  article, or allow more time:
+
+`add_filter( 'wpnc_ai_timeout', function() { return 120; } );`
+
+A timeout no longer retries the remaining keys. Every key would wait exactly
+as long, so trying them only multiplied the delay and then blamed the keys.
+
 == Changelog ==
+
+= 1.15.0 =
+* Fixed: a timed-out AI request was reported as every key failing, and tried
+  each key first - so a 12 second timeout became a 36 second wait ending in a
+  message about the wrong thing. It now stops on the first timeout and says
+  what actually happened.
+* Added: the timeout message distinguishes "the answer took too long" from
+  "this server cut the request short", by comparing the duration in the
+  transport error against the timeout that was requested. The two need
+  opposite fixes and looked identical before.
+* Changed: AI requests no longer borrow the feed timeout, which is clamped to
+  30 seconds. Generation returns nothing until the whole answer is ready, so
+  it gets its own 60 second default, filterable with `wpnc_ai_timeout`.
+
 
 = 1.14.0 =
 * Added: post type, status, author and category can be set per item, under

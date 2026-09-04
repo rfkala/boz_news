@@ -351,6 +351,38 @@ class WPNC_AI_Providers {
 	}
 
 	/**
+	 * How long a transport error says it waited, in seconds.
+	 *
+	 * cURL puts the real figure in its message ("Operation timed out after
+	 * 12002 milliseconds"), and that number is worth reading rather than
+	 * discarding: compared against the timeout that was actually asked for,
+	 * it is the difference between "the model is slow" and "something on this
+	 * server is cutting outbound requests short", which need opposite fixes.
+	 *
+	 * @param string $message Transport error message.
+	 * @return float Seconds waited, or 0.0 when this was not a timeout.
+	 */
+	public static function timeout_seconds( $message ) {
+		$message = strtolower( (string) $message );
+
+		if ( false === strpos( $message, 'timed out' ) && false === strpos( $message, 'timeout' ) ) {
+			return 0.0;
+		}
+
+		if ( preg_match( '/after\s+([0-9]+(?:\.[0-9]+)?)\s*milliseconds/', $message, $m ) ) {
+			return round( ( (float) $m[1] ) / 1000, 3 );
+		}
+
+		if ( preg_match( '/after\s+([0-9]+(?:\.[0-9]+)?)\s*seconds/', $message, $m ) ) {
+			return (float) $m[1];
+		}
+
+		// A timeout whose duration we cannot read is still a timeout; -1
+		// says so without inventing a figure.
+		return -1.0;
+	}
+
+	/**
 	 * Whether the provider refused the request because of where it came from.
 	 *
 	 * This is the difference between "your key is spent" and "we do not serve

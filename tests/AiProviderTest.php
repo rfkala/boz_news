@@ -312,6 +312,30 @@ class AiProviderTest extends TestCase {
 		$this->assertTrue( WPNC_AI_Providers::should_rotate( 403, 'You do not have permission to use this model' ) );
 	}
 
+	public function test_a_curl_timeout_reports_how_long_it_actually_waited() {
+		// The figure matters: compared against the timeout that was asked
+		// for, it separates "the model is slow" from "this server is cutting
+		// requests short", which need opposite fixes.
+		$this->assertSame(
+			12.002,
+			WPNC_AI_Providers::timeout_seconds( 'cURL error 28: Operation timed out after 12002 milliseconds with 0 bytes received' )
+		);
+		$this->assertSame(
+			30.0,
+			WPNC_AI_Providers::timeout_seconds( 'Operation timed out after 30 seconds' )
+		);
+	}
+
+	public function test_a_timeout_with_no_readable_duration_is_still_a_timeout() {
+		$this->assertSame( -1.0, WPNC_AI_Providers::timeout_seconds( 'Connection timed out' ) );
+	}
+
+	public function test_a_failure_that_is_not_a_timeout_reports_nothing() {
+		$this->assertSame( 0.0, WPNC_AI_Providers::timeout_seconds( 'cURL error 6: Could not resolve host' ) );
+		$this->assertSame( 0.0, WPNC_AI_Providers::timeout_seconds( 'SSL certificate problem' ) );
+		$this->assertSame( 0.0, WPNC_AI_Providers::timeout_seconds( '' ) );
+	}
+
 	public function test_an_ordinary_failure_is_not_read_as_an_access_refusal() {
 		$this->assertFalse( WPNC_AI_Providers::is_location_block( 429, 'Rate limit reached' ) );
 		$this->assertFalse( WPNC_AI_Providers::is_location_block( 500, 'Internal server error' ) );

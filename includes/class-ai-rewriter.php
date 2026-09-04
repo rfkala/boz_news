@@ -546,6 +546,68 @@ class WPNC_AI_Rewriter {
 	}
 
 	/**
+	 * How long to wait for a generated answer.
+	 *
+	 * Deliberately not the feed timeout. Fetching a feed is a download that
+	 * either starts promptly or is broken; generation sends nothing at all
+	 * until the whole answer is ready, so a long answer legitimately takes
+	 * far longer than any feed should. The feed setting is clamped to 30
+	 * seconds, which is the right ceiling there and the wrong one here.
+	 *
+	 * Filterable because the ceiling that matters is the host's, not ours:
+	 * a server with a short max_execution_time wants this lower, and one
+	 * behind a slow gateway wants it higher.
+	 *
+	 * @return int Seconds.
+	 */
+	public static function timeout() {
+		$timeout = (int) apply_filters( 'wpnc_ai_timeout', 60 );
+
+		return max( 5, $timeout );
+	}
+
+	/**
+	 * Explain a timeout in terms of what the editor can do about it.
+	 *
+	 * @param float  $waited  Seconds the transport reported waiting.
+	 * @param int    $asked   Seconds we asked for.
+	 * @param string $label   Provider name.
+	 * @return WP_Error
+	 */
+	private static function timeout_error( $waited, $asked, $label ) {
+		// Cut off well before our own limit means the limit was not ours.
+		// Saying so is the whole value here: raising a setting that is
+		// already being ignored is the obvious next move and a dead end.
+		if ( $waited > 0 && $waited < ( $asked * 0.8 ) ) {
+			return new WP_Error(
+				'wpnc_ai_timeout_capped',
+				sprintf(
+					/* translators: 1: seconds waited, 2: seconds requested */
+					wpnc__(
+						'The request was cut off after %1$ss even though %2$ss was allowed, so something on this server is capping outbound requests - a host limit, a proxy or a security plugin. Raising the plugin timeout will not help until that cap is lifted.',
+						'درخواست پس از %1$s ثانیه قطع شد، در حالی که %2$s ثانیه مجاز بود؛ یعنی چیزی روی این سرور درخواست‌های خروجی را محدود می‌کند - محدودیت هاست، یک پراکسی، یا افزونه‌ای امنیتی. تا وقتی آن محدودیت برداشته نشود، افزایش زمان‌انتظار افزونه کمکی نمی‌کند.'
+					),
+					round( $waited, 1 ),
+					$asked
+				)
+			);
+		}
+
+		return new WP_Error(
+			'wpnc_ai_timeout',
+			sprintf(
+				/* translators: 1: provider name, 2: seconds */
+				wpnc__(
+					'%1$s did not answer within %2$ss. Your keys are fine - the answer simply took too long. Actions that rebuild the whole article are the slowest, so try a shorter article, or allow more time with the wpnc_ai_timeout filter.',
+					'%1$s ظرف %2$s ثانیه پاسخ نداد. کلیدها سالم‌اند؛ فقط تولید پاسخ طول کشیده است. کارهایی که کل متن را بازسازی می‌کنند کندترین‌اند، پس متن کوتاه‌تری را امتحان کنید یا با فیلتر wpnc_ai_timeout زمان بیشتری بدهید.'
+				),
+				$label,
+				$waited > 0 ? round( $waited, 1 ) : $asked
+			)
+		);
+	}
+
+	/**
 	 * The configured address for a provider, if it has been overridden.
 	 *
 	 * @param string $slug Provider slug, empty for the active one.
@@ -627,18 +689,30 @@ class WPNC_AI_Rewriter {
 
 			$request = WPNC_AI_Providers::build_request( $slug, $keys[ $id ], $model, $messages, $options );
 
+			$timeout = self::timeout();
+
 			$response = wp_remote_post(
 				$request['url'],
 				array(
 					'headers' => $request['headers'],
 					'body'    => $request['body'],
-					'timeout' => WPNC_Settings::get_timeout( 45 ),
+					'timeout' => $timeout,
 				)
 			);
 
 			if ( is_wp_error( $response ) ) {
-				// A transport failure is the network, not the key, so do not
-				// stand the key down for it.
+				$waited = WPNC_AI_Providers::timeout_seconds( $response->get_error_message() );
+
+				// A timeout is about how long the answer takes, not about the
+				// credential. Every remaining key would wait exactly as long,
+				// so trying them only multiplies the delay before the editor
+				// is told anything - and then blames the keys for it.
+				if ( 0.0 !== $waited ) {
+					return self::timeout_error( $waited, $timeout, $provider['label'] );
+				}
+
+				// Any other transport failure is the network, not the key, so
+				// do not stand the key down for it.
 				$last_error = $response;
 				continue;
 			}
