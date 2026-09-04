@@ -351,6 +351,7 @@ jQuery(function($) {
                 .append(document.createTextNode(' ' + t('select_all', 'Select All')))
                 .appendTo($bulk);
             $('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-bulk-approve').text(t('approve_selected', 'Approve Selected')).appendTo($bulk);
+            renderBulkDestination($bulk);
             $('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-bulk-reject').text(t('reject_selected', 'Reject Selected')).appendTo($bulk);
             $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($bulk);
         } else {
@@ -460,10 +461,96 @@ jQuery(function($) {
             return;
         }
 
-        $('<button>').attr('type', 'button').addClass('button button-primary wpnc-approve').data('id', item.id).text(t('approve', 'Approve')).appendTo($actions);
+        renderSendButtons($actions, item.id);
         $('<button>').attr('type', 'button').addClass('button wpnc-edit').data('item', item).text(t('edit', 'Edit')).appendTo($actions);
         $('<button>').attr('type', 'button').addClass('button wpnc-reject').data('id', item.id).text(t('reject', 'Reject')).appendTo($actions);
         $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete').data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
+    }
+
+    /**
+     * Destination picker for the bulk bar.
+     *
+     * Only drawn when there is a choice to make; with the site alone, Approve
+     * Selected already says everything.
+     */
+    function renderBulkDestination($bulk) {
+        var channels = readyChannels();
+
+        if (channels.length < 2) {
+            return;
+        }
+
+        var $wrap = $('<span>').addClass('wpnc-bulk-destination').appendTo($bulk);
+        $('<label>').attr('for', 'wpnc-bulk-channels').text(t('destination', 'Destination')).appendTo($wrap);
+
+        var $select = $('<select>').attr('id', 'wpnc-bulk-channels').appendTo($wrap);
+
+        $.each(channels, function(index, channel) {
+            $('<option>').attr('value', channel.slug).text(channel.label).appendTo($select);
+        });
+
+        $('<option>').attr('value', 'all').text(t('send_all', 'All')).appendTo($select);
+
+        $select.on('change', function() {
+            $('#wpnc-bulk-approve').data('channels', $(this).val());
+        }).trigger('change');
+    }
+
+    /**
+     * Channels an editor may send to right now.
+     *
+     * A destination is offered only when it has credentials AND a passing
+     * test. Offering an untested one would put a button on screen whose
+     * failure the editor only discovers after approving the item, by which
+     * point the queue row is gone.
+     */
+    function readyChannels() {
+        var status = wpnc_ajax.channels || {};
+        var out = [];
+
+        $.each(status, function(slug, info) {
+            if (info && info.ready) {
+                out.push({ slug: slug, label: info.label });
+            }
+        });
+
+        return out;
+    }
+
+    /**
+     * "Send to" controls for one queue row.
+     *
+     * With only the site available this is a single Approve button, exactly
+     * as before - no reason to make a one-item menu out of it.
+     */
+    function renderSendButtons($actions, id) {
+        var channels = readyChannels();
+
+        if (channels.length < 2) {
+            $('<button>').attr('type', 'button')
+                .addClass('button button-primary wpnc-approve')
+                .data({ id: id, channels: 'site' })
+                .text(t('approve', 'Approve'))
+                .appendTo($actions);
+            return;
+        }
+
+        var $group = $('<span>').addClass('wpnc-send-group').appendTo($actions);
+        $('<span>').addClass('wpnc-send-label').text(t('send_to', 'Send to')).appendTo($group);
+
+        $.each(channels, function(index, channel) {
+            $('<button>').attr('type', 'button')
+                .addClass('button wpnc-approve wpnc-send-one')
+                .data({ id: id, channels: channel.slug })
+                .text(channel.label)
+                .appendTo($group);
+        });
+
+        $('<button>').attr('type', 'button')
+            .addClass('button button-primary wpnc-approve wpnc-send-all')
+            .data({ id: id, channels: 'all' })
+            .text(t('send_all', 'All'))
+            .appendTo($group);
     }
 
     /* ==========================================================
@@ -945,7 +1032,7 @@ jQuery(function($) {
         });
 
         $('.wpnc-approve').off('click').on('click', function() {
-            actionOne($(this), 'wpnc_approve_item');
+            actionOne($(this), 'wpnc_approve_item', { channels: $(this).data('channels') || 'site' });
         });
 
         $('.wpnc-reject').off('click').on('click', function() {
@@ -996,7 +1083,7 @@ jQuery(function($) {
         });
 
         $('#wpnc-bulk-approve').off('click').on('click', function() {
-            actionBulk($(this), 'wpnc_bulk_approve');
+            actionBulk($(this), 'wpnc_bulk_approve', { channels: $(this).data('channels') || 'site' });
         });
 
         $('#wpnc-bulk-reject').off('click').on('click', function() {
@@ -1135,14 +1222,15 @@ jQuery(function($) {
             });
     }
 
-    function actionOne($button, action) {
+    function actionOne($button, action, extra) {
         var id = $button.data('id');
         var $card = $('#wpnc-item-' + id);
+        var payload = $.extend({ id: id }, extra || {});
 
         setBusy($button, true);
         $card.addClass('wpnc-card-busy');
 
-        request(action, { id: id })
+        request(action, payload)
             .done(function(data) {
                 flash((data && data.message) || t('done', 'Done.'), 'ok');
                 $card.fadeOut(function() {
@@ -1166,7 +1254,7 @@ jQuery(function($) {
             });
     }
 
-    function actionBulk($button, action) {
+    function actionBulk($button, action, extra) {
         var ids = $('.wpnc-item-checkbox:checked').map(function() {
             return $(this).val();
         }).get();
@@ -1177,7 +1265,7 @@ jQuery(function($) {
         }
 
         setBusy($button, true);
-        request(action, { ids: ids })
+        request(action, $.extend({ ids: ids }, extra || {}))
             .done(function(data) {
                 var failed = (data && (data.failed || data.skipped)) || 0;
                 flash((data && data.message) || t('done', 'Done.'), failed ? 'warn' : 'ok');
@@ -1881,6 +1969,45 @@ jQuery(function($) {
     }
 
     /* ==========================================================
+       Delivery destinations
+
+       The test runs against the stored credentials, so a passing result is
+       what unlocks the destination's button on the queue.
+       ========================================================== */
+
+    function bindChannelSettings() {
+        var $blocks = $('.wpnc-channel');
+        if (!$blocks.length) {
+            return;
+        }
+
+        $('.wpnc-channel-test').on('click', function() {
+            var $button = $(this);
+            var $block = $button.closest('.wpnc-channel');
+            var $result = $block.find('.wpnc-channel-result');
+            var $state = $block.find('.wpnc-channel-state');
+
+            setBusy($button, true);
+            $result.removeClass('wpnc-channel-ok wpnc-channel-bad').text(t('processing', 'Processing...'));
+
+            request('wpnc_test_channel', { channel: $button.data('channel') })
+                .done(function(data) {
+                    $result.addClass('wpnc-channel-ok').text((data && data.message) || t('done', 'Done.'));
+                    $state.removeClass('is-empty is-untested').addClass('is-ready')
+                        .text(t('channel_ready', 'Tested and ready'));
+                })
+                .fail(function(error) {
+                    $result.addClass('wpnc-channel-bad').text(error.message);
+                    $state.removeClass('is-ready').addClass('is-untested')
+                        .text(t('channel_untested', 'Not tested yet'));
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+    }
+
+    /* ==========================================================
        Source health actions
        ========================================================== */
 
@@ -2011,5 +2138,6 @@ jQuery(function($) {
         progress: '#wpnc-dash-progress',
         onDone: loadDashboard
     });
+    bindChannelSettings();
     bindSourceHealth();
 });

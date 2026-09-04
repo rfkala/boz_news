@@ -39,8 +39,12 @@ $options = array(
 	'wpnc_ai_key_state',
 	'wpnc_auto_rewrite',
 	'wpnc_target_language',
+	'wpnc_ai_base_urls',
 	'wpnc_telegram_token',
 	'wpnc_telegram_chat_id',
+	'wpnc_bale_token',
+	'wpnc_bale_chat_id',
+	'wpnc_channel_verified',
 
 	// Runtime state.
 	'wpnc_last_run',

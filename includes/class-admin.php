@@ -99,7 +99,9 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_auto_rewrite', array( 'WPNC_Settings', 'sanitize_checkbox' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_target_language', 'sanitize_text_field' );
 		register_setting( 'wpnc_settings_group', 'wpnc_telegram_token', array( $this, 'sanitize_telegram_token' ) );
-		register_setting( 'wpnc_settings_group', 'wpnc_telegram_chat_id', 'sanitize_text_field' );
+		register_setting( 'wpnc_settings_group', 'wpnc_telegram_chat_id', array( 'WPNC_Settings', 'sanitize_chat_id' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_bale_token', array( $this, 'sanitize_bale_token' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_bale_chat_id', array( 'WPNC_Settings', 'sanitize_chat_id' ) );
 	}
 
 	public function render_admin_page() {
@@ -791,26 +793,73 @@ class WPNC_Admin {
 			</section>
 
 			<section id="wpnc-set-telegram" class="wpnc-settings-group">
-			<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Telegram Auto-Post', 'ارسال خودکار به تلگرام' ); ?></h3>
-			<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Optional. Mirror every published item to a Telegram chat or channel.', 'اختیاری. هر خبر منتشرشده را در یک چت یا کانال تلگرام هم بازنشر می‌کند.' ); ?></p>
-			<table class="form-table" role="presentation">
-				<tr>
-					<th scope="row"><label for="wpnc_telegram_token"><?php wpnc_e( 'Telegram Bot Token', 'توکن ربات تلگرام' ); ?></label></th>
-					<td>
-						<input id="wpnc_telegram_token" type="password" name="wpnc_telegram_token" value=""
-							placeholder="<?php echo esc_attr( $has_telegram ? wpnc__( 'Saved — enter a new token to replace.', 'ذخیره شده — توکن جدید وارد کنید.' ) : '' ); ?>"
-							class="regular-text" autocomplete="off" dir="ltr" />
-						<p class="description"><?php wpnc_e( 'Leave blank to keep the saved token. Enter __delete__ to remove it.', 'برای حفظ توکن فعلی خالی بگذارید. برای حذف __delete__ وارد کنید.' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="wpnc_telegram_chat_id"><?php wpnc_e( 'Telegram Chat ID', 'Chat ID تلگرام' ); ?></label></th>
-					<td>
-						<input id="wpnc_telegram_chat_id" type="text" name="wpnc_telegram_chat_id" value="<?php echo esc_attr( get_option( 'wpnc_telegram_chat_id', '' ) ); ?>" class="regular-text" dir="ltr" />
-						<p class="description"><?php wpnc_e( 'Numeric id for a chat, or @channelname for a public channel. Both token and chat id must be set or nothing is sent.', 'شناسه عددی چت، یا @نام‌کانال برای کانال عمومی. تا هر دو مقدار توکن و شناسه پر نشوند چیزی ارسال نمی‌شود.' ); ?></p>
-					</td>
-				</tr>
-			</table>
+			<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Delivery Destinations', 'مقصدهای ارسال' ); ?></h3>
+			<p class="wpnc-settings-group-hint"><?php wpnc_e( 'Optional. Once a destination is filled in and its test passes, it appears as a Send to button on the moderation queue.', 'اختیاری. هر مقصدی که پر شود و تستش موفق باشد، به شکل دکمهٔ «ارسال به» در صف بازبینی ظاهر می‌شود.' ); ?></p>
+
+			<?php foreach ( WPNC_Channels::all() as $channel_slug => $channel ) : ?>
+				<?php
+				if ( 'bot' !== $channel['kind'] ) {
+					continue;
+				}
+				$has_token  = '' !== (string) get_option( $channel['token'], '' );
+				$is_ready   = WPNC_Channels::is_ready( $channel_slug );
+				$configured = WPNC_Channels::is_configured( $channel_slug );
+				?>
+				<div class="wpnc-channel" data-channel="<?php echo esc_attr( $channel_slug ); ?>">
+					<div class="wpnc-channel-head">
+						<span class="wpnc-channel-name"><?php echo esc_html( $channel['label'] ); ?></span>
+						<span class="wpnc-channel-state <?php echo $is_ready ? 'is-ready' : ( $configured ? 'is-untested' : 'is-empty' ); ?>">
+							<?php
+							if ( $is_ready ) {
+								wpnc_e( 'Tested and ready', 'تست‌شده و آماده' );
+							} elseif ( $configured ) {
+								wpnc_e( 'Not tested yet', 'هنوز تست نشده' );
+							} else {
+								wpnc_e( 'Not set up', 'تنظیم نشده' );
+							}
+							?>
+						</span>
+					</div>
+
+					<table class="form-table" role="presentation">
+						<tr>
+							<th scope="row">
+								<label for="<?php echo esc_attr( $channel['token'] ); ?>"><?php wpnc_e( 'Bot Token', 'توکن ربات' ); ?></label>
+							</th>
+							<td>
+								<input id="<?php echo esc_attr( $channel['token'] ); ?>" type="password"
+									name="<?php echo esc_attr( $channel['token'] ); ?>" value=""
+									placeholder="<?php echo esc_attr( $has_token ? wpnc__( 'Saved — enter a new token to replace.', 'ذخیره شده — توکن جدید وارد کنید.' ) : '' ); ?>"
+									class="regular-text" autocomplete="off" dir="ltr" />
+								<p class="description"><?php wpnc_e( 'Leave blank to keep the saved token. Enter __delete__ to remove it.', 'برای حفظ توکن فعلی خالی بگذارید. برای حذف __delete__ وارد کنید.' ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="<?php echo esc_attr( $channel['chat'] ); ?>"><?php wpnc_e( 'Chat ID', 'شناسه گفتگو' ); ?></label>
+							</th>
+							<td>
+								<input id="<?php echo esc_attr( $channel['chat'] ); ?>" type="text"
+									name="<?php echo esc_attr( $channel['chat'] ); ?>"
+									value="<?php echo esc_attr( get_option( $channel['chat'], '' ) ); ?>"
+									class="regular-text" dir="ltr" />
+								<p class="description">
+									<?php wpnc_e( 'Numeric id for a chat, or @channelname for a public channel. Both halves must be set or nothing is sent.', 'شناسه عددی چت، یا @نام‌کانال برای کانال عمومی. تا هر دو مقدار پر نشوند چیزی ارسال نمی‌شود.' ); ?>
+								</p>
+								<p class="wpnc-channel-actions">
+									<button type="button" class="button wpnc-channel-test" data-channel="<?php echo esc_attr( $channel_slug ); ?>">
+										<?php wpnc_e( 'Test connection', 'تست اتصال' ); ?>
+									</button>
+									<span class="wpnc-channel-result" aria-live="polite"></span>
+								</p>
+								<p class="description">
+									<?php wpnc_e( 'Save the page first — the test uses the stored credentials, not what is typed above.', 'ابتدا صفحه را ذخیره کنید؛ تست از مقادیر ذخیره‌شده استفاده می‌کند نه آنچه بالا تایپ شده است.' ); ?>
+								</p>
+							</td>
+						</tr>
+					</table>
+				</div>
+			<?php endforeach; ?>
 
 			</section>
 
@@ -837,7 +886,7 @@ class WPNC_Admin {
 			'wpnc-set-housekeeping' => wpnc__( 'Housekeeping', 'نگهداری' ),
 			'wpnc-set-general'      => wpnc__( 'Panel', 'پنل' ),
 			'wpnc-set-ai'           => wpnc__( 'AI Assistant', 'دستیار هوش مصنوعی' ),
-			'wpnc-set-telegram'     => wpnc__( 'Telegram Auto-Post', 'ارسال خودکار به تلگرام' ),
+			'wpnc-set-telegram'     => wpnc__( 'Delivery Destinations', 'مقصدهای ارسال' ),
 		);
 		?>
 		<nav class="wpnc-settings-nav" aria-label="<?php echo esc_attr( wpnc__( 'Settings sections', 'بخش‌های تنظیمات' ) ); ?>">
@@ -1287,6 +1336,16 @@ class WPNC_Admin {
 		return implode( "\n", $lines );
 	}
 
+	public function sanitize_bale_token( $value ) {
+		return WPNC_Settings::sanitize_secret( $value, 'wpnc_bale_token' );
+	}
+
+	/**
+	 * Sanitize the Telegram bot token.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
 	public function sanitize_telegram_token( $value ) {
 		return WPNC_Settings::sanitize_secret( $value, 'wpnc_telegram_token' );
 	}

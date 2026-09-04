@@ -15,9 +15,9 @@ class WPNC_Publisher {
 	private $image_service;
 
 	/**
-	 * @var WPNC_Telegram
+	 * @var WPNC_Messenger
 	 */
-	private $telegram;
+	private $messenger;
 
 	/**
 	 * @var WPNC_Logger
@@ -29,7 +29,7 @@ class WPNC_Publisher {
 	 */
 	public function __construct() {
 		$this->image_service = new WPNC_Image_Service();
-		$this->telegram      = new WPNC_Telegram();
+		$this->messenger     = new WPNC_Messenger();
 		$this->logger        = new WPNC_Logger();
 	}
 
@@ -38,9 +38,14 @@ class WPNC_Publisher {
 	 *
 	 * @param array|object $item      Item.
 	 * @param string       $post_type Optional post type override.
+	 * @param array|null   $channels  Bot channels to notify. Null keeps the
+	 *                                unattended behaviour of notifying every
+	 *                                channel that has credentials, which is
+	 *                                what scheduled publishing has always
+	 *                                done; an array sends to exactly those.
 	 * @return int|WP_Error
 	 */
-	public function publish( $item, $post_type = '' ) {
+	public function publish( $item, $post_type = '', $channels = null ) {
 		$item = (array) $item;
 
 		$post_type = $post_type ? sanitize_key( $post_type ) : WPNC_Settings::get_target_post_type();
@@ -127,28 +132,87 @@ class WPNC_Publisher {
 			}
 		}
 
-		$telegram_result = $this->telegram->send_post( $post_id, $title );
-		if ( is_wp_error( $telegram_result ) ) {
-			$this->logger->log(
-				WPNC_Logger::LEVEL_WARNING,
-				wpnc__( 'Telegram notification failed.', 'ارسال اعلان تلگرام ناموفق بود.' ),
-				array(
-					'post_id' => $post_id,
-					'error'   => $telegram_result->get_error_message(),
-				),
-				$item['source_key'] ?? ''
-			);
+		if ( null === $channels ) {
+			$channels = self::configured_bots();
 		}
+
+		$this->deliver( $channels, $title, get_permalink( $post_id ), $item['source_key'] ?? '' );
 
 		return $post_id;
 	}
 
 	/**
-	 * Assemble the post body from the configured template.
+	 * Bot channels that have credentials.
 	 *
-	 * @param array $parts Item values.
-	 * @return string
+	 * Used for unattended publishing, which has always notified whatever was
+	 * set up. The buttons an editor sees use WPNC_Channels::is_ready()
+	 * instead, which also demands a passing test - a stricter question,
+	 * asked because an editor choosing a destination deserves to know it
+	 * works, while a cron run must not silently stop notifying an install
+	 * that never pressed Test.
+	 *
+	 * @return array
 	 */
+	public static function configured_bots() {
+		$out = array();
+
+		foreach ( WPNC_Channels::all() as $slug => $channel ) {
+			if ( 'bot' === $channel['kind'] && WPNC_Channels::is_configured( $slug ) ) {
+				$out[] = $slug;
+			}
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Send one item's headline to each bot channel.
+	 *
+	 * A channel that fails is logged and the rest still go: one dead bot
+	 * token should not hold up the others.
+	 *
+	 * @param array  $channels   Channel slugs; site is ignored.
+	 * @param string $title      Headline.
+	 * @param string $link       Link to include.
+	 * @param string $source_key Source key, for the log.
+	 * @return array slug => true|string error message.
+	 */
+	public function deliver( $channels, $title, $link, $source_key = '' ) {
+		$results = array();
+
+		foreach ( (array) $channels as $slug ) {
+			if ( 'site' === $slug ) {
+				continue;
+			}
+
+			$result = $this->messenger->send( $slug, $title, $link );
+
+			if ( is_wp_error( $result ) ) {
+				$results[ $slug ] = $result->get_error_message();
+
+				$this->logger->log(
+					WPNC_Logger::LEVEL_WARNING,
+					sprintf(
+						/* translators: %s: channel name */
+						wpnc__( 'Sending to %s failed.', 'ارسال به %s ناموفق بود.' ),
+						$slug
+					),
+					array(
+						'channel' => $slug,
+						'error'   => $result->get_error_message(),
+					),
+					$source_key
+				);
+
+				continue;
+			}
+
+			$results[ $slug ] = true;
+		}
+
+		return $results;
+	}
+
 	/**
 	 * Assemble the post body for one item.
 	 *

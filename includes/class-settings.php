@@ -252,6 +252,40 @@ class WPNC_Settings {
 	 * @return array
 	 */
 	/**
+	 * A messenger chat id.
+	 *
+	 * Either a numeric id - negative for a group or channel - or an @name for
+	 * a public channel. Anything else is a typo that would fail silently on
+	 * every send, so it is refused loudly instead.
+	 *
+	 * No verification state is touched here: WPNC_Channels stores a
+	 * fingerprint of the credentials alongside a passing test, so changing
+	 * this invalidates that test on its own.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_chat_id( $value ) {
+		$value = trim( (string) $value );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		if ( preg_match( '/^-?\d+$/', $value ) || preg_match( '/^@[A-Za-z0-9_]{3,}$/', $value ) ) {
+			return $value;
+		}
+
+		self::notify(
+			'wpnc_bad_chat_id',
+			'A chat id must be a number or an @channelname. It was not saved.',
+			'شناسه گفتگو باید عدد یا @نام‌کانال باشد. ذخیره نشد.'
+		);
+
+		return '';
+	}
+
+	/**
 	 * Per-provider Base URL overrides.
 	 *
 	 * http is allowed only for a loopback address, which is how a model

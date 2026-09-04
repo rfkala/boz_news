@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.12.0
+ * Version: 1.13.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.12.0' );
+define( 'WPNC_VERSION', '1.13.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -30,7 +30,8 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
-require_once WPNC_PLUGIN_DIR . 'includes/class-telegram.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
@@ -129,6 +130,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			'panel_url'      => admin_url( 'admin.php?page=boz-news&tab=' ),
 			'ai_enabled'     => WPNC_AI_Rewriter::is_configured(),
 			'ai_actions'     => WPNC_AI_Rewriter::actions(),
+			// Which destinations may be offered as a button, and why.
+			'channels'       => WPNC_Channels::status(),
 			'i18n'           => array(
 				'loading'                => 'Loading...',
 				'processing'             => 'Processing...',
@@ -214,6 +217,11 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview'                => 'Preview',
 				'words'                  => 'words',
 				'read_minutes'           => 'min read',
+				'send_to'                => 'Send to',
+				'send_all'               => 'All',
+				'channel_ready'          => 'Tested and ready',
+				'channel_untested'       => 'Not tested yet',
+				'destination'            => 'Destination',
 				'suggested_titles'       => 'Suggested headlines',
 				'suggested_tags'         => 'Suggested tags',
 				'apply_to_title'         => 'Apply to title',
@@ -328,6 +336,11 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview'                => 'پیش‌نمایش',
 				'words'                  => 'کلمه',
 				'read_minutes'           => 'دقیقه مطالعه',
+				'send_to'                => 'ارسال به',
+				'send_all'               => 'همه',
+				'channel_ready'          => 'تست‌شده و آماده',
+				'channel_untested'       => 'هنوز تست نشده',
+				'destination'            => 'مقصد',
 				'suggested_titles'       => 'عنوان‌های پیشنهادی',
 				'suggested_tags'         => 'برچسب‌های پیشنهادی',
 				'apply_to_title'         => 'اعمال در عنوان',

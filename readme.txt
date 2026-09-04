@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.12.0
+Stable tag: 1.13.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -43,7 +43,8 @@ Key features:
   GapGPT, with several keys per provider and automatic rotation when one runs
   out. Any other service speaking the OpenAI chat-completions format works
   too, and every provider's address can be overridden.
-* Optional Telegram notification after publishing.
+* Send an approved item to the site, to Telegram, to Bale, or to all of
+  them, with each destination unlocked by a passing connection test.
 * CSV export of any queue view.
 * Shortcode `[news_bulletin]` for the front end.
 
@@ -196,6 +197,30 @@ Regenerate translation files after changing any `__()` string:
 `python tools/make_translations.py`
 
 == Changelog ==
+
+= 1.13.0 =
+* Added: approving an item now asks where to send it. The queue row carries a
+  Send to group - Site, Telegram, Bale, All - and the bulk bar carries the
+  same choice as a dropdown.
+* Added: Bale, which speaks the same bot API as Telegram, so both share one
+  transport and differ only by address and credentials.
+* Added: a destination appears as a button only once its credentials are
+  saved AND its Test connection has passed. The test result is stored against
+  a fingerprint of those credentials, so editing the token or chat id
+  invalidates it rather than leaving a button that promises something it can
+  no longer do.
+* Added: Test connection checks the chat as well as the token. A valid token
+  paired with a chat the bot cannot post to used to be indistinguishable from
+  a working setup until the first real send.
+* Changed: sending to a messenger without publishing to the site is allowed,
+  and links readers to the original article, since there is no post to link.
+* Changed: approval reports where the item actually went, and names any
+  destination that refused it rather than reporting a flat success.
+* Fixed: a bot token could reach the screen or the log inside a transport
+  error, because it travels in the URL. It is redacted now.
+* Note: unattended publishing is unchanged - a scheduled run still notifies
+  every destination that has credentials, tested or not, so an existing
+  install does not go quiet.
 
 = 1.12.0 =
 * Fixed: Suggest titles and Suggest tags replaced the article with their own

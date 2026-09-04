@@ -47,6 +47,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
 		add_action( 'wp_ajax_wpnc_preview_item', array( $this, 'preview_item' ) );
+		add_action( 'wp_ajax_wpnc_test_channel', array( $this, 'test_channel' ) );
 		add_action( 'wp_ajax_wpnc_get_dashboard', array( $this, 'get_dashboard' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
@@ -105,17 +106,149 @@ class WPNC_Ajax {
 			);
 		}
 
-		$post_id = $this->publisher->publish( $item );
-		if ( is_wp_error( $post_id ) ) {
-			$this->queue->mark_error( $id, $post_id->get_error_message() );
-			$this->fail( $post_id->get_error_message(), 'wpnc_publish_failed' );
+		$channels = $this->get_posted_channels();
+
+		if ( empty( $channels ) ) {
+			$this->fail(
+				wpnc__(
+					'Choose a destination that is set up and tested under Settings.',
+					'مقصدی را انتخاب کنید که در تنظیمات پیکربندی و تست شده باشد.'
+				),
+				'wpnc_no_channel',
+				array(),
+				400
+			);
 		}
 
+		$post_id = 0;
+
+		if ( in_array( 'site', $channels, true ) ) {
+			// Empty array, not null: the messengers are driven by the
+			// selection here rather than by whatever happens to be set up.
+			$post_id = $this->publisher->publish( $item, '', array() );
+
+			if ( is_wp_error( $post_id ) ) {
+				$this->queue->mark_error( $id, $post_id->get_error_message() );
+				$this->fail( $post_id->get_error_message(), 'wpnc_publish_failed' );
+			}
+		}
+
+		// Without a post there is no permalink, so readers get the original.
+		$link = $post_id ? get_permalink( $post_id ) : $item->main_link;
+
+		$sent   = $this->publisher->deliver( $channels, $item->title, $link, $item->source_key );
+		$failed = array_keys( array_filter( $sent, 'is_string' ) );
+
 		$this->queue->mark_approved( $id, $post_id );
+
 		wp_send_json_success(
 			array(
-				'message' => wpnc__( 'Item approved and published successfully.', 'آیتم تأیید و با موفقیت منتشر شد.' ),
-				'post_id' => $post_id,
+				'message'  => $this->describe_delivery( $channels, $failed, $post_id ),
+				'post_id'  => $post_id,
+				'channels' => $channels,
+				'failed'   => $failed,
+			)
+		);
+	}
+
+	/**
+	 * The destinations this request asked for, reduced to the usable ones.
+	 *
+	 * Defaults to the site so that a caller which knows nothing about
+	 * channels still behaves the way approve always has.
+	 *
+	 * @return array
+	 */
+	private function get_posted_channels() {
+		if ( ! isset( $_POST['channels'] ) ) {
+			return WPNC_Channels::sanitize_selection( array( 'site' ) );
+		}
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$raw = wp_unslash( $_POST['channels'] );
+
+		if ( 'all' === $raw ) {
+			return WPNC_Channels::sanitize_selection( 'all' );
+		}
+
+		return WPNC_Channels::sanitize_selection( is_array( $raw ) ? $raw : explode( ',', (string) $raw ) );
+	}
+
+	/**
+	 * Say where an item actually went.
+	 *
+	 * A partial success is the common case worth wording carefully: the post
+	 * is on the site and Bale refused it, and an editor who reads only
+	 * "approved" would never go and look.
+	 *
+	 * @param array $channels Requested channels.
+	 * @param array $failed   Channels that refused.
+	 * @param int   $post_id  Post id, 0 when the site was not a destination.
+	 * @return string
+	 */
+	private function describe_delivery( $channels, $failed, $post_id ) {
+		$delivered = array_values( array_diff( $channels, $failed ) );
+		$names     = array();
+
+		foreach ( $delivered as $slug ) {
+			$channel = WPNC_Channels::get( $slug );
+			$names[] = isset( $channel['label'] ) ? $channel['label'] : $slug;
+		}
+
+		if ( empty( $names ) ) {
+			return wpnc__( 'Approved, but nothing could be sent.', 'تأیید شد، اما ارسال به هیچ مقصدی انجام نشد.' );
+		}
+
+		$message = sprintf(
+			/* translators: %s: comma separated destination names */
+			wpnc__( 'Approved and sent to %s.', 'تأیید و به %s ارسال شد.' ),
+			implode( wpnc__( ', ', '، ' ), $names )
+		);
+
+		if ( ! empty( $failed ) ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: comma separated destination names */
+				wpnc__( 'Failed: %s. See Logs & Tools.', 'ناموفق: %s. به تب لاگ و ابزارها مراجعه کنید.' ),
+				implode( wpnc__( ', ', '، ' ), $failed )
+			);
+		}
+
+		return $message;
+	}
+
+	/**
+	 * Check one channel's credentials against the live service.
+	 */
+	public function test_channel() {
+		$this->check_admin_request();
+
+		$slug = isset( $_POST['channel'] ) ? sanitize_key( wp_unslash( $_POST['channel'] ) ) : '';
+
+		if ( ! WPNC_Channels::exists( $slug ) || 'site' === $slug ) {
+			$this->fail(
+				wpnc__( 'Unknown destination.', 'مقصد ناشناخته.' ),
+				'wpnc_unknown_channel',
+				array(),
+				400
+			);
+		}
+
+		$messenger = new WPNC_Messenger();
+		$result    = $messenger->verify( $slug );
+
+		if ( is_wp_error( $result ) ) {
+			// A failed test must clear any earlier pass, or a channel that
+			// has since broken keeps its button enabled.
+			WPNC_Channels::clear_verified( $slug );
+			$this->fail( $result->get_error_message(), 'wpnc_channel_failed' );
+		}
+
+		WPNC_Channels::mark_verified( $slug );
+
+		wp_send_json_success(
+			array(
+				'message'  => wpnc__( 'Connected. This destination is ready to use.', 'اتصال برقرار شد. این مقصد آماده استفاده است.' ),
+				'channels' => WPNC_Channels::status(),
 			)
 		);
 	}
@@ -188,6 +321,7 @@ class WPNC_Ajax {
 		$this->check_admin_request();
 
 		$ids           = $this->get_posted_ids();
+		$channels      = $this->get_posted_channels();
 		$success_count = 0;
 		$error_count   = 0;
 		$skipped_count = 0;
@@ -199,12 +333,24 @@ class WPNC_Ajax {
 				continue;
 			}
 
-			$post_id = $this->publisher->publish( $item );
-			if ( is_wp_error( $post_id ) ) {
-				$this->queue->mark_error( $id, $post_id->get_error_message() );
-				$error_count++;
-				continue;
+			$post_id = 0;
+
+			if ( in_array( 'site', $channels, true ) ) {
+				$post_id = $this->publisher->publish( $item, '', array() );
+
+				if ( is_wp_error( $post_id ) ) {
+					$this->queue->mark_error( $id, $post_id->get_error_message() );
+					$error_count++;
+					continue;
+				}
 			}
+
+			$this->publisher->deliver(
+				$channels,
+				$item->title,
+				$post_id ? get_permalink( $post_id ) : $item->main_link,
+				$item->source_key
+			);
 
 			$this->queue->mark_approved( $id, $post_id );
 			$success_count++;
