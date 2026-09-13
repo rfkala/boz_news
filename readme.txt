@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.16.0
+Stable tag: 1.17.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -156,6 +156,24 @@ Two symptoms tell them apart, from the server:
   the connection being filtered by hostname, and a different address for the
   same service usually works. Set it in Base URL.
 
+= Why does a post sometimes publish without its featured image? =
+
+Open Logs & Tools and look for "No featured image was found for this item" or
+"Image sideload failed" - each records the reason. The usual ones:
+
+* The article page did not respond in time, so the picture it declares was
+  never read. The feed's own media and the item's HTML are now checked first,
+  and neither needs the page at all.
+* The image server refused the download (HTTP 403). News CDNs often block
+  requests that do not look like a browser or carry no Referer; downloads now
+  send both. A site that prefers to identify itself can change the agent with
+  the `wpnc_http_user_agent` filter.
+* The address had no file extension, or pointed to an AVIF. Both are accepted
+  now: the type is read from the downloaded bytes, not guessed from the URL.
+
+Each item's featured image can also be checked and changed in the editor
+before sending, under Featured image.
+
 = Are API keys displayed in the admin? =
 
 No. Saved OpenAI and Telegram secrets are never rendered back into the form.
@@ -219,6 +237,34 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.17.0 =
+* Fixed: the featured image attached for some sources and never for others.
+  WordPress's media_sideload_image() refused any address without a
+  .jpg/.png/.gif/.webp extension, sent no Referer and WordPress's own user
+  agent - which many news CDNs block - and reported all of it as the same
+  "Invalid image URL". Downloads now go through the plugin, send a browser
+  agent and the article as Referer, and take the type from the bytes.
+* Fixed: detection read only the first enclosure, and only when its type said
+  "image/"; a relative or protocol-relative og:image was rejected as unsafe;
+  and a lazy-loaded article image was read as its placeholder. The feed's
+  media, the item's own HTML and the page's declared image are now all tried,
+  in that order, with every address resolved against the article.
+* Fixed: a post was inserted as published and only then given its featured
+  image, so page caches, sitemaps and sharing plugins saw it without one. It
+  is now built as a draft, given its image, and published last.
+* Fixed: the default image from Settings was downloaded again for every post
+  without a picture, adding a copy to the media library each time. An image
+  already in the library is now used as it is.
+* Added: the featured image is its own field in the editor - thumbnail,
+  address, choose from the media library, find in the source, remove - and
+  the preview shows it apart from the text.
+* Changed: the featured image is no longer repeated inside the article body.
+  When the lead picture of an article is also its featured image, it is
+  removed from the text at publish time, together with its caption.
+* Added: a log entry, with the reason, when a fetched item has no featured
+  image, so "the page did not respond" can be told from "the page has none".
+* Fixed: "Load full article" reported about 0 words for Persian text.
 
 = 1.16.0 =
 * Fixed: an edit that failed to save was reported as saved. The queue update

@@ -2236,3 +2236,80 @@ a.wpnc-chip:hover {
     width: 100%;
     max-width: 100%;
 }
+
+/* ============================================================
+   Featured image
+   ============================================================ */
+
+.wpnc-featured-body {
+    display: grid;
+    grid-template-columns: 132px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.wpnc-featured-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    padding: 6px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r-sm);
+    background: var(--wpnc-surface-2);
+    font-size: 11.5px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--wpnc-ink-4);
+    text-align: center;
+}
+
+.wpnc-featured-thumb img {
+    display: block;
+    width: calc(100% + 12px);
+    height: calc(100% + 12px);
+    margin: -6px;
+    object-fit: cover;
+}
+
+.wpnc-featured-thumb.is-broken {
+    border-style: dashed;
+    border-color: var(--wpnc-danger);
+    color: var(--wpnc-danger);
+}
+
+.wpnc-featured-note {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-featured-note.is-busy  { color: var(--wpnc-info); }
+.wpnc-featured-note.is-ok    { color: var(--wpnc-ok); }
+.wpnc-featured-note.is-error { color: var(--wpnc-danger); }
+
+/* Apart from the body, as a theme would show it. */
+.wpnc-preview-featured {
+    margin: 0 0 14px;
+}
+
+.wpnc-preview-featured img {
+    display: block;
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: var(--wpnc-r-sm);
+}
+
+.wpnc-preview-featured figcaption {
+    margin-top: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--wpnc-ink-4);
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-featured-body { grid-template-columns: minmax(0, 1fr); }
+}

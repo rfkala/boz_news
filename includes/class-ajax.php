@@ -45,6 +45,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
 		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
+		add_action( 'wp_ajax_wpnc_detect_image', array( $this, 'detect_image' ) );
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
 		add_action( 'wp_ajax_wpnc_preview_item', array( $this, 'preview_item' ) );
 		add_action( 'wp_ajax_wpnc_test_channel', array( $this, 'test_channel' ) );
@@ -305,15 +306,20 @@ class WPNC_Ajax {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$raw_options = isset( $_POST['publish_options'] ) ? wp_unslash( $_POST['publish_options'] ) : array();
 
-		$saved = $this->queue->update_item(
-			$id,
-			array(
-				'title'           => $title,
-				'description'     => $description,
-				'tags'            => $tags,
-				'publish_options' => WPNC_Publish_Options::sanitize( $raw_options ),
-			)
+		$fields = array(
+			'title'           => $title,
+			'description'     => $description,
+			'tags'            => $tags,
+			'publish_options' => WPNC_Publish_Options::sanitize( $raw_options ),
 		);
+
+		// Only when sent, so an older copy of the editor still open in another
+		// tab cannot wipe an item's picture by saving without the field.
+		if ( isset( $_POST['image_url'] ) ) {
+			$fields['image_url'] = $this->posted_image_url();
+		}
+
+		$saved = $this->queue->update_item( $id, $fields );
 
 		// Reporting success for a write that did not happen is the worst of
 		// both: the edit is gone and the editor has no reason to suspect it.
@@ -700,10 +706,103 @@ class WPNC_Ajax {
 				'message' => sprintf(
 					/* translators: %d: word count */
 					wpnc__( 'Full text loaded, about %d words.', 'متن کامل بارگذاری شد، حدود %d کلمه.' ),
-					str_word_count( wp_strip_all_tags( $content ) )
+					// str_word_count() counts Latin letters only, so every
+					// Persian article was "about 0 words".
+					WPNC_Template::word_count( wp_strip_all_tags( $content ) )
 				),
 			)
 		);
+	}
+
+	/**
+	 * Look for a featured image for an item already in the queue.
+	 *
+	 * Only finds one. Keeping it is left to Save, like every other change
+	 * made in the editor.
+	 */
+	public function detect_image() {
+		$this->check_admin_request();
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 60 );
+
+		$id   = $this->get_posted_id();
+		$item = $this->queue->get( $id );
+
+		if ( ! $item ) {
+			$this->fail( wpnc__( 'Item not found.', 'آیتم یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		$service = new WPNC_Image_Service();
+		$url     = $service->find_image_for_text( (string) $item->description, (string) $item->main_link );
+		$note    = $service->last_image_note();
+
+		if ( '' === $url ) {
+			$reasons = array(
+				'unsafe_url'       => wpnc__( 'That article URL is not safe to request.', 'آدرس این مقاله برای درخواست امن نیست.' ),
+				'page_no_response' => wpnc__( 'The article page did not respond.', 'صفحه مقاله پاسخ نداد.' ),
+				'page_no_image'    => wpnc__(
+					'Neither the item text nor its article page names a picture.',
+					'نه متن خبر و نه صفحهٔ مقاله، تصویری معرفی نکرده‌اند.'
+				),
+			);
+
+			$this->fail(
+				isset( $reasons[ $note ] ) ? $reasons[ $note ] : wpnc__( 'No picture was found.', 'تصویری پیدا نشد.' ),
+				'wpnc_no_image'
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'image_url' => $url,
+				'message'   => 'item_html' === $note
+					? wpnc__( 'Found a picture in the item text. Save to keep it.', 'تصویری در متن خبر پیدا شد. برای نگه‌داشتن، ذخیره کنید.' )
+					: wpnc__( 'Found the picture the article page declares. Save to keep it.', 'تصویری که صفحهٔ مقاله معرفی کرده پیدا شد. برای نگه‌داشتن، ذخیره کنید.' ),
+			)
+		);
+	}
+
+	/**
+	 * The featured image address sent by the editor.
+	 *
+	 * Blank is allowed and means "none for this item".
+	 *
+	 * @param bool $strict Fail the request on an invalid address. The preview
+	 *                     passes false: it runs while the address is still
+	 *                     being typed, and should show no picture rather than
+	 *                     an error on every keystroke.
+	 * @return string
+	 */
+	private function posted_image_url( $strict = true ) {
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- validated and sanitised with esc_url_raw() below.
+		$raw = isset( $_POST['image_url'] ) ? trim( (string) wp_unslash( $_POST['image_url'] ) ) : '';
+
+		if ( '' === $raw ) {
+			return '';
+		}
+
+		$url  = esc_url_raw( WPNC_Image_Picker::encode_spaces( $raw ), array( 'http', 'https' ) );
+		$host = '' !== $url ? (string) wp_parse_url( $url, PHP_URL_HOST ) : '';
+
+		// esc_url_raw() turns "not a url" into "http://notaurl", so a host
+		// without a dot is treated as the typo it almost certainly is.
+		if ( '' !== $url && false !== strpos( $host, '.' ) ) {
+			return $url;
+		}
+
+		if ( ! $strict ) {
+			return '';
+		}
+
+		$this->fail(
+			wpnc__( 'The featured image address is not a valid http or https URL.', 'آدرس تصویر شاخص یک نشانی http یا https معتبر نیست.' ),
+			'wpnc_bad_image_url',
+			array( 'field' => 'image_url' ),
+			422
+		);
+
+		return '';
 	}
 
 	/**
@@ -812,6 +911,9 @@ class WPNC_Ajax {
 		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
 		$tags    = isset( $_POST['tags'] ) ? sanitize_text_field( wp_unslash( $_POST['tags'] ) ) : '';
 
+		// The picture the editor currently shows, for the same reason as the text.
+		$image_url = isset( $_POST['image_url'] ) ? $this->posted_image_url( false ) : (string) $item->image_url;
+
 		$publisher = new WPNC_Publisher();
 		$body      = $publisher->build_content(
 			array(
@@ -820,7 +922,7 @@ class WPNC_Ajax {
 				'source_name' => $item->source_name,
 				'main_link'   => $item->main_link,
 				'pub_date'    => $item->pub_date,
-				'image_url'   => $item->image_url,
+				'image_url'   => $image_url,
 				'tags'        => $tags,
 			)
 		);
@@ -829,9 +931,10 @@ class WPNC_Ajax {
 
 		wp_send_json_success(
 			array(
-				'title' => $title,
-				'html'  => $body,
-				'stats' => array(
+				'title'    => $title,
+				'html'     => $body,
+				'featured' => $image_url,
+				'stats'    => array(
 					'words'   => WPNC_Template::word_count( $plain ),
 					'minutes' => WPNC_Template::reading_minutes( $plain ),
 				),

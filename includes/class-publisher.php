@@ -92,11 +92,18 @@ class WPNC_Publisher {
 
 		$schedule = $this->schedule_for( $pub_date, $options['post_status'] );
 
+		// Built as a draft and made public last. Inserting straight into
+		// "publish" fired every publish hook - page caches, sitemaps, social
+		// sharing - while the post had no featured image yet, and the download
+		// that follows can take seconds. Anything that looked at the post in
+		// that window saw it without a picture, and a cache kept it that way.
+		$staged = in_array( $schedule['status'], array( 'publish', 'future' ), true );
+
 		$post_id = wp_insert_post(
 			array(
 				'post_title'    => wp_strip_all_tags( $title ),
 				'post_content'  => $content,
-				'post_status'   => $schedule['status'],
+				'post_status'   => $staged ? 'draft' : $schedule['status'],
 				'post_author'   => $this->get_post_author( $options['post_author'] ),
 				'post_date_gmt' => $schedule['date_gmt'],
 				'post_type'     => $post_type,
@@ -130,7 +137,7 @@ class WPNC_Publisher {
 		}
 
 		if ( $image_url ) {
-			$attachment_id = $this->image_service->sideload_featured_image( $image_url, $post_id, $title );
+			$attachment_id = $this->image_service->sideload_featured_image( $image_url, $post_id, $title, $main_link );
 			if ( is_wp_error( $attachment_id ) ) {
 				add_post_meta( $post_id, '_wpnc_source_image', $image_url, true );
 				$this->logger->log(
@@ -138,11 +145,42 @@ class WPNC_Publisher {
 					wpnc__( 'Image sideload failed.', 'بارگذاری تصویر ناموفق بود.' ),
 					array(
 						'post_id' => $post_id,
+						'code'    => $attachment_id->get_error_code(),
 						'error'   => $attachment_id->get_error_message(),
 						'url'     => $image_url,
 					),
 					$item['source_key'] ?? ''
 				);
+			}
+		}
+
+		if ( $staged ) {
+			$released = wp_update_post(
+				array(
+					'ID'            => $post_id,
+					'post_status'   => $schedule['status'],
+					'post_date_gmt' => $schedule['date_gmt'],
+					'post_date'     => get_date_from_gmt( $schedule['date_gmt'] ),
+					'edit_date'     => true,
+				),
+				true
+			);
+
+			if ( is_wp_error( $released ) ) {
+				$this->logger->log(
+					WPNC_Logger::LEVEL_ERROR,
+					wpnc__(
+						'The post was built but could not be published, so it was left as a draft.',
+						'پست ساخته شد اما منتشر نشد و به‌صورت پیش‌نویس باقی ماند.'
+					),
+					array(
+						'post_id' => $post_id,
+						'error'   => $released->get_error_message(),
+					),
+					$item['source_key'] ?? ''
+				);
+
+				return $released;
 			}
 		}
 
@@ -251,6 +289,13 @@ class WPNC_Publisher {
 			),
 			(array) $parts
 		);
+
+		// The featured image belongs to the post, not to the story. When the
+		// article's lead picture is also the featured image, a theme shows it
+		// once as the thumbnail and again at the top of the text.
+		if ( '' !== (string) $parts['image_url'] ) {
+			$parts['content'] = WPNC_Image_Picker::strip_duplicate( $parts['content'], $parts['image_url'], $parts['main_link'] );
+		}
 
 		$link_text = $parts['source_name'] ? $parts['source_name'] : $parts['main_link'];
 

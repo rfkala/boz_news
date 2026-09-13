@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.16.0
+ * Version: 1.17.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.16.0' );
+define( 'WPNC_VERSION', '1.17.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -23,6 +23,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-db.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-logger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-image-picker.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
@@ -214,11 +215,13 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			// The settings an item may override at publish time, plus what
 			// it inherits when it overrides nothing.
 			'publish'        => array(
-				'defaults'   => WPNC_Publish_Options::defaults(),
-				'post_types' => wpnc_admin_post_type_choices(),
-				'statuses'   => WPNC_Publish_Options::statuses(),
-				'authors'    => wpnc_admin_author_choices(),
-				'categories' => wpnc_admin_category_choices(),
+				'defaults'      => WPNC_Publish_Options::defaults(),
+				'post_types'    => wpnc_admin_post_type_choices(),
+				'statuses'      => WPNC_Publish_Options::statuses(),
+				'authors'       => wpnc_admin_author_choices(),
+				'categories'    => wpnc_admin_category_choices(),
+				// So an item without a picture can say what it will get instead.
+				'default_image' => esc_url_raw( (string) get_option( 'wpnc_default_image', '' ) ),
 			),
 			'i18n'           => array(
 				'loading'                => 'Loading...',
@@ -296,6 +299,19 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dash_no_sources_yet'    => 'No source has produced an item yet.',
 				'dash_approved_of_total' => 'approved of total',
 				'load_full_text'         => 'Load full article',
+				'featured_image'         => 'Featured image',
+				'featured_hint'          => 'Kept apart from the article. It becomes the featured image of the post and is not repeated inside the text.',
+				'featured_none'          => 'No featured image. Paste an address, choose one from the library, or find one in the source.',
+				'featured_default'       => 'None set for this item, so the default image from Settings will be used.',
+				'featured_broken'        => 'Your browser could not load this address as an image. The server may still manage it, but check the address.',
+				'featured_broken_short'  => 'Preview unavailable',
+				'image_library'          => 'Choose from library',
+				'image_library_title'    => 'Choose the featured image',
+				'image_library_button'   => 'Use this image',
+				'image_detect'           => 'Find in source',
+				'image_detecting'        => 'Looking for an image in the source...',
+				'image_remove'           => 'Remove',
+				'media_unavailable'      => 'The media library is not available on this page.',
 				'open_original'          => 'Open the original',
 				'undo'                   => 'Undo',
 				'ai_badge'               => 'AI',
@@ -425,6 +441,19 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dash_no_sources_yet'    => 'هنوز هیچ منبعی خبری تولید نکرده است.',
 				'dash_approved_of_total' => 'تأییدشده از کل',
 				'load_full_text'         => 'دریافت متن کامل',
+				'featured_image'         => 'تصویر شاخص',
+				'featured_hint'          => 'جدا از متن خبر نگهداری می‌شود: تصویر شاخص پست می‌شود و داخل متن تکرار نمی‌شود.',
+				'featured_none'          => 'تصویر شاخصی ندارد. آدرس یک تصویر را وارد کنید، از کتابخانه انتخاب کنید یا از منبع پیدا کنید.',
+				'featured_default'       => 'برای این خبر تصویری تعیین نشده، پس تصویر پیش‌فرض تنظیمات استفاده می‌شود.',
+				'featured_broken'        => 'مرورگر شما نتوانست این آدرس را به‌صورت تصویر باز کند. ممکن است سرور بتواند، اما آدرس را بررسی کنید.',
+				'featured_broken_short'  => 'پیش‌نمایش در دسترس نیست',
+				'image_library'          => 'انتخاب از کتابخانه',
+				'image_library_title'    => 'انتخاب تصویر شاخص',
+				'image_library_button'   => 'استفاده از این تصویر',
+				'image_detect'           => 'یافتن از منبع',
+				'image_detecting'        => 'در حال جست‌وجوی تصویر در منبع...',
+				'image_remove'           => 'حذف',
+				'media_unavailable'      => 'کتابخانهٔ رسانه در این صفحه در دسترس نیست.',
 				'open_original'          => 'مشاهده اصل خبر',
 				'undo'                   => 'بازگردانی',
 				'ai_badge'               => 'هوش مصنوعی',

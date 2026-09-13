@@ -585,6 +585,156 @@ jQuery(function($) {
         return $select;
     }
 
+    /* ==========================================================
+       Featured image
+
+       A property of the post rather than a paragraph of the story: it goes
+       to set_post_thumbnail() and is kept out of the article text. There
+       was no way to see, change or remove it in the editor before, so a
+       wrong or missing picture only showed up after publishing.
+       ========================================================== */
+
+    var featuredFrame = null;
+    var featuredTimer = null;
+
+    function renderFeatured($parent) {
+        var $field = $('<div>').addClass('wpnc-field wpnc-featured').appendTo($parent);
+        var $head = $('<div>').addClass('wpnc-field-head').appendTo($field);
+        $('<label>').attr('for', 'wpnc-edit-image').text(t('featured_image', 'Featured image')).appendTo($head);
+
+        var $tools = $('<span>').addClass('wpnc-field-tools').appendTo($head);
+        $('<button>').attr({ type: 'button', id: 'wpnc-image-library' })
+            .addClass('button button-small')
+            .text(t('image_library', 'Choose from library'))
+            .appendTo($tools);
+        $('<button>').attr({ type: 'button', id: 'wpnc-image-detect' })
+            .addClass('button button-small')
+            .text(t('image_detect', 'Find in source'))
+            .appendTo($tools);
+        $('<button>').attr({ type: 'button', id: 'wpnc-image-remove' })
+            .addClass('button button-small')
+            .text(t('image_remove', 'Remove'))
+            .appendTo($tools);
+
+        var $body = $('<div>').addClass('wpnc-featured-body').appendTo($field);
+        $('<div>').attr({ id: 'wpnc-featured-thumb', 'aria-hidden': 'true' }).addClass('wpnc-featured-thumb').appendTo($body);
+
+        var $meta = $('<div>').addClass('wpnc-featured-meta').appendTo($body);
+        $('<input>')
+            .attr({ type: 'url', id: 'wpnc-edit-image', dir: 'ltr', placeholder: 'https://', autocomplete: 'off', spellcheck: 'false' })
+            .addClass('large-text')
+            .appendTo($meta);
+        $('<p>').attr({ id: 'wpnc-featured-note', dir: 'auto', 'aria-live': 'polite' }).addClass('wpnc-featured-note').appendTo($meta);
+    }
+
+    function featuredUrl() {
+        return $.trim($('#wpnc-edit-image').val() || '');
+    }
+
+    function featuredNote(message, type) {
+        $('#wpnc-featured-note')
+            .attr('class', 'wpnc-featured-note' + (type ? ' is-' + type : ''))
+            .text(message || '');
+    }
+
+    /* Draws the thumbnail from the field as it stands. The browser loading
+       the picture is only a hint - the server downloads it with a request
+       of its own - so a failure here warns rather than blocks. */
+    function showFeatured() {
+        var url = featuredUrl();
+        var $thumb = $('#wpnc-featured-thumb').empty().removeClass('is-empty is-broken');
+
+        $('#wpnc-image-remove').prop('disabled', !url);
+
+        if (!url) {
+            $thumb.addClass('is-empty').text(t('no_image', 'No Image'));
+            featuredNote(publishConfig().default_image
+                ? t('featured_default', 'None set for this item, so the default image from Settings will be used.')
+                : t('featured_none', 'No featured image. Paste an address, choose one from the library, or find one in the source.'));
+            return;
+        }
+
+        featuredNote(t('featured_hint', 'Kept apart from the article. It becomes the featured image of the post and is not repeated inside the text.'));
+
+        $('<img>')
+            .attr({ src: url, alt: '' })
+            .on('error', function() {
+                // A slow earlier address must not overwrite a newer one.
+                if (featuredUrl() !== url) {
+                    return;
+                }
+                $thumb.addClass('is-broken').empty().text(t('featured_broken_short', 'Preview unavailable'));
+                featuredNote(t('featured_broken', 'Your browser could not load this address as an image. The server may still manage it, but check the address.'), 'error');
+            })
+            .appendTo($thumb);
+    }
+
+    function setFeatured(url) {
+        $('#wpnc-edit-image').val(url || '');
+        showFeatured();
+        schedulePreview();
+    }
+
+    /* Shown above the title, apart from the body, the way a theme shows a
+       featured image - so the preview cannot suggest it is part of the text. */
+    function renderPreviewFeatured(url) {
+        var $paper = $('#wpnc-preview-body').closest('.wpnc-preview-paper');
+        $paper.children('.wpnc-preview-featured').remove();
+
+        if (!url) {
+            return;
+        }
+
+        $('<figure>').addClass('wpnc-preview-featured')
+            .append($('<img>').attr({ src: url, alt: '' }))
+            .append($('<figcaption>').text(t('featured_image', 'Featured image')))
+            .prependTo($paper);
+    }
+
+    function chooseFeatured() {
+        if (!(window.wp && wp.media)) {
+            featuredNote(t('media_unavailable', 'The media library is not available on this page.'), 'error');
+            return;
+        }
+
+        if (!featuredFrame) {
+            featuredFrame = wp.media({
+                title: t('image_library_title', 'Choose the featured image'),
+                button: { text: t('image_library_button', 'Use this image') },
+                library: { type: 'image' },
+                multiple: false
+            });
+
+            featuredFrame.on('select', function() {
+                var picked = featuredFrame.state().get('selection').first();
+                if (picked && picked.get('url')) {
+                    setFeatured(picked.get('url'));
+                }
+            });
+        }
+
+        featuredFrame.open();
+    }
+
+    function detectFeatured() {
+        var $button = $('#wpnc-image-detect');
+
+        setBusy($button, true);
+        featuredNote(t('image_detecting', 'Looking for an image in the source...'), 'busy');
+
+        request('wpnc_detect_image', { id: $('#wpnc-edit-id').val() })
+            .done(function(data) {
+                setFeatured(data.image_url);
+                featuredNote(data.message, 'ok');
+            })
+            .fail(function(error) {
+                featuredNote(error.message, 'error');
+            })
+            .always(function() {
+                setBusy($button, false);
+            });
+    }
+
     function renderAdvanced($parent) {
         var config = publishConfig();
 
@@ -645,7 +795,8 @@ jQuery(function($) {
             $('#wpnc-edit-title').val() || '',
             editorGet(),
             $('#wpnc-edit-tags').val() || '',
-            publishOptions()
+            publishOptions(),
+            featuredUrl()
         ]);
     }
 
@@ -727,9 +878,11 @@ jQuery(function($) {
             id: $('#wpnc-edit-id').val(),
             title: $('#wpnc-edit-title').val(),
             content: editorGet(),
-            tags: $('#wpnc-edit-tags').val()
+            tags: $('#wpnc-edit-tags').val(),
+            image_url: featuredUrl()
         })
             .done(function(data) {
+                renderPreviewFeatured(data.featured || '');
                 $('#wpnc-preview-title').text(data.title || '');
                 // Server-rendered through the same template the publisher
                 // uses, and already passed through wp_kses there.
@@ -934,6 +1087,8 @@ jQuery(function($) {
         $('<h3>').attr({ id: 'wpnc-preview-title', dir: 'auto' }).addClass('wpnc-preview-title').appendTo($paper);
         $('<div>').attr({ id: 'wpnc-preview-body', dir: 'auto' }).addClass('wpnc-preview-body').appendTo($paper);
 
+        renderFeatured($left);
+
         var $descField = $('<div>').addClass('wpnc-field').appendTo($left);
         var $descHead = $('<div>').addClass('wpnc-field-head').appendTo($descField);
         $('<label>').attr('for', EDITOR_ID).text(t('field_description', 'Description')).appendTo($descHead);
@@ -999,6 +1154,8 @@ jQuery(function($) {
         $('#wpnc-edit-id').val(item.id);
         $('#wpnc-edit-title').val(item.title || '');
         $('#wpnc-edit-tags').val(item.tags || '');
+        $('#wpnc-edit-image').val(item.image_url || '');
+        showFeatured();
 
         var overrides = item.publish_options || {};
         $('#wpnc-edit-post-type').val(overrides.post_type || '');
@@ -1052,6 +1209,13 @@ jQuery(function($) {
         }, 250);
 
         $('#wpnc-edit-title, #wpnc-edit-tags').off('input.wpncpreview').on('input.wpncpreview', schedulePreview);
+
+        // Debounced so typing an address does not request a picture per key.
+        $('#wpnc-edit-image').off('input.wpncpreview').on('input.wpncpreview', function() {
+            window.clearTimeout(featuredTimer);
+            featuredTimer = window.setTimeout(showFeatured, 400);
+            schedulePreview();
+        });
     }
 
     /**
@@ -1153,6 +1317,11 @@ jQuery(function($) {
         });
         $('#wpnc-save-send').off('click').on('click', saveAndSend);
         $('#wpnc-load-full-text').off('click').on('click', loadFullText);
+        $('#wpnc-image-library').off('click').on('click', chooseFeatured);
+        $('#wpnc-image-detect').off('click').on('click', detectFeatured);
+        $('#wpnc-image-remove').off('click').on('click', function() {
+            setFeatured('');
+        });
         $('#wpnc-editor-undo').off('click').on('click', editorUndo);
         $('.wpnc-ai-run').off('click').on('click', function() {
             runAi($(this), $(this).data('action'));
@@ -1311,6 +1480,7 @@ jQuery(function($) {
             title: title,
             description: editorGet(),
             tags: $('#wpnc-edit-tags').val(),
+            image_url: featuredUrl(),
             publish_options: publishOptions()
         })
             .done(function(data) {

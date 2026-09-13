@@ -367,6 +367,21 @@ class WPNC_Fetcher {
 
 		$item['image_url'] = $this->image_service->extract_image( $item['raw_item'], $item['main_link'] );
 
+		// An item without a picture is common and not an error, but "the page
+		// did not respond" and "the page has none" need different fixes, and
+		// neither used to leave a trace.
+		if ( '' === $item['image_url'] ) {
+			$this->logger->log(
+				WPNC_Logger::LEVEL_INFO,
+				wpnc__( 'No featured image was found for this item.', 'برای این خبر تصویر شاخصی پیدا نشد.' ),
+				array(
+					'reason' => $this->image_service->last_image_note(),
+					'url'    => $item['main_link'],
+				),
+				$item['source_key']
+			);
+		}
+
 		if ( get_option( 'wpnc_extract_full_text', 0 ) ) {
 			$full_text = $this->image_service->extract_full_text( $item['main_link'] );
 

@@ -164,6 +164,12 @@ class WPNC_Queue_Repository {
 			$format[]              = '%d';
 		}
 
+		// Same rule as the options: written only when the caller sent it.
+		if ( array_key_exists( 'image_url', $data ) ) {
+			$fields['image_url'] = esc_url_raw( (string) $data['image_url'] );
+			$format[]            = '%s';
+		}
+
 		$updated = $wpdb->update(
 			$this->table_name(),
 			$fields,
