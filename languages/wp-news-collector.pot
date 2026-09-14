@@ -7,15 +7,27 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:618
+#: wp-news-collector.php:170
+msgid "All categories"
+msgstr ""
+
+#: wp-news-collector.php:740
 msgid "Boz News"
 msgstr ""
 
-#: wp-news-collector.php:620
+#: wp-news-collector.php:742
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr ""
 
-#: wp-news-collector.php:107
+#: wp-news-collector.php:199
+msgid "Bulletin settings"
+msgstr ""
+
+#: wp-news-collector.php:204
+msgid "Category"
+msgstr ""
+
+#: wp-news-collector.php:229
 msgid "Could not load more news. Please try again."
 msgstr ""
 
@@ -27,23 +39,59 @@ msgstr ""
 msgid "Every 3 Hours"
 msgstr ""
 
-#: wp-news-collector.php:105
-#: includes/class-shortcode.php:75
+#: wp-news-collector.php:203
+msgid "Grid"
+msgstr ""
+
+#: wp-news-collector.php:201
+msgid "Layout"
+msgstr ""
+
+#: wp-news-collector.php:202
+msgid "List"
+msgstr ""
+
+#: wp-news-collector.php:227
+#: includes/class-shortcode.php:94
 msgid "Load More News"
 msgstr ""
 
-#: wp-news-collector.php:104
+#: wp-news-collector.php:226
 msgid "Loading..."
 msgstr ""
 
-#: wp-news-collector.php:106
+#: wp-news-collector.php:197
+msgid "News bulletin"
+msgstr ""
+
+#: wp-news-collector.php:228
 msgid "No more news"
 msgstr ""
 
-#: includes/class-ajax.php:1441
+#: includes/class-ajax.php:1457
 msgid "No more posts available."
 msgstr ""
 
-#: includes/class-shortcode.php:57
+#: includes/class-shortcode.php:67
 msgid "No news found."
+msgstr ""
+
+#: wp-news-collector.php:200
+msgid "Number of items"
+msgstr ""
+
+#: wp-news-collector.php:205
+msgid "Show pictures"
+msgstr ""
+
+#: wp-news-collector.php:206
+msgid "Show the source"
+msgstr ""
+
+#: wp-news-collector.php:207
+msgid "Summary length (words)"
+msgstr ""
+
+#: wp-news-collector.php:198
+msgid "The latest news this site published, with pictures."
 msgstr ""

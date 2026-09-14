@@ -1416,9 +1416,25 @@ class WPNC_Ajax {
 		// no action for a forged request to perform - while a nonce on a page
 		// that a cache serves to everyone expires with the cached copy and
 		// takes the button down for every visitor a day later.
-		$page     = isset( $_POST['page'] ) ? max( 1, absint( wp_unslash( $_POST['page'] ) ) ) : 1;
-		$limit    = isset( $_POST['limit'] ) ? max( 1, min( 50, absint( wp_unslash( $_POST['limit'] ) ) ) ) : 10;
-		$category = isset( $_POST['category'] ) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';
+		$page = isset( $_POST['page'] ) ? max( 1, absint( wp_unslash( $_POST['page'] ) ) ) : 1;
+
+		// Read through the same rules as the shortcode and the block, so a page
+		// loaded in later is laid out like the one it joins.
+		// phpcs:disable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- WPNC_Bulletin::args() sanitises each value.
+		$args = WPNC_Bulletin::args(
+			array(
+				'limit'    => isset( $_POST['limit'] ) ? wp_unslash( $_POST['limit'] ) : 10,
+				'category' => isset( $_POST['category'] ) ? wp_unslash( $_POST['category'] ) : '',
+				'layout'   => isset( $_POST['layout'] ) ? wp_unslash( $_POST['layout'] ) : 'list',
+				'image'    => isset( $_POST['image'] ) ? wp_unslash( $_POST['image'] ) : '1',
+				'excerpt'  => isset( $_POST['excerpt'] ) ? wp_unslash( $_POST['excerpt'] ) : 30,
+				'source'   => isset( $_POST['source'] ) ? wp_unslash( $_POST['source'] ) : '1',
+			)
+		);
+		// phpcs:enable WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
+		$limit     = $args['limit'];
+		$category  = $args['category'];
 		$post_type = WPNC_Settings::get_target_post_type();
 
 		$args = array(
@@ -1447,7 +1463,7 @@ class WPNC_Ajax {
 		ob_start();
 		while ( $query->have_posts() ) {
 			$query->the_post();
-			WPNC_Shortcode::render_news_item();
+			WPNC_Shortcode::render_news_item( $args );
 		}
 		wp_reset_postdata();
 

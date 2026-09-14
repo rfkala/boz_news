@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.25.0
+Stable tag: 1.26.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -80,12 +80,22 @@ resume, or clear a source's failure history from the Source Health panel.
 
 == Shortcode ==
 
-`[news_bulletin limit="10" category="world"]`
+`[news_bulletin limit="10" category="world" layout="grid" image="yes" excerpt="30" source="yes"]`
 
 * `limit` — how many items to show, 1 to 50. Default 10.
 * `category` — a category slug. Leave empty for all categories.
+* `layout` — `list` or `grid`. Default `list`.
+* `image` — show each item's featured image, `yes` or `no`. Default `yes`.
+* `excerpt` — words of summary under each headline, 0 to 100; `0` hides it.
+  Default 30.
+* `source` — name the original source beside the date, `yes` or `no`.
+  Default `yes`.
 
-A Load More button appears when more items exist.
+A Load More button appears when more items exist, and what it loads is laid
+out like the rest of the list.
+
+The same list is available as a block, News bulletin, with these options in
+the block sidebar and a live preview in the editor.
 
 == Keyword Filters ==
 
@@ -261,6 +271,14 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.26.0 =
+* Added: the news list on the site shows each item's featured image, the
+  source it came from and a short summary, as a list or a grid. The shortcode
+  takes layout, image, excerpt and source attributes, and Load More keeps the
+  layout of the list it adds to.
+* Added: a News bulletin block for the block editor, with the same options in
+  its sidebar and a live preview drawn by the same code as the shortcode.
 
 = 1.25.0 =
 * Added: search metadata for published items. Each item can carry a meta

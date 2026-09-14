@@ -1,42 +1,125 @@
+/* ============================================================
+   News list - shortcode and block
+
+   Colours are left to the theme: borders and muted text use translucency
+   rather than fixed greys, so the list sits on a dark theme as well as a
+   light one. Spacing uses logical properties, so an RTL site needs nothing
+   extra.
+   ============================================================ */
+
 .wpnc-news-list {
     display: flex;
     flex-direction: column;
     gap: 20px;
 }
 
+.wpnc-news-list.is-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 28px 24px;
+}
+
 .wpnc-news-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid rgba(127, 127, 127, 0.2);
 }
 
 .wpnc-news-item:last-child {
     border-bottom: none;
 }
 
+.wpnc-news-thumb {
+    flex: 0 0 200px;
+    display: block;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border-radius: 8px;
+    background: rgba(127, 127, 127, 0.12);
+}
+
+.wpnc-news-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.35s ease;
+}
+
+.wpnc-news-item:hover .wpnc-news-thumb img {
+    transform: scale(1.04);
+}
+
+.wpnc-news-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .wpnc-news-title {
-    margin: 0 0 10px 0;
-    font-size: 1.25em;
+    margin: 0 0 8px;
+    font-size: 1.2em;
+    line-height: 1.5;
 }
 
 .wpnc-news-title a {
-    text-decoration: none;
     color: inherit;
+    text-decoration: none;
+}
+
+.wpnc-news-title a:hover,
+.wpnc-news-title a:focus {
+    text-decoration: underline;
 }
 
 .wpnc-news-meta {
-    font-size: 0.9em;
-    color: #666;
-    margin-bottom: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin-bottom: 8px;
+    font-size: 0.85em;
+    opacity: 0.72;
+}
+
+.wpnc-news-source::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    margin-inline-end: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    vertical-align: middle;
 }
 
 .wpnc-news-excerpt {
-    font-size: 1em;
-    line-height: 1.6;
+    margin: 0;
+    font-size: 0.97em;
+    line-height: 1.8;
+}
+
+/* Grid: picture on top, no dividers between cards. */
+.wpnc-news-list.is-grid .wpnc-news-item {
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.wpnc-news-list.is-grid .wpnc-news-thumb {
+    flex-basis: auto;
+    width: 100%;
+}
+
+.wpnc-news-empty {
+    opacity: 0.72;
 }
 
 .wpnc-load-more-wrapper {
+    margin-top: 24px;
     text-align: center;
-    margin-top: 20px;
 }
 
 .wpnc-load-more-btn {
@@ -47,8 +130,31 @@
     cursor: not-allowed;
     opacity: 0.7;
 }
+
 .wpnc-load-more-message {
     margin-top: 12px;
     font-size: 0.95em;
-    color: #666;
+    opacity: 0.72;
+}
+
+@media (max-width: 600px) {
+    .wpnc-news-item {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .wpnc-news-thumb {
+        flex-basis: auto;
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wpnc-news-thumb img {
+        transition: none;
+    }
+
+    .wpnc-news-item:hover .wpnc-news-thumb img {
+        transform: none;
+    }
 }

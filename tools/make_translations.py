@@ -34,6 +34,20 @@ TRANSLATIONS = {
     'No news found.': 'خبری یافت نشد.',
     'No more posts available.': 'پست دیگری موجود نیست.',
 
+    # The News bulletin block, which follows the site and user locale.
+    'News bulletin': 'خبرنامه',
+    'The latest news this site published, with pictures.': 'آخرین خبرهای منتشرشده در این سایت، همراه تصویر.',
+    'Bulletin settings': 'تنظیمات خبرنامه',
+    'Number of items': 'تعداد خبر',
+    'Layout': 'چیدمان',
+    'List': 'فهرست',
+    'Grid': 'شبکه‌ای',
+    'Category': 'دسته‌بندی',
+    'All categories': 'همهٔ دسته‌بندی‌ها',
+    'Show pictures': 'نمایش تصویر',
+    'Show the source': 'نمایش منبع',
+    'Summary length (words)': 'طول خلاصه (کلمه)',
+
     # Cron schedule names, shown by WordPress and other plugins.
     'Every 15 Minutes': 'هر ۱۵ دقیقه',
     'Every 3 Hours': 'هر ۳ ساعت',

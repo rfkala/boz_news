@@ -245,6 +245,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-seo.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-bulletin.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';

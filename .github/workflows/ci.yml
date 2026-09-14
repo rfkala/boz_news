@@ -125,6 +125,7 @@ jobs:
         run: |
           node --check assets/admin.js
           node --check assets/frontend.js
+          node --check assets/block.js
 
       - name: Stylesheets balance
         run: |

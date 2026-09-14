@@ -21,6 +21,13 @@ jQuery(function($) {
         var limit = parseInt($button.attr('data-limit'), 10) || 10;
         var category = $button.attr('data-category') || '';
         var maxPages = parseInt($button.attr('data-max-pages'), 10) || 1;
+
+        // The list's own display choices travel with the request, so the items
+        // that load in are laid out like the ones already on the page.
+        var layout = $button.attr('data-layout') || 'list';
+        var image = $button.attr('data-image') || '1';
+        var excerpt = $button.attr('data-excerpt') || '30';
+        var source = $button.attr('data-source') || '1';
         var nextPage = page + 1;
 
         $button.closest('.wpnc-load-more-wrapper').find('.wpnc-load-more-message').remove();
@@ -34,7 +41,11 @@ jQuery(function($) {
                 action: 'wpnc_load_more_news',
                 page: nextPage,
                 limit: limit,
-                category: category
+                category: category,
+                layout: layout,
+                image: image,
+                excerpt: excerpt,
+                source: source
             }
         }).done(function(response) {
             if (response && response.success && response.data && response.data.html) {

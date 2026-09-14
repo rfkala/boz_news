@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.25.0
+ * Version: 1.26.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.25.0' );
+define( 'WPNC_VERSION', '1.26.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -40,6 +40,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-seo.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-bulletin.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
@@ -90,10 +91,131 @@ function wpnc_load_textdomain() {
 add_action( 'plugins_loaded', 'wpnc_load_textdomain' );
 
 /**
+ * Register the stylesheet the news list and the block share.
+ *
+ * On init rather than wp_enqueue_scripts: the block editor asks for a block's
+ * style before that hook runs, and a handle it cannot find is dropped without
+ * a word, leaving the editor preview unstyled.
+ */
+function wpnc_register_shared_style() {
+	wp_register_style( 'wpnc-frontend-style', WPNC_PLUGIN_URL . 'assets/frontend.css', array(), wpnc_asset_version( 'assets/frontend.css' ) );
+}
+add_action( 'init', 'wpnc_register_shared_style' );
+
+/**
+ * The news list as a block for the block editor.
+ *
+ * Server-rendered through the same code as the shortcode, so the two cannot
+ * show different lists for the same choices.
+ */
+function wpnc_register_block() {
+	if ( ! function_exists( 'register_block_type' ) ) {
+		return;
+	}
+
+	// A variable rather than an inline array: tools/check_enqueue.py reads the
+	// argument after the first comma past the asset path as the version, and
+	// an inline list of dependencies would put a dependency in that position.
+	$block_deps = array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-server-side-render' );
+
+	wp_register_script( 'wpnc-block', WPNC_PLUGIN_URL . 'assets/block.js', $block_deps, wpnc_asset_version( 'assets/block.js' ), true );
+
+	register_block_type(
+		'boz-news/bulletin',
+		array(
+			'editor_script'   => 'wpnc-block',
+			'style'           => 'wpnc-frontend-style',
+			'render_callback' => array( 'WPNC_Shortcode', 'render_block' ),
+			'attributes'      => array(
+				'limit'    => array(
+					'type'    => 'number',
+					'default' => 10,
+				),
+				'category' => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'layout'   => array(
+					'type'    => 'string',
+					'default' => 'list',
+				),
+				'image'    => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
+				'excerpt'  => array(
+					'type'    => 'number',
+					'default' => 30,
+				),
+				'source'   => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
+			),
+		)
+	);
+}
+add_action( 'init', 'wpnc_register_block', 20 );
+
+/**
+ * Labels and categories for the block, in the editor only.
+ *
+ * Kept off every other page: the category list is a query, and the front end
+ * has no use for it.
+ */
+function wpnc_block_editor_data() {
+	$categories = array(
+		array(
+			'value' => '',
+			'label' => __( 'All categories', 'wp-news-collector' ),
+		),
+	);
+
+	$terms = get_terms(
+		array(
+			'taxonomy'   => 'category',
+			'hide_empty' => false,
+			'number'     => 200,
+			'orderby'    => 'name',
+		)
+	);
+
+	if ( ! is_wp_error( $terms ) ) {
+		foreach ( $terms as $term ) {
+			$categories[] = array(
+				'value' => $term->slug,
+				'label' => $term->name,
+			);
+		}
+	}
+
+	wp_localize_script(
+		'wpnc-block',
+		'wpnc_block',
+		array(
+			'labels'     => array(
+				'title'       => __( 'News bulletin', 'wp-news-collector' ),
+				'description' => __( 'The latest news this site published, with pictures.', 'wp-news-collector' ),
+				'settings'    => __( 'Bulletin settings', 'wp-news-collector' ),
+				'limit'       => __( 'Number of items', 'wp-news-collector' ),
+				'layout'      => __( 'Layout', 'wp-news-collector' ),
+				'list'        => __( 'List', 'wp-news-collector' ),
+				'grid'        => __( 'Grid', 'wp-news-collector' ),
+				'category'    => __( 'Category', 'wp-news-collector' ),
+				'image'       => __( 'Show pictures', 'wp-news-collector' ),
+				'source'      => __( 'Show the source', 'wp-news-collector' ),
+				'excerpt'     => __( 'Summary length (words)', 'wp-news-collector' ),
+			),
+			'categories' => $categories,
+		)
+	);
+}
+add_action( 'enqueue_block_editor_assets', 'wpnc_block_editor_data' );
+
+/**
  * Register shared frontend assets.
  */
 function wpnc_register_frontend_assets() {
-	wp_register_style( 'wpnc-frontend-style', WPNC_PLUGIN_URL . 'assets/frontend.css', array(), wpnc_asset_version( 'assets/frontend.css' ) );
 	wp_register_script( 'wpnc-frontend-script', WPNC_PLUGIN_URL . 'assets/frontend.js', array( 'jquery' ), wpnc_asset_version( 'assets/frontend.js' ), true );
 	wp_localize_script(
 		'wpnc-frontend-script',
