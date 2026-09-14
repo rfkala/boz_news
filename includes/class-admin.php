@@ -1082,8 +1082,13 @@ class WPNC_Admin {
 					title="<?php echo esc_attr( wpnc__( 'Use if a previous fetch got stuck', 'اگر دریافت قبلی گیر کرد استفاده کنید' ) ); ?>">
 					<?php wpnc_e( 'Clear Lock', 'پاک کردن قفل' ); ?>
 				</button>
+				<button type="button" class="button" id="wpnc-diagnose"
+					title="<?php echo esc_attr( wpnc__( 'Test whether this server can reach the outside, and how quickly it is cut off', 'آزمایش اینکه این سرور به بیرون دسترسی دارد یا نه، و چقدر زود قطع می‌شود' ) ); ?>">
+					<?php wpnc_e( 'Connection check', 'بررسی اتصال' ); ?>
+				</button>
 				<span id="wpnc-fetch-status" class="wpnc-inline-status"></span>
 			</p>
+			<div id="wpnc-diagnose-result" class="wpnc-diagnose" hidden></div>
 			<div id="wpnc-fetch-progress" class="wpnc-progress-wrap" style="display:none">
 				<div class="wpnc-progress-bar">
 					<div class="wpnc-progress-fill"></div>

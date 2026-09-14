@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.19.0
+ * Version: 1.20.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.19.0' );
+define( 'WPNC_VERSION', '1.20.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -33,6 +33,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-image-service.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
@@ -364,6 +365,13 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dismiss'                => 'Dismiss',
 				'go_to_tools'            => 'Fetch now',
 				'clear_search'           => 'Clear the search',
+				'diagnose_running' => 'Testing outbound requests. This can take up to a minute.',
+				'diagnose_answered' => 'answered',
+				'diagnose_failed' => 'no answer',
+				'diagnose_allowed' => 'Allowed per request',
+				'diagnose_ai_timeout' => 'Assistant timeout',
+				'diagnose_php_limit' => 'PHP time limit',
+				'diagnose_none' => 'none',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -506,6 +514,13 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'dismiss'                => 'بستن',
 				'go_to_tools'            => 'دریافت فوری',
 				'clear_search'           => 'پاک کردن جستجو',
+				'diagnose_running' => 'در حال آزمایش درخواست‌های خروجی. ممکن است تا یک دقیقه طول بکشد.',
+				'diagnose_answered' => 'پاسخ داد',
+				'diagnose_failed' => 'بدون پاسخ',
+				'diagnose_allowed' => 'مجاز برای هر درخواست',
+				'diagnose_ai_timeout' => 'زمان‌انتظار دستیار',
+				'diagnose_php_limit' => 'محدودیت زمانی PHP',
+				'diagnose_none' => 'ندارد',
 			),
 		)
 	);

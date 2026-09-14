@@ -55,6 +55,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_get_sources_list', array( $this, 'get_sources_list' ) );
 		add_action( 'wp_ajax_wpnc_fetch_one_source', array( $this, 'fetch_one_source' ) );
 		add_action( 'wp_ajax_wpnc_clear_fetch_lock', array( $this, 'clear_fetch_lock' ) );
+		add_action( 'wp_ajax_wpnc_diagnose_network', array( $this, 'diagnose_network' ) );
 		add_action( 'wp_ajax_wpnc_fetch_finalize', array( $this, 'fetch_finalize' ) );
 		add_action( 'wp_ajax_wpnc_load_more_news', array( $this, 'load_more_news' ) );
 		add_action( 'wp_ajax_nopriv_wpnc_load_more_news', array( $this, 'load_more_news' ) );
@@ -1158,6 +1159,36 @@ class WPNC_Ajax {
 		$fetcher = new WPNC_Fetcher();
 
 		wp_send_json_success( $fetcher->fetch_single_source( $index ) );
+	}
+
+	/**
+	 * Test outbound requests from this server and report what happened.
+	 *
+	 * The plugin can tell an editor that something is cutting its requests
+	 * short, but it has been saying so on the evidence of one failed request.
+	 * This is the experiment behind the claim.
+	 */
+	public function diagnose_network() {
+		$this->check_admin_request();
+
+		// Three probes, each allowed thirty seconds.
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 180 );
+
+		$report = WPNC_Diagnostics::run();
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_INFO,
+			sprintf(
+				/* translators: %s: verdict code */
+				wpnc__( 'Connection check ran: %s', 'بررسی اتصال اجرا شد: %s' ),
+				$report['verdict']['code']
+			),
+			$report,
+			'diagnostics'
+		);
+
+		wp_send_json_success( $report );
 	}
 
 	/**

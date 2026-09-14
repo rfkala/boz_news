@@ -234,6 +234,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-providers.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-keys.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';

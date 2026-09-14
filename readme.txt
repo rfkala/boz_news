@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.19.0
+Stable tag: 1.20.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -140,6 +140,25 @@ Base URL sits under Settings, in the AI Assistant section, per provider. Only
 the address changes - the request format, the key rotation and the editor all
 behave the same.
 
+= The assistant says this server is cutting requests short. Is that true? =
+
+Open Logs & Tools and press Connection check. It asks three addresses for an
+answer, gives each thirty seconds, and reports how long each actually took:
+the AI endpoint you have configured, WordPress.org, and your own site.
+
+* More than one address cut off well before thirty seconds - a limit on this
+  server, not the provider. Ask the host what caps outbound HTTP requests; a
+  security plugin or a proxy can do it too.
+* Only the AI endpoint failing, while WordPress.org answered - that address
+  is unreachable from here. Set a Base URL that answers, or pick another
+  provider.
+* Everything answered - outbound requests are fine, and an action that still
+  times out is one whose answer genuinely takes that long. The actions that
+  rebuild the whole article are the slowest; Suggest titles is the fastest.
+
+The check writes its result to the log, so it can be compared with a later
+run.
+
 = AI requests hang for 30 seconds and then time out. Is the provider down? =
 
 Check IPv6 before concluding anything about the provider. If the server
@@ -237,6 +256,15 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.20.0 =
+* Added: Connection check, under Logs & Tools. The plugin could already tell
+  you that something was cutting its requests short, but only ever on the
+  evidence of one failed request. This runs the experiment - three addresses,
+  thirty seconds each, timed - and reports what happened, so a limit on the
+  server can be told apart from an endpoint that is unreachable and from an
+  answer that is simply slow.
+
 
 = 1.19.0 =
 * Fixed: two long addresses from the same section could collide and the

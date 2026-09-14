@@ -2313,3 +2313,86 @@ a.wpnc-chip:hover {
 @media screen and (max-width: 782px) {
     .wpnc-featured-body { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ============================================================
+   Connection check
+   ============================================================ */
+
+.wpnc-diagnose {
+    margin: 12px 0 0;
+    padding: 14px 16px;
+    border: 1px solid var(--wpnc-line);
+    border-radius: var(--wpnc-r);
+    background: var(--wpnc-surface-2);
+}
+
+.wpnc-diagnose-running {
+    margin: 0;
+    font-size: 13px;
+    color: var(--wpnc-ink-3);
+}
+
+.wpnc-diagnose-verdict {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.8;
+    color: var(--wpnc-ink);
+}
+
+.wpnc-diagnose-verdict.is-capped,
+.wpnc-diagnose-verdict.is-no_outbound { color: var(--wpnc-danger); }
+.wpnc-diagnose-verdict.is-endpoint_blocked { color: var(--wpnc-warn, var(--wpnc-danger)); }
+.wpnc-diagnose-verdict.is-healthy { color: var(--wpnc-ok); }
+
+.wpnc-diagnose-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--wpnc-line-soft);
+}
+
+.wpnc-diagnose-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--wpnc-line-soft);
+    font-size: 12.5px;
+}
+
+.wpnc-diagnose-label {
+    flex: 0 0 auto;
+    min-width: 180px;
+    font-weight: 600;
+    color: var(--wpnc-ink-2);
+}
+
+.wpnc-diagnose-detail {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--wpnc-ink-3);
+    word-break: break-word;
+}
+
+.wpnc-diagnose-list li.is-error .wpnc-diagnose-detail { color: var(--wpnc-danger); }
+.wpnc-diagnose-list li.is-ok .wpnc-diagnose-detail { color: var(--wpnc-ok); }
+
+.wpnc-diagnose-elapsed {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--wpnc-ink-4);
+}
+
+.wpnc-diagnose-meta {
+    margin: 10px 0 0;
+    font-size: 12px;
+    color: var(--wpnc-ink-4);
+}
+
+@media screen and (max-width: 782px) {
+    .wpnc-diagnose-list li { flex-direction: column; gap: 2px; }
+    .wpnc-diagnose-label { min-width: 0; }
+}

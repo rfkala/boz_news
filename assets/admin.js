@@ -1704,6 +1704,87 @@ jQuery(function($) {
        Fetch tool
        ========================================================== */
 
+    /**
+     * Connection check: run the probes and show what each address did.
+     *
+     * The panel already tells an editor that something is cutting requests
+     * short. This is the evidence for it, gathered from the server rather
+     * than inferred from one failure.
+     */
+    function bindDiagnostics() {
+        var $button = $('#wpnc-diagnose');
+        var $panel = $('#wpnc-diagnose-result');
+
+        if (!$button.length || $button.data('wpncBound')) {
+            return;
+        }
+
+        $button.data('wpncBound', true);
+
+        $button.on('click', function() {
+            setBusy($button, true);
+            $panel.prop('hidden', false).empty().append(
+                $('<p>').addClass('wpnc-diagnose-running').attr('dir', 'auto')
+                    .text(t('diagnose_running', 'Testing outbound requests. This can take up to a minute.'))
+            );
+
+            request('wpnc_diagnose_network')
+                .done(function(data) {
+                    renderDiagnostics($panel, data);
+                })
+                .fail(function(error) {
+                    $panel.empty().append(
+                        $('<p>').addClass('wpnc-status-error').attr('dir', 'auto').text(error.message)
+                    );
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+    }
+
+    function renderDiagnostics($panel, data) {
+        $panel.empty();
+
+        if (!data) {
+            return;
+        }
+
+        var verdict = data.verdict || {};
+
+        $('<p>')
+            .addClass('wpnc-diagnose-verdict is-' + (verdict.code || 'unknown'))
+            .attr('dir', 'auto')
+            .text(verdict.message || '')
+            .appendTo($panel);
+
+        var $list = $('<ul>').addClass('wpnc-diagnose-list').appendTo($panel);
+
+        $.each(data.probes || [], function(index, probe) {
+            var detail = probe.ok
+                ? t('diagnose_answered', 'answered') + ' (HTTP ' + probe.status + ')'
+                : (probe.error || t('diagnose_failed', 'no answer'));
+
+            $('<li>')
+                .addClass(probe.ok ? 'is-ok' : 'is-error')
+                .attr('dir', 'auto')
+                .append($('<span>').addClass('wpnc-diagnose-label').text(probe.label))
+                .append($('<span>').addClass('wpnc-diagnose-detail').text(detail))
+                .append($('<span>').addClass('wpnc-diagnose-elapsed').text(probe.elapsed + 's'))
+                .appendTo($list);
+        });
+
+        $('<p>')
+            .addClass('wpnc-diagnose-meta')
+            .attr('dir', 'auto')
+            .text(
+                t('diagnose_allowed', 'Allowed per request') + ': ' + data.asked + 's' +
+                '  ·  ' + t('diagnose_ai_timeout', 'Assistant timeout') + ': ' + data.ai_timeout + 's' +
+                '  ·  ' + t('diagnose_php_limit', 'PHP time limit') + ': ' + (data.php_limit || t('diagnose_none', 'none'))
+            )
+            .appendTo($panel);
+    }
+
     function bindFetchTool(opts) {
         opts = opts || {};
 
@@ -1768,6 +1849,8 @@ jQuery(function($) {
                     setBusy($self, false);
                 });
         });
+
+        bindDiagnostics();
 
         $btn.on('click', function() {
             setBusy($btn, true);
