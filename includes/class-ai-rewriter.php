@@ -649,14 +649,20 @@ class WPNC_AI_Rewriter {
 		// Saying so is the whole value here: raising a setting that is
 		// already being ignored is the obvious next move and a dead end.
 		if ( $waited > 0 && $waited < ( $asked * 0.8 ) ) {
+			// Deliberately two possibilities rather than one. This used to
+			// name a server-side cap outright, and a single failed request
+			// does not distinguish that from an address that never answers -
+			// which is what it turned out to be. Connection check tells them
+			// apart by asking several addresses instead of one.
 			return new WP_Error(
 				'wpnc_ai_timeout_capped',
 				sprintf(
-					/* translators: 1: seconds waited, 2: seconds requested */
+					/* translators: 1: provider name, 2: seconds waited, 3: seconds requested */
 					wpnc__(
-						'The request was cut off after %1$ss even though %2$ss was allowed, so something on this server is capping outbound requests - a host limit, a proxy or a security plugin. Raising the plugin timeout will not help until that cap is lifted.',
-						'درخواست پس از %1$s ثانیه قطع شد، در حالی که %2$s ثانیه مجاز بود؛ یعنی چیزی روی این سرور درخواست‌های خروجی را محدود می‌کند - محدودیت هاست، یک پراکسی، یا افزونه‌ای امنیتی. تا وقتی آن محدودیت برداشته نشود، افزایش زمان‌انتظار افزونه کمکی نمی‌کند.'
+						'%1$s sent nothing back and the request stopped after %2$ss, though %3$ss was allowed. Either that address does not answer from this server, or something here is cutting outbound requests short. Run Connection check under Logs & Tools to see which.',
+						'%1$s هیچ پاسخی نفرستاد و درخواست پس از %2$s ثانیه متوقف شد، در حالی که %3$s ثانیه مجاز بود. یا آن آدرس از این سرور پاسخ نمی‌دهد، یا چیزی اینجا درخواست‌های خروجی را کوتاه می‌کند. برای تشخیص، در «لاگ‌ها و ابزارها» دکمهٔ «بررسی اتصال» را بزنید.'
 					),
+					$label,
 					round( $waited, 1 ),
 					$asked
 				)

@@ -1089,6 +1089,17 @@ class WPNC_Admin {
 				<span id="wpnc-fetch-status" class="wpnc-inline-status"></span>
 			</p>
 			<div id="wpnc-diagnose-result" class="wpnc-diagnose" hidden></div>
+			<p class="wpnc-fetch-actions">
+				<label for="wpnc-probe-url" class="wpnc-probe-label">
+					<?php wpnc_e( 'Which AI addresses answer from this server?', 'کدام آدرس‌های هوش مصنوعی از این سرور پاسخ می‌دهند؟' ); ?>
+				</label>
+				<input type="url" id="wpnc-probe-url" class="regular-text" dir="ltr"
+					placeholder="<?php echo esc_attr( wpnc__( 'Optional: an address to test as well', 'اختیاری: آدرسی که می‌خواهید آن هم آزمایش شود' ) ); ?>" />
+				<button type="button" class="button" id="wpnc-probe-endpoints">
+					<?php wpnc_e( 'Check addresses', 'بررسی آدرس‌ها' ); ?>
+				</button>
+			</p>
+			<div id="wpnc-probe-result" class="wpnc-diagnose" hidden></div>
 			<div id="wpnc-fetch-progress" class="wpnc-progress-wrap" style="display:none">
 				<div class="wpnc-progress-bar">
 					<div class="wpnc-progress-fill"></div>

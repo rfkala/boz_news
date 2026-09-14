@@ -84,18 +84,19 @@ class WPNC_Diagnostics {
 	 * A GET with no credentials is enough: any HTTP status at all proves the
 	 * address answered, and what it answered is beside the point here.
 	 *
-	 * @param string $key   Probe key.
-	 * @param string $label Human label.
-	 * @param string $url   URL to request.
+	 * @param string $key     Probe key.
+	 * @param string $label   Human label.
+	 * @param string $url     URL to request.
+	 * @param int    $timeout Seconds to allow.
 	 * @return array
 	 */
-	private static function probe( $key, $label, $url ) {
+	private static function probe( $key, $label, $url, $timeout = self::PROBE_TIMEOUT ) {
 		$started = microtime( true );
 
 		$response = wp_remote_get(
 			$url,
 			array(
-				'timeout'     => self::PROBE_TIMEOUT,
+				'timeout'     => max( 1, absint( $timeout ) ),
 				'redirection' => 2,
 				'sslverify'   => true,
 			)
@@ -127,6 +128,133 @@ class WPNC_Diagnostics {
 			'timed_out' => false,
 			'error'     => '',
 			'elapsed'   => $elapsed,
+		);
+	}
+
+	/**
+	 * How long each address in a sweep is given.
+	 *
+	 * Shorter than a single check on purpose: an address that works answers a
+	 * bare GET in well under a second, so this only has to separate "answers"
+	 * from "does not", and a dozen of them still has to finish inside the
+	 * page.
+	 */
+	const SWEEP_TIMEOUT = 8;
+
+	/**
+	 * Addresses worth trying when the configured one does not answer.
+	 *
+	 * Every provider the plugin knows, plus the hosts that are documented
+	 * alternates of one another - a service reachable under one address and
+	 * not the other is the situation this exists for.
+	 *
+	 * @param string $extra An address the admin wants tested too.
+	 * @return array of { label, url }
+	 */
+	public static function candidates( $extra = '' ) {
+		$out  = array();
+		$seen = array();
+
+		$add = function ( $label, $url ) use ( &$out, &$seen ) {
+			$url = trim( (string) $url );
+
+			if ( '' === $url || isset( $seen[ $url ] ) ) {
+				return;
+			}
+
+			$seen[ $url ] = true;
+			$out[]        = array(
+				'label' => $label,
+				'url'   => $url,
+			);
+		};
+
+		$extra = trim( (string) $extra );
+
+		if ( '' !== $extra ) {
+			$add(
+				wpnc__( 'The address you entered', 'آدرسی که وارد کردید' ),
+				WPNC_AI_Providers::endpoint( 'custom', $extra, 'test-model' )
+			);
+		}
+
+		foreach ( WPNC_AI_Providers::all() as $slug => $provider ) {
+			$base = WPNC_AI_Rewriter::base_url( $slug );
+			$url  = WPNC_AI_Providers::endpoint( $slug, $base, 'test-model' );
+
+			if ( '' !== $url ) {
+				$add( $provider['label'], $url );
+			}
+
+			// The provider's own address as well, when a Base URL is standing
+			// in front of it: knowing which of the two answers is the point.
+			if ( '' !== $base ) {
+				$direct = WPNC_AI_Providers::endpoint( $slug, '', 'test-model' );
+
+				if ( '' !== $direct ) {
+					$add(
+						sprintf(
+							/* translators: %s: provider name */
+							wpnc__( '%s, direct', '%s، مستقیم' ),
+							$provider['label']
+						),
+						$direct
+					);
+				}
+			}
+		}
+
+		// GapGPT documents api.gapgpt.app and serves the same API from
+		// api.gapapi.com. Which of them answers depends on where the server
+		// is, so both are offered rather than assumed.
+		$add( 'GapGPT (api.gapgpt.app)', 'https://api.gapgpt.app/v1/chat/completions' );
+		$add( 'GapGPT (api.gapapi.com)', 'https://api.gapapi.com/v1/chat/completions' );
+
+		return $out;
+	}
+
+	/**
+	 * Ask each candidate whether it answers from this server.
+	 *
+	 * @param string $extra An address the admin wants tested too.
+	 * @return array
+	 */
+	public static function sweep( $extra = '' ) {
+		$rows    = array();
+		$working = array();
+
+		foreach ( self::candidates( $extra ) as $index => $candidate ) {
+			$probe = self::probe( 'sweep-' . $index, $candidate['label'], $candidate['url'], self::SWEEP_TIMEOUT );
+
+			// Any HTTP status at all means the address answered. A bare GET
+			// with no key is meant to be refused; being refused is the proof.
+			if ( $probe['ok'] ) {
+				$working[] = $candidate['label'];
+			}
+
+			$rows[] = $probe;
+		}
+
+		return array(
+			'asked'   => self::SWEEP_TIMEOUT,
+			'probes'  => $rows,
+			'working' => $working,
+			'verdict' => array(
+				'code'    => empty( $working ) ? 'none_reachable' : 'some_reachable',
+				'message' => empty( $working )
+					? wpnc__(
+						'None of these answered from this server. If Connection check showed the internet working otherwise, an address that answers from here is what is missing - a gateway, a reseller, or a model running on the server itself.',
+						'هیچ‌کدام از این آدرس‌ها از این سرور پاسخ ندادند. اگر «بررسی اتصال» نشان داده که اینترنت سرور سالم است، چیزی که کم است آدرسی است که از اینجا جواب بدهد - یک درگاه واسط، یک فروشندهٔ داخلی، یا مدلی که روی خود سرور اجرا می‌شود.'
+					)
+					: sprintf(
+						/* translators: %s: comma separated list of addresses that answered */
+						wpnc__(
+							'These answered from this server: %s. Put one of them in Base URL under Settings, with a key that works there.',
+							'این‌ها از این سرور پاسخ دادند: %s. یکی از آن‌ها را در تنظیمات در Base URL بگذارید، با کلیدی که روی همان کار می‌کند.'
+						),
+						implode( wpnc__( ', ', '، ' ), $working )
+					),
+			),
 		);
 	}
 

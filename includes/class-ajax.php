@@ -56,6 +56,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_fetch_one_source', array( $this, 'fetch_one_source' ) );
 		add_action( 'wp_ajax_wpnc_clear_fetch_lock', array( $this, 'clear_fetch_lock' ) );
 		add_action( 'wp_ajax_wpnc_diagnose_network', array( $this, 'diagnose_network' ) );
+		add_action( 'wp_ajax_wpnc_probe_endpoints', array( $this, 'probe_endpoints' ) );
 		add_action( 'wp_ajax_wpnc_fetch_finalize', array( $this, 'fetch_finalize' ) );
 		add_action( 'wp_ajax_wpnc_load_more_news', array( $this, 'load_more_news' ) );
 		add_action( 'wp_ajax_nopriv_wpnc_load_more_news', array( $this, 'load_more_news' ) );
@@ -1183,6 +1184,45 @@ class WPNC_Ajax {
 				/* translators: %s: verdict code */
 				wpnc__( 'Connection check ran: %s', 'بررسی اتصال اجرا شد: %s' ),
 				$report['verdict']['code']
+			),
+			$report,
+			'diagnostics'
+		);
+
+		wp_send_json_success( $report );
+	}
+
+	/**
+	 * Ask every candidate AI address whether it answers from this server.
+	 *
+	 * "Choose another provider" is advice nobody can act on without knowing
+	 * which ones work from where they are. This answers that.
+	 */
+	public function probe_endpoints() {
+		$this->check_admin_request();
+
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 180 );
+
+		$extra = isset( $_POST['url'] ) ? esc_url_raw( trim( (string) wp_unslash( $_POST['url'] ) ) ) : '';
+
+		if ( isset( $_POST['url'] ) && '' !== trim( (string) wp_unslash( $_POST['url'] ) ) && '' === $extra ) {
+			$this->fail(
+				wpnc__( 'That is not a valid address.', 'آن آدرس معتبر نیست.' ),
+				'wpnc_bad_url',
+				array( 'field' => 'url' ),
+				422
+			);
+		}
+
+		$report = WPNC_Diagnostics::sweep( $extra );
+
+		$this->logger->log(
+			WPNC_Logger::LEVEL_INFO,
+			sprintf(
+				/* translators: %d: how many addresses answered */
+				wpnc__( 'Address check ran: %d answered.', 'بررسی آدرس‌ها اجرا شد: %d آدرس پاسخ داد.' ),
+				count( $report['working'] )
 			),
 			$report,
 			'diagnostics'

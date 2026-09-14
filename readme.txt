@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.20.0
+Stable tag: 1.21.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -159,6 +159,11 @@ the AI endpoint you have configured, WordPress.org, and your own site.
 The check writes its result to the log, so it can be compared with a later
 run.
 
+Next to it, Check addresses asks every AI address the plugin knows - and any
+address you type - whether it answers from this server, and lists the ones
+that do. Put one of those in Base URL under Settings, with a key that works
+there.
+
 = AI requests hang for 30 seconds and then time out. Is the provider down? =
 
 Check IPv6 before concluding anything about the provider. If the server
@@ -256,6 +261,18 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.21.0 =
+* Added: Check addresses, under Logs & Tools. It asks every AI address the
+  plugin knows - plus one you type - whether it answers from this server, and
+  names the ones that do. "Choose another provider" is not advice anyone can
+  act on without that list.
+* Fixed: a single timed-out request was reported as proof that the server caps
+  outbound requests. It is equally consistent with an address that does not
+  answer from there, which is what it turned out to be on the install that
+  prompted the message. It now names both possibilities and points at
+  Connection check, which can tell them apart.
+
 
 = 1.20.0 =
 * Added: Connection check, under Logs & Tools. The plugin could already tell

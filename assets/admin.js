@@ -1741,6 +1741,46 @@ jQuery(function($) {
                     setBusy($button, false);
                 });
         });
+
+        bindEndpointProbe();
+    }
+
+    /**
+     * Which AI addresses answer from this server.
+     *
+     * "Choose another provider" is not advice anybody can act on without
+     * this: the addresses that work depend on where the server sits.
+     */
+    function bindEndpointProbe() {
+        var $button = $('#wpnc-probe-endpoints');
+        var $panel = $('#wpnc-probe-result');
+
+        if (!$button.length || $button.data('wpncBound')) {
+            return;
+        }
+
+        $button.data('wpncBound', true);
+
+        $button.on('click', function() {
+            setBusy($button, true);
+            $panel.prop('hidden', false).empty().append(
+                $('<p>').addClass('wpnc-diagnose-running').attr('dir', 'auto')
+                    .text(t('probe_running', 'Asking each address whether it answers. This can take a minute.'))
+            );
+
+            request('wpnc_probe_endpoints', { url: $.trim($('#wpnc-probe-url').val() || '') })
+                .done(function(data) {
+                    renderDiagnostics($panel, data);
+                })
+                .fail(function(error) {
+                    $panel.empty().append(
+                        $('<p>').addClass('wpnc-status-error').attr('dir', 'auto').text(error.message)
+                    );
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
     }
 
     function renderDiagnostics($panel, data) {
@@ -1773,6 +1813,10 @@ jQuery(function($) {
                 .append($('<span>').addClass('wpnc-diagnose-elapsed').text(probe.elapsed + 's'))
                 .appendTo($list);
         });
+
+        if (!data.ai_timeout) {
+            return;
+        }
 
         $('<p>')
             .addClass('wpnc-diagnose-meta')
