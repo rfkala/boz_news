@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.5.0';
+	const SCHEMA_VERSION = '1.6.0';
 
 	/**
 	 * Columns the queue table must have for the plugin to write to it.
@@ -32,6 +32,7 @@ class WPNC_DB {
 		'category_id',
 		'tags',
 		'publish_options',
+		'link_hash',
 		'post_id',
 		'error_message',
 		'created_at',
@@ -50,12 +51,23 @@ class WPNC_DB {
 	const UPGRADE_LOCK = 'wpnc_upgrading';
 
 	/**
+	 * Option recording that the link_hash migration has finished.
+	 */
+	const LINK_HASH_READY = 'wpnc_link_hash_ready';
+
+	/**
+	 * Event that continues that migration between requests.
+	 */
+	const LINK_HASH_EVENT = 'wpnc_migrate_link_hash_event';
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
 		register_activation_hook( WPNC_PLUGIN_FILE, array( $this, 'activate' ) );
 		register_deactivation_hook( WPNC_PLUGIN_FILE, array( $this, 'deactivate' ) );
 		add_action( 'plugins_loaded', array( $this, 'maybe_upgrade' ), 5 );
+		add_action( self::LINK_HASH_EVENT, array( $this, 'migrate_link_hash' ) );
 	}
 
 	/**
@@ -78,6 +90,7 @@ class WPNC_DB {
 	public function deactivate() {
 		wp_clear_scheduled_hook( 'wpnc_fetch_news_event' );
 		wp_clear_scheduled_hook( 'wpnc_cleanup_news_event' );
+		wp_clear_scheduled_hook( self::LINK_HASH_EVENT );
 
 		// The lock is an option now, so that taking it is atomic. Deactivating
 		// mid-run must clear both it and the transient older builds used, or
@@ -127,6 +140,11 @@ class WPNC_DB {
 			if ( version_compare( $version, '1.3.0', '<' ) ) {
 				$this->migrate_ai_key_to_pool();
 			}
+
+			// Started here and continued in the background. An install with a
+			// large queue cannot have every row rewritten inside whichever
+			// request happened to load the plugin after an update.
+			$this->migrate_link_hash();
 
 			update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
 		} finally {
@@ -235,6 +253,186 @@ class WPNC_DB {
 	}
 
 	/**
+	 * Give every queue row a key derived from its whole address.
+	 *
+	 * Uniqueness used to rest on the first 191 characters of main_link, which
+	 * is all a MySQL index can cover of a column that size. One Persian letter
+	 * costs six of those characters once percent-encoded, so two genuinely
+	 * different articles from the same section could share a prefix - and the
+	 * second was rejected as a duplicate and lost, with nothing to show for it
+	 * but "Failed to insert queue item" in the log.
+	 *
+	 * Runs in bounded passes and reschedules itself, because rewriting every
+	 * row of a long queue does not belong in whichever page load happened to
+	 * follow the update.
+	 *
+	 * @return bool True when the migration is complete.
+	 */
+	public function migrate_link_hash() {
+		global $wpdb;
+
+		if ( get_option( self::LINK_HASH_READY, 0 ) ) {
+			return true;
+		}
+
+		$table = $wpdb->prefix . 'news_queue';
+
+		if ( ! $this->table_exists( $table ) ) {
+			return false;
+		}
+
+		$this->add_missing_queue_columns( $table );
+
+		if ( in_array( 'link_hash', $this->missing_columns( $table, array( 'link_hash' ) ), true ) ) {
+			// Without the column there is nothing to fill; the schema error
+			// option already records why.
+			return false;
+		}
+
+		$deadline = microtime( true ) + WPNC_Settings::time_budget( 20 );
+
+		do {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( "SELECT id, main_link FROM `$table` WHERE link_hash = '' LIMIT 200" );
+			$rows = (array) $rows;
+
+			foreach ( $rows as $row ) {
+				$wpdb->update(
+					$table,
+					array( 'link_hash' => WPNC_Link::storage_hash( $row->main_link ) ),
+					array( 'id' => absint( $row->id ) ),
+					array( '%s' ),
+					array( '%d' )
+				);
+			}
+
+			if ( microtime( true ) >= $deadline && count( $rows ) === 200 ) {
+				// More to do than this request can afford.
+				$this->schedule_link_hash_pass();
+				return false;
+			}
+		} while ( count( $rows ) === 200 );
+
+		$this->finish_link_hash( $table );
+
+		return true;
+	}
+
+	/**
+	 * Ask for another pass at the backfill shortly.
+	 */
+	private function schedule_link_hash_pass() {
+		if ( ! wp_next_scheduled( self::LINK_HASH_EVENT ) ) {
+			wp_schedule_single_event( time() + MINUTE_IN_SECONDS, self::LINK_HASH_EVENT );
+		}
+	}
+
+	/**
+	 * Swap the truncated unique index for one over the whole address.
+	 *
+	 * @param string $table Queue table name.
+	 */
+	private function finish_link_hash( $table ) {
+		global $wpdb;
+
+		// Normalising addresses can map two rows that were distinct as strings
+		// onto one key - the same article under http and https, say. Those
+		// rows are kept and given a key of their own rather than deleted:
+		// removing somebody's queue rows to add an index would be a poor
+		// trade. The oldest keeps the real key, so duplicate detection still
+		// recognises the story.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$wpdb->query(
+			"UPDATE `$table` AS q
+			INNER JOIN (
+				SELECT link_hash, MIN(id) AS keep_id
+				FROM `$table`
+				WHERE link_hash <> ''
+				GROUP BY link_hash
+				HAVING COUNT(*) > 1
+			) AS dupes ON dupes.link_hash = q.link_hash AND q.id <> dupes.keep_id
+			SET q.link_hash = MD5( CONCAT( 'dup:', q.id ) )"
+		);
+
+		if ( $this->index_exists( $table, 'main_link' ) && ! $this->index_is_unique( $table, 'main_link' ) ) {
+			// Already the plain lookup index the new schema wants.
+			$this->add_link_hash_index( $table );
+			return;
+		}
+
+		if ( $this->index_exists( $table, 'main_link' ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( "ALTER TABLE `$table` DROP INDEX `main_link`" );
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( "ALTER TABLE `$table` ADD KEY `main_link` (main_link(191))" );
+		}
+
+		$this->add_link_hash_index( $table );
+	}
+
+	/**
+	 * Add the unique index, once nothing collides on it.
+	 *
+	 * @param string $table Queue table name.
+	 */
+	private function add_link_hash_index( $table ) {
+		global $wpdb;
+
+		if ( ! $this->index_exists( $table, 'link_hash' ) ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			$wpdb->query( "ALTER TABLE `$table` ADD UNIQUE KEY `link_hash` (link_hash)" );
+		}
+
+		if ( $this->index_exists( $table, 'link_hash' ) ) {
+			update_option( self::LINK_HASH_READY, 1, false );
+			return;
+		}
+
+		// The index did not take, so the old guarantee is all there is. Record
+		// it rather than leaving the table half-migrated in silence.
+		update_option( self::HEALTH_OPTION, $table . ': could not add the link_hash index - ' . (string) $wpdb->last_error );
+	}
+
+	/**
+	 * Whether a named index exists on a table.
+	 *
+	 * @param string $table Table name.
+	 * @param string $name  Index name.
+	 * @return bool
+	 */
+	private function index_exists( $table, $name ) {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$found = $wpdb->get_var( $wpdb->prepare( "SHOW INDEX FROM `$table` WHERE Key_name = %s", $name ) );
+
+		return ! empty( $found );
+	}
+
+	/**
+	 * Whether a named index enforces uniqueness.
+	 *
+	 * @param string $table Table name.
+	 * @param string $name  Index name.
+	 * @return bool
+	 */
+	private function index_is_unique( $table, $name ) {
+		global $wpdb;
+
+		// Non_unique is 0 for a unique index and 1 otherwise.
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( "SHOW INDEX FROM `$table` WHERE Key_name = %s", $name ), ARRAY_A );
+
+		foreach ( (array) $rows as $row ) {
+			if ( isset( $row['Non_unique'] ) ) {
+				return 0 === (int) $row['Non_unique'];
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Create or upgrade custom tables.
 	 *
 	 * @return bool True when both tables exist afterwards.
@@ -262,13 +460,15 @@ class WPNC_DB {
 			category_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			tags varchar(255) DEFAULT '' NOT NULL,
 			publish_options text NULL,
+			link_hash char(32) DEFAULT '' NOT NULL,
 			post_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			error_message text NULL,
 			created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
 			updated_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
 			processed_at datetime NULL,
 			PRIMARY KEY  (id),
-			UNIQUE KEY main_link (main_link(191)),
+			UNIQUE KEY link_hash (link_hash),
+			KEY main_link (main_link(191)),
 			KEY guid (guid(191)),
 			KEY status_pub_date (status, pub_date),
 			KEY post_id (post_id),
@@ -376,6 +576,7 @@ class WPNC_DB {
 
 		$added_later = array(
 			'publish_options' => 'text NULL',
+			'link_hash'       => "char(32) DEFAULT '' NOT NULL",
 		);
 
 		$missing = $this->missing_columns( $table, array_keys( $added_later ) );

@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.18.0
+Stable tag: 1.19.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -237,6 +237,32 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.19.0 =
+* Fixed: two long addresses from the same section could collide and the
+  second story was lost. Uniqueness rested on the first 191 characters of the
+  address, which is all an index can cover of a column that size - and one
+  Persian letter costs six of those once encoded. It now rests on a key
+  derived from the whole address. Existing rows are migrated in the
+  background; no queue row is deleted to make room for the new index.
+* Changed: the article page is downloaded once per item instead of twice. The
+  picture and the text were fetched separately, from the same URL.
+* Changed: a feed that publishes the whole article in content:encoded is now
+  read properly. Only the teaser was taken before, which is why the plugin
+  went to the article page to recover text the feed had already sent - and
+  with full-text extraction on, that page is no longer fetched at all when
+  the feed body is already a full article.
+* Fixed: the "Load more news" button stopped working on cached sites. A public
+  read-only endpoint required a nonce, which expires with the cached page and
+  took the button down for every visitor. There is no action to forge here, so
+  the nonce is gone.
+* Changed: unattended rewriting treats the feed as data rather than as
+  instructions. The article now travels in its own fenced message with the
+  instructions in a system turn, and the result may not contain links - the
+  model is handed text with every link already stripped, so any link in the
+  answer is invented, and nobody reads that answer before it is published.
+* Fixed: auto-published rewrites arrived as one unbroken block of text.
+
 
 = 1.18.0 =
 * Fixed: new stories arrived at most twice a day whatever the update interval

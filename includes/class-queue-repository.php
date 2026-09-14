@@ -324,10 +324,14 @@ class WPNC_Queue_Repository {
 			'updated_at'    => $now,
 		);
 
+		// Uniqueness rests on this rather than on a truncated prefix of the
+		// address, which two long Persian URLs from one section could share.
+		$data['link_hash'] = WPNC_Link::storage_hash( $data['main_link'] );
+
 		$inserted = $wpdb->insert(
 			$this->table_name(),
 			$data,
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( ! $inserted ) {
@@ -826,9 +830,17 @@ class WPNC_Queue_Repository {
 		}
 
 		if ( $main_link ) {
-			$queue_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE main_link = %s LIMIT 1", $main_link ) );
-			if ( $queue_id ) {
-				return true;
+			// By key, not by string: indexed, and it recognises the same
+			// article arriving under https, with www, or with a campaign
+			// parameter appended.
+			$hash = WPNC_Link::storage_hash( $main_link );
+
+			if ( '' !== $hash ) {
+				$queue_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE link_hash = %s LIMIT 1", $hash ) );
+
+				if ( $queue_id ) {
+					return true;
+				}
 			}
 
 			$post_id = $wpdb->get_var(

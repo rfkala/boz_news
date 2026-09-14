@@ -45,6 +45,21 @@ class WPNC_Image_Service {
 	const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 
 	/**
+	 * How many article pages are kept in memory at once.
+	 *
+	 * Two: the page being worked on, and one spare so that finishing an item
+	 * and starting the next does not immediately evict it.
+	 */
+	const PAGE_CACHE_SIZE = 2;
+
+	/**
+	 * Article pages already downloaded during this request.
+	 *
+	 * @var array
+	 */
+	private $page_cache = array();
+
+	/**
 	 * @var WPNC_Feed_Reader
 	 */
 	private $feed_reader;
@@ -621,6 +636,16 @@ class WPNC_Image_Service {
 	 * @return string
 	 */
 	private function remote_get_body( $url ) {
+		$key = md5( (string) $url );
+
+		// Importing one item asks this class for the article's picture and
+		// then for its text, and both used to download the same page. On a
+		// run of twenty items that was twenty wasted requests and, on a slow
+		// source, most of the time budget.
+		if ( array_key_exists( $key, $this->page_cache ) ) {
+			return $this->page_cache[ $key ];
+		}
+
 		$timeout = WPNC_Settings::get_timeout();
 
 		$response = wp_remote_get(
@@ -634,11 +659,23 @@ class WPNC_Image_Service {
 			)
 		);
 
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			return '';
+		$body = '';
+
+		if ( ! is_wp_error( $response ) && 200 === wp_remote_retrieve_response_code( $response ) ) {
+			$body = (string) wp_remote_retrieve_body( $response );
 		}
 
-		return (string) wp_remote_retrieve_body( $response );
+		// One instance serves a whole fetch run, so the cache is cleared once
+		// it stops being about the item in hand. A failed fetch is cached too:
+		// a page that did not answer for the picture will not answer for the
+		// text either, and waiting for it twice helps nobody.
+		if ( count( $this->page_cache ) >= self::PAGE_CACHE_SIZE ) {
+			$this->page_cache = array();
+		}
+
+		$this->page_cache[ $key ] = $body;
+
+		return $body;
 	}
 
 	/**

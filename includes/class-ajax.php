@@ -1217,8 +1217,10 @@ class WPNC_Ajax {
 	 * Load more frontend news.
 	 */
 	public function load_more_news() {
-		check_ajax_referer( 'wpnc_frontend_nonce', 'nonce' );
-
+		// No nonce. This reads published posts and nothing else, so there is
+		// no action for a forged request to perform - while a nonce on a page
+		// that a cache serves to everyone expires with the cached copy and
+		// takes the button down for every visitor a day later.
 		$page     = isset( $_POST['page'] ) ? max( 1, absint( wp_unslash( $_POST['page'] ) ) ) : 1;
 		$limit    = isset( $_POST['limit'] ) ? max( 1, min( 50, absint( wp_unslash( $_POST['limit'] ) ) ) ) : 10;
 		$category = isset( $_POST['category'] ) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';

@@ -32,7 +32,6 @@ jQuery(function($) {
             dataType: 'json',
             data: {
                 action: 'wpnc_load_more_news',
-                nonce: wpnc_frontend_ajax.nonce,
                 page: nextPage,
                 limit: limit,
                 category: category

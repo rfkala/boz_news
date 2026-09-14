@@ -8,6 +8,30 @@
 
 use PHPUnit\Framework\TestCase;
 
+/**
+ * The two methods of a SimplePie item that best_body() consults.
+ */
+class WPNC_Fake_Feed_Item {
+
+	private $description;
+	private $content;
+
+	public function __construct( $description, $content ) {
+		$this->description = $description;
+		$this->content     = $content;
+	}
+
+	public function get_description() {
+		return $this->description;
+	}
+
+	public function get_content() {
+		// SimplePie falls back to the description when there is no
+		// content:encoded, and the real thing is mirrored here.
+		return '' !== $this->content ? $this->content : $this->description;
+	}
+}
+
 class FeedSourceTest extends TestCase {
 
 	/**
@@ -150,5 +174,43 @@ class FeedSourceTest extends TestCase {
 		$this->assertCount( 1, $sources );
 		$this->assertFalse( $sources[0]['valid'] );
 		$this->assertSame( 'http://127.0.0.1/feed|3|local', WPNC_Feed_Reader::to_line( $sources[0] ) );
+	}
+
+	public function test_the_full_article_is_taken_over_the_teaser() {
+		// Publishers put the whole article in content:encoded and a teaser in
+		// description. Only the teaser was read, so the plugin downloaded the
+		// article page to recover text the feed had already sent.
+		$item = new WPNC_Fake_Feed_Item(
+			'<p>A short teaser.</p>',
+			'<p>The whole article, which is considerably longer than the teaser above.</p>'
+		);
+
+		$this->assertStringContainsString( 'whole article', WPNC_Feed_Reader::best_body( $item ) );
+	}
+
+	public function test_a_feed_that_puts_the_article_in_description_is_respected() {
+		$item = new WPNC_Fake_Feed_Item(
+			'<p>The whole article, which is considerably longer than the summary.</p>',
+			'<p>Summary.</p>'
+		);
+
+		$this->assertStringContainsString( 'whole article', WPNC_Feed_Reader::best_body( $item ) );
+	}
+
+	public function test_markup_does_not_decide_which_body_is_fuller() {
+		// Compared by visible text: a teaser wrapped in a lot of markup is
+		// still a teaser.
+		$item = new WPNC_Fake_Feed_Item(
+			'<div class="a"><p><strong><em>Teaser.</em></strong></p></div>',
+			'<p>The real article text, longer than the teaser once tags are set aside.</p>'
+		);
+
+		$this->assertStringContainsString( 'real article text', WPNC_Feed_Reader::best_body( $item ) );
+	}
+
+	public function test_an_item_without_content_encoded_still_yields_its_description() {
+		$item = new WPNC_Fake_Feed_Item( '<p>Only a description here.</p>', '' );
+
+		$this->assertSame( '<p>Only a description here.</p>', WPNC_Feed_Reader::best_body( $item ) );
 	}
 }

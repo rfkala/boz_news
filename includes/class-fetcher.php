@@ -424,7 +424,7 @@ class WPNC_Fetcher {
 			);
 		}
 
-		if ( get_option( 'wpnc_extract_full_text', 0 ) ) {
+		if ( get_option( 'wpnc_extract_full_text', 0 ) && $this->needs_full_text( $item['description'] ) ) {
 			$full_text = $this->image_service->extract_full_text( $item['main_link'] );
 
 			if ( ! empty( $full_text ) ) {
@@ -496,6 +496,28 @@ class WPNC_Fetcher {
 		}
 
 		return 'queued';
+	}
+
+	/**
+	 * Whether the article page is worth downloading for its text.
+	 *
+	 * A feed that publishes the whole article in content:encoded has already
+	 * given us what the page would; going and fetching it anyway costs a
+	 * request per item and risks extracting a worse copy than the one in hand.
+	 * Short bodies are still teasers, and those are what the setting is for.
+	 *
+	 * @param string $description Body the feed supplied.
+	 * @return bool
+	 */
+	private function needs_full_text( $description ) {
+		$visible = trim( wp_strip_all_tags( (string) $description ) );
+		$length  = function_exists( 'mb_strlen' ) ? mb_strlen( $visible ) : strlen( $visible );
+
+		/**
+		 * Visible characters above which a feed body counts as the full
+		 * article rather than a teaser.
+		 */
+		return $length < (int) apply_filters( 'wpnc_full_text_threshold', 1500 );
 	}
 
 	/**

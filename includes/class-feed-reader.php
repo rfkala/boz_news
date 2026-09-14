@@ -198,7 +198,7 @@ class WPNC_Feed_Reader {
 				'category_id'  => absint( $source['category_id'] ?? 0 ),
 				'guid'         => $guid,
 				'title'        => sanitize_text_field( $feed_item->get_title() ),
-				'description'  => wp_kses_post( $feed_item->get_description() ),
+				'description'  => wp_kses_post( self::best_body( $feed_item ) ),
 				'main_link'    => $permalink,
 				'pub_date'     => $feed_item->get_date( 'Y-m-d H:i:s' ) ? $feed_item->get_date( 'Y-m-d H:i:s' ) : WPNC_Time::now(),
 				'image_url'    => '',
@@ -211,6 +211,33 @@ class WPNC_Feed_Reader {
 			'url'   => esc_url_raw( $source['url'] ),
 			'items' => $items,
 		);
+	}
+
+	/**
+	 * The fullest version of an item the feed is willing to give.
+	 *
+	 * Many publishers put the whole article in content:encoded and a teaser in
+	 * description. Only the teaser was ever read, so the plugin then went and
+	 * downloaded the article page to recover text the feed had already handed
+	 * it - a request per item, for nothing.
+	 *
+	 * Compared by visible length rather than assumed: a few feeds put the
+	 * summary in content and the full text in description.
+	 *
+	 * @param SimplePie_Item $item Feed item.
+	 * @return string
+	 */
+	public static function best_body( $item ) {
+		$summary = (string) $item->get_description();
+
+		// SimplePie falls back to the description here when there is no
+		// content:encoded, so this is never worse than the old behaviour.
+		$content = method_exists( $item, 'get_content' ) ? (string) $item->get_content() : '';
+
+		$summary_length = strlen( wp_strip_all_tags( $summary ) );
+		$content_length = strlen( wp_strip_all_tags( $content ) );
+
+		return $content_length > $summary_length ? $content : $summary;
 	}
 
 	/**

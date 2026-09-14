@@ -11,6 +11,7 @@ global $wpdb;
 
 wp_clear_scheduled_hook( 'wpnc_fetch_news_event' );
 wp_clear_scheduled_hook( 'wpnc_cleanup_news_event' );
+wp_clear_scheduled_hook( 'wpnc_migrate_link_hash_event' );
 
 delete_transient( 'wpnc_fetch_lock' );
 delete_transient( 'wpnc_admin_notify_lock' );
@@ -58,6 +59,7 @@ $options = array(
 	'wpnc_fetch_lock',
 	'wpnc_schema_version',
 	'wpnc_schema_error',
+	'wpnc_link_hash_ready',
 
 	// Removed in earlier versions; deleted so upgraded sites leave no rows.
 	'wpnc_admin_notify',

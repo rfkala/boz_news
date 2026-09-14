@@ -173,6 +173,30 @@ class WPNC_Link {
 	}
 
 	/**
+	 * The key a row is stored under.
+	 *
+	 * Differs from hash() in one way that matters to a unique index: an
+	 * address too broken to normalise still gets a key of its own, derived
+	 * from the raw text. Returning nothing for those would file every broken
+	 * address under one key, and the second row carrying one would be
+	 * rejected as a duplicate of the first.
+	 *
+	 * @param string $url Raw URL.
+	 * @return string 32 hex characters, or empty only for an empty address.
+	 */
+	public static function storage_hash( $url ) {
+		$hash = self::hash( $url );
+
+		if ( '' !== $hash ) {
+			return $hash;
+		}
+
+		$raw = trim( (string) $url );
+
+		return '' === $raw ? '' : md5( 'raw:' . $raw );
+	}
+
+	/**
 	 * A key for a feed's own item identifier.
 	 *
 	 * A guid is opaque by specification, so it is compared as given rather

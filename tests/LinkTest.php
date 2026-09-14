@@ -111,6 +111,31 @@ class LinkTest extends TestCase {
 		$this->assertNotSame( WPNC_Link::guid_hash( 'ABC' ), WPNC_Link::guid_hash( 'abc' ) );
 	}
 
+	public function test_an_address_too_broken_to_normalise_still_gets_its_own_key() {
+		// This one is a unique index talking. Returning nothing for these
+		// would file every broken address under one key, and the second row
+		// carrying one would be refused as a duplicate of the first.
+		$a = WPNC_Link::storage_hash( 'not a url at all' );
+		$b = WPNC_Link::storage_hash( 'another broken one' );
+
+		$this->assertNotSame( '', $a );
+		$this->assertNotSame( '', $b );
+		$this->assertNotSame( $a, $b );
+		$this->assertSame( 32, strlen( $a ) );
+	}
+
+	public function test_a_usable_address_stores_under_its_normalised_key() {
+		$this->assertSame(
+			WPNC_Link::hash( 'https://example.com/news/1' ),
+			WPNC_Link::storage_hash( 'http://www.example.com/news/1/?utm_source=x' )
+		);
+	}
+
+	public function test_only_a_truly_empty_address_has_no_key() {
+		$this->assertSame( '', WPNC_Link::storage_hash( '' ) );
+		$this->assertSame( '', WPNC_Link::storage_hash( '   ' ) );
+	}
+
 	public function test_a_port_that_matters_is_kept() {
 		$this->assertNotSame(
 			WPNC_Link::hash( 'https://example.com/news' ),
