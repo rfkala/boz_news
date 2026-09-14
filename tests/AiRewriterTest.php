@@ -294,4 +294,9 @@ class AiRewriterTest extends TestCase {
 			'treated as a body, two sentences of caption would replace the whole article'
 		);
 	}
+
+	public function test_seo_is_offered_and_never_replaces_the_article() {
+		$this->assertArrayHasKey( 'seo', WPNC_AI_Rewriter::actions() );
+		$this->assertSame( 'seo', WPNC_AI_Rewriter::action_kind( 'seo' ) );
+	}
 }

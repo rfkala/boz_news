@@ -205,4 +205,23 @@ class PublishOptionsTest extends TestCase {
 
 		$this->assertSame( "First\n\nSecond", WPNC_Publish_Options::decode( $json )['caption'] );
 	}
+
+	public function test_seo_fields_are_held_to_search_result_shape() {
+		$clean = WPNC_Publish_Options::sanitize(
+			array(
+				'seo_description' => '<p>' . str_repeat( 'word ', 100 ) . '</p>',
+				'seo_keyword'     => "  <b>rates</b>\n",
+			)
+		);
+
+		$this->assertLessThanOrEqual( WPNC_SEO::DESCRIPTION_LIMIT, mb_strlen( $clean['seo_description'] ) );
+		$this->assertSame( 'rates', $clean['seo_keyword'] );
+	}
+
+	public function test_empty_seo_fields_are_no_opinion() {
+		$clean = WPNC_Publish_Options::sanitize( array( 'seo_description' => ' ', 'seo_keyword' => '' ) );
+
+		$this->assertArrayNotHasKey( 'seo_description', $clean );
+		$this->assertArrayNotHasKey( 'seo_keyword', $clean );
+	}
 }

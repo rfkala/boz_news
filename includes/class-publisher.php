@@ -140,6 +140,18 @@ class WPNC_Publisher {
 			add_post_meta( $post_id, '_wpnc_source_guid', sanitize_text_field( $item['guid'] ), true );
 		}
 
+		// Written before the post goes public, for the same reason as the
+		// featured image: whatever reads the post on publish should see it.
+		$seo_options = WPNC_Publish_Options::decode( $item['publish_options'] ?? '' );
+		$written     = ! empty( $seo_options['seo_description'] );
+
+		WPNC_SEO::write_meta(
+			$post_id,
+			$written ? $seo_options['seo_description'] : WPNC_SEO::meta_description( $description ),
+			isset( $seo_options['seo_keyword'] ) ? $seo_options['seo_keyword'] : '',
+			$written
+		);
+
 		$image_url = esc_url_raw( $item['image_url'] ?? '' );
 		if ( empty( $image_url ) ) {
 			$image_url = esc_url_raw( get_option( 'wpnc_default_image', '' ) );

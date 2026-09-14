@@ -2599,3 +2599,21 @@ a.wpnc-chip:hover {
     gap: 10px;
     margin: 0;
 }
+
+/* ============================================================
+   SEO fields
+   ============================================================ */
+
+.wpnc-seo-count {
+    display: block;
+    margin-top: 3px;
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+    color: var(--wpnc-ink-4);
+}
+
+.wpnc-seo-count.is-over {
+    color: var(--wpnc-danger);
+}

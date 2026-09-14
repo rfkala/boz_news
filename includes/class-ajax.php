@@ -1016,6 +1016,20 @@ class WPNC_Ajax {
 			);
 		}
 
+		if ( 'seo' === $kind ) {
+			wp_send_json_success(
+				array(
+					'kind'        => 'seo',
+					'description' => WPNC_SEO::meta_description( isset( $result['description'] ) ? $result['description'] : '' ),
+					'keyword'     => WPNC_SEO::clean_keyword( isset( $result['keyword'] ) ? $result['keyword'] : '' ),
+					'message'     => wpnc__(
+						'Description and keyword written under the caption. Read them before saving.',
+						'توضیحات و کلمهٔ کلیدی زیر کپشن نوشته شد. پیش از ذخیره آن‌ها را بخوانید.'
+					),
+				)
+			);
+		}
+
 		// Before the body fall-through below, which would read a content key a
 		// caption does not have and hand the editor an empty article.
 		if ( 'caption' === $kind ) {

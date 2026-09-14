@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.24.0
+Stable tag: 1.25.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -261,6 +261,16 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.25.0 =
+* Added: search metadata for published items. Each item can carry a meta
+  description and a focus keyword, typed or written by Write SEO in the
+  editor's assistant. With Yoast or Rank Math installed they go into that
+  plugin's own fields; without one, the post prints its own description and
+  NewsArticle markup that names the original as its source.
+* Changed: Yoast describes posts this plugin published as NewsArticle rather
+  than as a generic Article.
+
 
 = 1.24.0 =
 * Added: one story from several sources is shown once. A new item joins the

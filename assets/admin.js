@@ -871,6 +871,17 @@ jQuery(function($) {
             .insertAfter($when);
     }
 
+    /* The same limit the server holds the description to. */
+    var SEO_DESCRIPTION_LIMIT = 155;
+
+    function updateSeoCount() {
+        var length = ($('#wpnc-edit-seo-description').val() || '').length;
+
+        $('#wpnc-seo-count')
+            .text(length + ' / ' + SEO_DESCRIPTION_LIMIT)
+            .toggleClass('is-over', length > SEO_DESCRIPTION_LIMIT);
+    }
+
     function publishOptions() {
         return {
             post_type: $('#wpnc-edit-post-type').val() || '',
@@ -880,7 +891,9 @@ jQuery(function($) {
             // Always sent, even empty: an emptied field is how an editor takes
             // a scheduled item back to "publish on approval".
             publish_at_local: $('#wpnc-edit-publish-at').val() || '',
-            caption: $('#wpnc-edit-caption').val() || ''
+            caption: $('#wpnc-edit-caption').val() || '',
+            seo_description: $('#wpnc-edit-seo-description').val() || '',
+            seo_keyword: $('#wpnc-edit-seo-keyword').val() || ''
         };
     }
 
@@ -1541,6 +1554,19 @@ jQuery(function($) {
             .text(t('caption_hint', 'Used for Telegram and Bale. Leave empty to use the opening of the article.'))
             .insertAfter($caption);
 
+        // What a search result shows under the headline. The counter is there
+        // because the limit is the whole point of the field.
+        var $seoDescription = labelledField($left, 'wpnc-edit-seo-description', t('field_seo_description', 'Meta description'),
+            $('<textarea>').attr({ rows: 2, dir: 'auto' }).addClass('large-text'));
+        $('<span>').attr('id', 'wpnc-seo-count').addClass('wpnc-seo-count').insertAfter($seoDescription);
+        $seoDescription.on('input', updateSeoCount);
+
+        var $seoKeyword = labelledField($left, 'wpnc-edit-seo-keyword', t('field_seo_keyword', 'Focus keyword'),
+            $('<input>').attr({ type: 'text', dir: 'auto' }).addClass('large-text'));
+        $('<span>').addClass('wpnc-field-hint').attr('dir', 'auto')
+            .text(t('seo_hint', 'For search engines. Leave the description empty to use the opening of the article. Yoast or Rank Math receive both when installed.'))
+            .insertAfter($seoKeyword);
+
         renderAdvanced($left);
 
         var $actions = $('<p>').addClass('wpnc-modal-actions')
@@ -1603,6 +1629,9 @@ jQuery(function($) {
         $('#wpnc-edit-post-author').val(overrides.post_author ? String(overrides.post_author) : '');
         $('#wpnc-edit-publish-at').val(overrides.publish_at_local || '');
         $('#wpnc-edit-caption').val(overrides.caption || '');
+        $('#wpnc-edit-seo-description').val(overrides.seo_description || '');
+        $('#wpnc-edit-seo-keyword').val(overrides.seo_keyword || '');
+        updateSeoCount();
 
         // Seeded from the row's own column, not just from the overrides: a
         // category can arrive from the source's mapping at fetch time, and
@@ -2098,6 +2127,14 @@ jQuery(function($) {
                 // Into its own field, never the article.
                 if (data.kind === 'caption') {
                     $('#wpnc-edit-caption').val(data.caption || '').trigger('focus');
+                    editorStatus(data.message, 'ok');
+                    return;
+                }
+
+                if (data.kind === 'seo') {
+                    $('#wpnc-edit-seo-description').val(data.description || '').trigger('focus');
+                    $('#wpnc-edit-seo-keyword').val(data.keyword || '');
+                    updateSeoCount();
                     editorStatus(data.message, 'ok');
                     return;
                 }

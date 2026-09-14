@@ -113,6 +113,16 @@ class WPNC_Publish_Options {
 			$clean['caption'] = $caption;
 		}
 
+		$seo_description = isset( $raw['seo_description'] ) ? WPNC_SEO::meta_description( $raw['seo_description'] ) : '';
+		if ( '' !== $seo_description ) {
+			$clean['seo_description'] = $seo_description;
+		}
+
+		$seo_keyword = isset( $raw['seo_keyword'] ) ? WPNC_SEO::clean_keyword( $raw['seo_keyword'] ) : '';
+		if ( '' !== $seo_keyword ) {
+			$clean['seo_keyword'] = $seo_keyword;
+		}
+
 		return $clean;
 	}
 

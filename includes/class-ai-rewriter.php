@@ -103,6 +103,7 @@ class WPNC_AI_Rewriter {
 			'headline'  => wpnc__( 'Suggest titles', 'پیشنهاد عنوان' ),
 			'tags'      => wpnc__( 'Suggest tags', 'پیشنهاد برچسب' ),
 			'caption'   => wpnc__( 'Write caption', 'نوشتن کپشن' ),
+			'seo'       => wpnc__( 'Write SEO', 'نوشتن سئو' ),
 		);
 	}
 
@@ -128,6 +129,7 @@ class WPNC_AI_Rewriter {
 			'headline'  => 'Suggest five alternative headlines for this article, as an unordered list. Output only the list.',
 			'tags'      => 'Extract up to eight short topical tags for this article. Output only a comma separated list, nothing else.',
 			'caption'   => 'Write a short summary of this article for a post in a Telegram or Bale channel: two or three sentences telling a reader what happened and why it matters. Keep every fact, name and number exact, and add nothing that is not in the article.',
+			'seo'       => 'Write search engine metadata for this article: a meta description of at most 155 characters that says what happened, and one focus keyword or short key phrase a reader would actually search for. Keep every fact exact.',
 		);
 
 		$base = isset( $map[ $action ] ) ? $map[ $action ] : $map['rewrite'];
@@ -218,6 +220,8 @@ class WPNC_AI_Rewriter {
 			$system .= ' Return only the tags as a single comma separated line, with no numbering, bullets or commentary.';
 		} elseif ( 'caption' === $kind ) {
 			$system .= ' Return only the summary as plain text, with no title, hashtags, links, emoji, surrounding quotes or commentary.';
+		} elseif ( 'seo' === $kind ) {
+			$system .= ' Return exactly two lines and nothing else: "DESCRIPTION: " followed by the description, then "KEYWORD: " followed by the keyword.';
 		} else {
 			// The tag list is the vocabulary the instruction can be carried
 			// out in: asking for a table is pointless if the model has been
@@ -255,6 +259,27 @@ class WPNC_AI_Rewriter {
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
+		}
+
+		if ( 'seo' === $kind ) {
+			$seo = WPNC_SEO::parse_ai( $result );
+
+			if ( '' === $seo['description'] && '' === $seo['keyword'] ) {
+				return new WP_Error(
+					'wpnc_ai_no_suggestions',
+					wpnc__(
+						'The assistant did not return anything usable. Try again.',
+						'دستیار چیز قابل استفاده‌ای برنگرداند. دوباره تلاش کنید.'
+					)
+				);
+			}
+
+			return array(
+				'kind'        => 'seo',
+				'description' => $seo['description'],
+				'keyword'     => $seo['keyword'],
+				'action'      => $action,
+			);
 		}
 
 		if ( 'caption' === $kind ) {
@@ -320,6 +345,7 @@ class WPNC_AI_Rewriter {
 			// A channel caption is written into its own field. Treated as a
 			// body it would replace the article with two sentences.
 			'caption'  => 'caption',
+			'seo'      => 'seo',
 		);
 
 		return isset( $kinds[ $action ] ) ? $kinds[ $action ] : 'body';

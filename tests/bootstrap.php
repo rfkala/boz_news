@@ -226,8 +226,8 @@ function wp_get_schedules() {
 	);
 }
 
-function wp_json_encode( $data ) {
-	return json_encode( $data );
+function wp_json_encode( $data, $options = 0, $depth = 512 ) {
+	return json_encode( $data, $options, $depth );
 }
 
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
@@ -244,6 +244,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-seo.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';
