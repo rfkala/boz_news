@@ -265,6 +265,69 @@ class WPNC_Settings {
 	 * @param mixed $value Raw value.
 	 * @return string
 	 */
+	/**
+	 * A channel caption template: plain text, line breaks kept.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_caption_template( $value ) {
+		$text = wp_strip_all_tags( (string) $value );
+		$text = trim( (string) preg_replace( "/\r\n|\r/", "\n", $text ) );
+
+		return function_exists( 'mb_substr' ) ? mb_substr( $text, 0, 1000, 'UTF-8' ) : substr( $text, 0, 1000 );
+	}
+
+	/**
+	 * Which service alerts are sent through: a bot, or nothing.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_alert_channel( $value ) {
+		$value = sanitize_key( (string) $value );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		$channel = WPNC_Channels::get( $value );
+
+		return ( ! empty( $channel ) && 'bot' === $channel['kind'] ) ? $value : '';
+	}
+
+	/**
+	 * The administrator's own chat, which must not be a readers' channel.
+	 *
+	 * Alerts are about the plugin, not the news. Pointing them at the channel
+	 * the readers follow would publish "a source is down" to an audience, so
+	 * that one value is refused and the previous one kept.
+	 *
+	 * @param mixed $value Raw value.
+	 * @return string
+	 */
+	public static function sanitize_alert_chat_id( $value ) {
+		$value = self::sanitize_chat_id( $value );
+
+		if ( '' === $value ) {
+			return '';
+		}
+
+		foreach ( WPNC_Channels::all() as $channel ) {
+			if ( 'bot' === $channel['kind'] && $value === trim( (string) get_option( $channel['chat'], '' ) ) ) {
+				self::notify(
+					'wpnc_alert_public_chat',
+					'That is the chat your readers see. Alerts are about the plugin, not the news, so they were not pointed there.',
+					'این همان گفتگویی است که خوانندگان شما می‌بینند. هشدارها دربارهٔ افزونه‌اند نه خبر، پس به آنجا تنظیم نشدند.'
+				);
+
+				return (string) get_option( 'wpnc_alert_chat_id', '' );
+			}
+		}
+
+		return $value;
+	}
+
 	public static function sanitize_chat_id( $value ) {
 		$value = trim( (string) $value );
 

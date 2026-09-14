@@ -102,6 +102,17 @@ class WPNC_Admin {
 		register_setting( 'wpnc_settings_group', 'wpnc_telegram_chat_id', array( 'WPNC_Settings', 'sanitize_chat_id' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_bale_token', array( $this, 'sanitize_bale_token' ) );
 		register_setting( 'wpnc_settings_group', 'wpnc_bale_chat_id', array( 'WPNC_Settings', 'sanitize_chat_id' ) );
+
+		foreach ( WPNC_Channels::all() as $channel_slug => $channel ) {
+			if ( 'bot' !== $channel['kind'] ) {
+				continue;
+			}
+			register_setting( 'wpnc_settings_group', WPNC_Channels::option( $channel_slug, 'caption' ), array( 'WPNC_Settings', 'sanitize_caption_template' ) );
+			register_setting( 'wpnc_settings_group', WPNC_Channels::option( $channel_slug, 'photo' ), array( 'WPNC_Settings', 'sanitize_checkbox' ) );
+		}
+
+		register_setting( 'wpnc_settings_group', 'wpnc_alert_channel', array( 'WPNC_Settings', 'sanitize_alert_channel' ) );
+		register_setting( 'wpnc_settings_group', 'wpnc_alert_chat_id', array( 'WPNC_Settings', 'sanitize_alert_chat_id' ) );
 	}
 
 	public function render_admin_page() {
@@ -857,10 +868,79 @@ class WPNC_Admin {
 								</p>
 							</td>
 						</tr>
+						<?php
+						$photo_option   = WPNC_Channels::option( $channel_slug, 'photo' );
+						$caption_option = WPNC_Channels::option( $channel_slug, 'caption' );
+						?>
+						<tr>
+							<th scope="row"><?php wpnc_e( 'Post format', 'قالب ارسال' ); ?></th>
+							<td>
+								<?php // An unticked box posts nothing, so the hidden zero is what records "off". ?>
+								<input type="hidden" name="<?php echo esc_attr( $photo_option ); ?>" value="0" />
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( $photo_option ); ?>" value="1" <?php checked( (string) get_option( $photo_option, '1' ), '1' ); ?> />
+									<?php wpnc_e( 'Send the featured image with the caption', 'ارسال تصویر شاخص همراه کپشن' ); ?>
+								</label>
+								<p class="description"><?php wpnc_e( 'If the service cannot fetch the picture, the same words go out as a text message instead.', 'اگر سرویس نتواند تصویر را دریافت کند، همان متن به‌صورت پیام متنی ارسال می‌شود.' ); ?></p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row">
+								<label for="<?php echo esc_attr( $caption_option ); ?>"><?php wpnc_e( 'Caption template', 'قالب کپشن' ); ?></label>
+							</th>
+							<td>
+								<textarea id="<?php echo esc_attr( $caption_option ); ?>" name="<?php echo esc_attr( $caption_option ); ?>"
+									rows="5" class="large-text" dir="auto"
+									placeholder="<?php echo esc_attr( WPNC_Messenger::DEFAULT_CAPTION ); ?>"><?php echo esc_textarea( (string) get_option( $caption_option, '' ) ); ?></textarea>
+								<p class="description">
+									<?php wpnc_e( 'Leave empty for the layout shown. Placeholders: {title} {summary} {link} {hashtags} {source}. {summary} is the caption written for the item in the editor, or else the opening of the article; tags become hashtags.', 'برای همان چیدمان نشان‌داده‌شده خالی بگذارید. جای‌نگارها: {title} {summary} {link} {hashtags} {source}. مقدار {summary} کپشنی است که برای خبر در ویرایشگر نوشته شده، وگرنه ابتدای متن خبر؛ برچسب‌ها به هشتگ تبدیل می‌شوند.' ); ?>
+								</p>
+							</td>
+						</tr>
 					</table>
 				</div>
 			<?php endforeach; ?>
 
+			</section>
+
+			<section id="wpnc-set-alerts" class="wpnc-settings-group">
+			<h3 class="wpnc-settings-group-title"><?php wpnc_e( 'Alerts', 'هشدارها' ); ?></h3>
+			<p class="wpnc-settings-group-hint"><?php wpnc_e( 'A message to you, not to your readers, when a source stops responding or comes back, and when every AI key has run out.', 'پیامی به خود شما، نه به خوانندگان: وقتی منبعی از کار می‌افتد یا برمی‌گردد، و وقتی همهٔ کلیدهای هوش مصنوعی تمام شده‌اند.' ); ?></p>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="wpnc_alert_channel"><?php wpnc_e( 'Send alerts through', 'ارسال هشدار از طریق' ); ?></label></th>
+					<td>
+						<select id="wpnc_alert_channel" name="wpnc_alert_channel">
+							<option value=""><?php wpnc_e( 'Off', 'خاموش' ); ?></option>
+							<?php foreach ( WPNC_Channels::all() as $alert_slug => $alert_channel ) : ?>
+								<?php
+								if ( 'bot' !== $alert_channel['kind'] ) {
+									continue;
+								}
+								?>
+								<option value="<?php echo esc_attr( $alert_slug ); ?>" <?php selected( (string) get_option( 'wpnc_alert_channel', '' ), $alert_slug ); ?>>
+									<?php echo esc_html( $alert_channel['label'] ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php wpnc_e( 'Uses the bot token already saved above for that service.', 'از توکن رباتی استفاده می‌کند که بالاتر برای همان سرویس ذخیره شده است.' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="wpnc_alert_chat_id"><?php wpnc_e( 'Your chat ID', 'شناسهٔ گفتگوی شما' ); ?></label></th>
+					<td>
+						<input id="wpnc_alert_chat_id" type="text" name="wpnc_alert_chat_id"
+							value="<?php echo esc_attr( (string) get_option( 'wpnc_alert_chat_id', '' ) ); ?>"
+							class="regular-text" dir="ltr" />
+						<p class="description"><?php wpnc_e( 'Your own chat with the bot, or a private admin group. Never the channel readers follow - these messages are about the plugin, not the news.', 'گفتگوی خودتان با ربات، یا یک گروه خصوصی مدیران. هرگز کانالی که خوانندگان دنبال می‌کنند نباشد - این پیام‌ها دربارهٔ افزونه‌اند، نه خبر.' ); ?></p>
+						<p class="wpnc-channel-actions">
+							<button type="button" class="button" id="wpnc-alert-test"><?php wpnc_e( 'Send a test alert', 'ارسال هشدار آزمایشی' ); ?></button>
+							<span class="wpnc-channel-result" id="wpnc-alert-result" aria-live="polite"></span>
+						</p>
+						<p class="description"><?php wpnc_e( 'Save the page first. The same alert is not repeated more than once every six hours.', 'ابتدا صفحه را ذخیره کنید. یک هشدار یکسان بیش از هر شش ساعت یک بار تکرار نمی‌شود.' ); ?></p>
+					</td>
+				</tr>
+			</table>
 			</section>
 
 			<div class="wpnc-save-bar">

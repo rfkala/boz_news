@@ -787,7 +787,8 @@ jQuery(function($) {
             category_id: $('#wpnc-edit-category').val() || '',
             // Always sent, even empty: an emptied field is how an editor takes
             // a scheduled item back to "publish on approval".
-            publish_at_local: $('#wpnc-edit-publish-at').val() || ''
+            publish_at_local: $('#wpnc-edit-publish-at').val() || '',
+            caption: $('#wpnc-edit-caption').val() || ''
         };
     }
 
@@ -1440,6 +1441,14 @@ jQuery(function($) {
 
         $('<div>').attr('id', 'wpnc-tag-suggestions').addClass('wpnc-suggest').hide().appendTo($left);
 
+        // What Telegram and Bale show under the picture. Written here - by hand
+        // or by the assistant - so it is read before it goes out.
+        var $caption = labelledField($left, 'wpnc-edit-caption', t('field_caption', 'Channel caption'),
+            $('<textarea>').attr({ rows: 3, dir: 'auto' }).addClass('large-text'));
+        $('<span>').addClass('wpnc-field-hint').attr('dir', 'auto')
+            .text(t('caption_hint', 'Used for Telegram and Bale. Leave empty to use the opening of the article.'))
+            .insertAfter($caption);
+
         renderAdvanced($left);
 
         var $actions = $('<p>').addClass('wpnc-modal-actions')
@@ -1501,6 +1510,7 @@ jQuery(function($) {
         $('#wpnc-edit-post-status').val(overrides.post_status || '');
         $('#wpnc-edit-post-author').val(overrides.post_author ? String(overrides.post_author) : '');
         $('#wpnc-edit-publish-at').val(overrides.publish_at_local || '');
+        $('#wpnc-edit-caption').val(overrides.caption || '');
 
         // Seeded from the row's own column, not just from the overrides: a
         // category can arrive from the source's mapping at fetch time, and
@@ -1988,6 +1998,13 @@ jQuery(function($) {
 
                 if (data.kind === 'tags') {
                     renderTagSuggestions(data.suggestions || []);
+                    editorStatus(data.message, 'ok');
+                    return;
+                }
+
+                // Into its own field, never the article.
+                if (data.kind === 'caption') {
+                    $('#wpnc-edit-caption').val(data.caption || '').trigger('focus');
                     editorStatus(data.message, 'ok');
                     return;
                 }
@@ -2983,6 +3000,27 @@ jQuery(function($) {
         if (!$blocks.length) {
             return;
         }
+
+        // A real message to the administrator's chat: the only proof that
+        // alerts will actually be seen.
+        $('#wpnc-alert-test').off('click').on('click', function() {
+            var $button = $(this);
+            var $result = $('#wpnc-alert-result');
+
+            setBusy($button, true);
+            $result.removeClass('wpnc-channel-ok wpnc-channel-bad').text(t('processing', 'Processing...'));
+
+            request('wpnc_test_alert')
+                .done(function(data) {
+                    $result.addClass('wpnc-channel-ok').text((data && data.message) || t('done', 'Done.'));
+                })
+                .fail(function(error) {
+                    $result.addClass('wpnc-channel-bad').text(error.message);
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
 
         $('.wpnc-channel-test').on('click', function() {
             var $button = $(this);

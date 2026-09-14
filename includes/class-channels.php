@@ -56,6 +56,20 @@ class WPNC_Channels {
 	}
 
 	/**
+	 * Name of a per-channel option beyond the credentials.
+	 *
+	 * Derived rather than listed in all(), so a setting added for every bot
+	 * does not have to be spelled out once per service.
+	 *
+	 * @param string $slug Channel slug.
+	 * @param string $name Setting name, e.g. caption.
+	 * @return string
+	 */
+	public static function option( $slug, $name ) {
+		return 'wpnc_' . sanitize_key( $slug ) . '_' . sanitize_key( $name );
+	}
+
+	/**
 	 * Channel slugs, in the order they are offered.
 	 *
 	 * @return array

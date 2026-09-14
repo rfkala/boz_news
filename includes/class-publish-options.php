@@ -108,7 +108,40 @@ class WPNC_Publish_Options {
 			$clean['publish_at'] = $publish_at;
 		}
 
+		$caption = isset( $raw['caption'] ) ? self::clean_caption( $raw['caption'] ) : '';
+		if ( '' !== $caption ) {
+			$clean['caption'] = $caption;
+		}
+
 		return $clean;
+	}
+
+	/**
+	 * The longest caption an item may carry.
+	 *
+	 * Under the photo limit of both services with room left for the title,
+	 * the link and the hashtags around it.
+	 */
+	const CAPTION_LIMIT = 700;
+
+	/**
+	 * A caption written for Telegram and Bale: plain text, line breaks kept.
+	 *
+	 * @param mixed $value Raw caption.
+	 * @return string
+	 */
+	public static function clean_caption( $value ) {
+		$text = wp_strip_all_tags( (string) $value );
+		$text = (string) preg_replace( "/\r\n|\r/", "\n", $text );
+		$text = (string) preg_replace( "/[ \t]+\n/", "\n", $text );
+		$text = (string) preg_replace( "/\n{3,}/", "\n\n", $text );
+		$text = trim( $text );
+
+		$text = function_exists( 'mb_substr' )
+			? mb_substr( $text, 0, self::CAPTION_LIMIT, 'UTF-8' )
+			: substr( $text, 0, self::CAPTION_LIMIT );
+
+		return trim( $text );
 	}
 
 	/**

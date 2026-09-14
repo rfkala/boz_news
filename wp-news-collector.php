@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.22.0
+ * Version: 1.23.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.22.0' );
+define( 'WPNC_VERSION', '1.23.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -36,6 +36,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
@@ -45,6 +46,9 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-shortcode.php';
 // Messages for a post that was scheduled are sent when it goes live, not when
 // it was approved - its link does not work until then.
 add_action( 'future_to_publish', array( 'WPNC_Publisher', 'deliver_deferred' ) );
+
+// The moment the last AI key goes down is when the assistant stops working.
+add_action( 'wpnc_ai_pool_exhausted', array( 'WPNC_Alerts', 'pool_exhausted' ) );
 
 if ( is_admin() ) {
 	require_once WPNC_PLUGIN_DIR . 'includes/class-admin.php';
@@ -401,6 +405,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'publish_at_hint' => 'Leave empty to publish on approval. Telegram and Bale wait until the post is live.',
 				'scheduled_for' => 'Scheduled for',
 				'preview_unconfirmed' => 'Could not confirm with the server',
+				'field_caption' => 'Channel caption',
+				'caption_hint' => 'Used for Telegram and Bale. Leave empty to use the opening of the article.',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -565,6 +571,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'publish_at_hint' => 'خالی بگذارید تا هنگام تأیید منتشر شود. تلگرام و بله تا منتشر شدن پست صبر می‌کنند.',
 				'scheduled_for' => 'زمان‌بندی‌شده برای',
 				'preview_unconfirmed' => 'تأیید با سرور ممکن نشد',
+				'field_caption' => 'کپشن کانال',
+				'caption_hint' => 'برای تلگرام و بله. خالی بگذارید تا ابتدای متن خبر استفاده شود.',
 			),
 		)
 	);

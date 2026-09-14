@@ -197,7 +197,7 @@ class WPNC_Publisher {
 			$channels = self::configured_bots();
 		}
 
-		$this->deliver_or_defer( $post_id, $channels, $title, $item['source_key'] ?? '' );
+		$this->deliver_or_defer( $post_id, $channels, $title, $item['source_key'] ?? '', '', self::message_context( $post_id, $item ) );
 
 		return $post_id;
 	}
@@ -238,7 +238,7 @@ class WPNC_Publisher {
 	 * @param string $source_key Source key, for the log.
 	 * @return array slug => true|string error message.
 	 */
-	public function deliver( $channels, $title, $link, $source_key = '' ) {
+	public function deliver( $channels, $title, $link, $source_key = '', $context = array() ) {
 		$results = array();
 
 		foreach ( (array) $channels as $slug ) {
@@ -246,7 +246,7 @@ class WPNC_Publisher {
 				continue;
 			}
 
-			$result = $this->messenger->send( $slug, $title, $link );
+			$result = $this->messenger->send( $slug, $title, $link, $context );
 
 			if ( is_wp_error( $result ) ) {
 				$results[ $slug ] = $result->get_error_message();
@@ -288,9 +288,10 @@ class WPNC_Publisher {
 	 * @param string $title      Headline.
 	 * @param string $source_key Source key, for the log.
 	 * @param string $fallback   Link to use when there is no post.
+	 * @param array  $context    Caption material; see message_context().
 	 * @return array|null Delivery results, or null when held back.
 	 */
-	public function deliver_or_defer( $post_id, $channels, $title, $source_key = '', $fallback = '' ) {
+	public function deliver_or_defer( $post_id, $channels, $title, $source_key = '', $fallback = '', $context = array() ) {
 		$bots = array_values( array_diff( (array) $channels, array( 'site' ) ) );
 
 		if ( empty( $bots ) ) {
@@ -306,13 +307,16 @@ class WPNC_Publisher {
 				array(
 					'channels'   => $bots,
 					'source_key' => sanitize_key( $source_key ),
+					// Without the picture: by publication time the post has
+					// its own featured image, which is the one to send.
+					'context'    => array_diff_key( (array) $context, array( 'image' => true ) ),
 				)
 			);
 
 			return null;
 		}
 
-		return $this->deliver( $bots, $title, $post ? get_permalink( $post ) : $fallback, $source_key );
+		return $this->deliver( $bots, $title, $post ? get_permalink( $post ) : $fallback, $source_key, $context );
 	}
 
 	/**
@@ -337,12 +341,59 @@ class WPNC_Publisher {
 		// Removed before sending, so a second publish event cannot repeat it.
 		delete_post_meta( $post->ID, self::DEFERRED_META );
 
+		// What was chosen at approval - a caption, the tags - wins; the picture
+		// comes from the post as it stands now.
+		$stored  = isset( $held['context'] ) && is_array( $held['context'] ) ? $held['context'] : array();
+		$context = array_merge( self::message_context( $post->ID ), $stored );
+
 		$publisher = new self();
 		$publisher->deliver(
 			(array) $held['channels'],
 			get_the_title( $post ),
 			get_permalink( $post ),
-			isset( $held['source_key'] ) ? (string) $held['source_key'] : ''
+			isset( $held['source_key'] ) ? (string) $held['source_key'] : '',
+			$context
+		);
+	}
+
+	/**
+	 * What a channel post is made from.
+	 *
+	 * The caption written for the item in the editor when there is one, the
+	 * opening of the article otherwise. The picture is the post's own featured
+	 * image when the post has one - a copy on this site, which the service can
+	 * fetch far more reliably than the original on somebody else's CDN.
+	 *
+	 * @param int          $post_id Post id, or 0 when the site was not a destination.
+	 * @param array|object $item    Queue row, when there is one.
+	 * @return array summary, tags, source, image.
+	 */
+	public static function message_context( $post_id, $item = array() ) {
+		$item    = (array) $item;
+		$options = WPNC_Publish_Options::decode( isset( $item['publish_options'] ) ? $item['publish_options'] : '' );
+		$post    = $post_id ? get_post( $post_id ) : null;
+		$caption = isset( $options['caption'] ) ? (string) $options['caption'] : '';
+		$body    = $post ? (string) $post->post_content : (string) ( isset( $item['description'] ) ? $item['description'] : '' );
+
+		$tags = isset( $item['tags'] ) ? (string) $item['tags'] : '';
+		if ( '' === $tags && $post ) {
+			$names = wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) );
+			$tags  = is_array( $names ) ? implode( ',', $names ) : '';
+		}
+
+		$image = '';
+		if ( $post && has_post_thumbnail( $post ) ) {
+			$image = (string) get_the_post_thumbnail_url( $post, 'large' );
+		}
+		if ( '' === $image && isset( $item['image_url'] ) ) {
+			$image = esc_url_raw( (string) $item['image_url'] );
+		}
+
+		return array(
+			'summary' => '' !== $caption ? $caption : WPNC_Template::excerpt( $body, 45 ),
+			'tags'    => $tags,
+			'source'  => isset( $item['source_name'] ) ? (string) $item['source_name'] : '',
+			'image'   => $image,
 		);
 	}
 

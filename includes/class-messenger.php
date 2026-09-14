@@ -17,6 +17,153 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPNC_Messenger {
 
 	/**
+	 * The layout a channel post takes when no template has been set.
+	 */
+	const DEFAULT_CAPTION = "{title}\n\n{summary}\n\n{link}\n\n{hashtags}";
+
+	/**
+	 * The longest caption either service accepts under a photo.
+	 */
+	const PHOTO_CAPTION_LIMIT = 1024;
+
+	/**
+	 * The longest text message either service accepts.
+	 */
+	const TEXT_LIMIT = 4096;
+
+	/**
+	 * Comma separated tags as hashtags a reader can actually tap.
+	 *
+	 * A hashtag ends at the first space or punctuation mark, so a two-word tag
+	 * posted as-is links only its first word. The zero-width non-joiner that
+	 * Persian spelling puts inside words breaks a hashtag the same way, and so
+	 * does a Persian comma used as the separator.
+	 *
+	 * @param string $tags Comma separated tags.
+	 * @return string Space separated hashtags.
+	 */
+	public static function hashtags( $tags ) {
+		$out = array();
+
+		foreach ( preg_split( '/[,\x{060C}]/u', (string) $tags ) as $tag ) {
+			$tag = trim( wp_strip_all_tags( (string) $tag ) );
+			$tag = preg_replace( '/[\s\x{200C}\x{200D}\-]+/u', '_', $tag );
+			$tag = preg_replace( '/[^\p{L}\p{N}_]+/u', '', (string) $tag );
+			$tag = trim( (string) $tag, '_' );
+
+			// Digits alone are not linked as a hashtag by either service.
+			if ( '' === $tag || preg_match( '/^[\p{N}_]+$/u', $tag ) ) {
+				continue;
+			}
+
+			$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $tag, 'UTF-8' ) : strtolower( $tag );
+
+			if ( ! isset( $out[ $key ] ) ) {
+				$out[ $key ] = '#' . $tag;
+			}
+		}
+
+		return implode( ' ', array_values( $out ) );
+	}
+
+	/**
+	 * A channel post, rendered from its template and held to a length.
+	 *
+	 * The summary gives way first when it is too long, and the link is never
+	 * the part that gets cut: a post whose link was trimmed away sends every
+	 * reader nowhere.
+	 *
+	 * @param string $template Template, or empty for the default layout.
+	 * @param array  $context  title, summary, link, tags, source.
+	 * @param int    $limit    Longest result allowed, in characters.
+	 * @return string
+	 */
+	public static function render_caption( $template, $context, $limit = self::TEXT_LIMIT ) {
+		$template = trim( (string) $template );
+		$template = '' !== $template ? $template : self::DEFAULT_CAPTION;
+		$context  = array_merge(
+			array(
+				'title'   => '',
+				'summary' => '',
+				'link'    => '',
+				'tags'    => '',
+				'source'  => '',
+			),
+			(array) $context
+		);
+
+		$values = array(
+			'title'    => trim( wp_strip_all_tags( (string) $context['title'] ) ),
+			'summary'  => trim( wp_strip_all_tags( (string) $context['summary'] ) ),
+			'link'     => trim( (string) $context['link'] ),
+			'hashtags' => self::hashtags( $context['tags'] ),
+			'source'   => trim( wp_strip_all_tags( (string) $context['source'] ) ),
+		);
+
+		$limit = max( 64, absint( $limit ) );
+		$text  = self::fill( $template, $values );
+		$over  = self::length( $text ) - $limit;
+
+		if ( $over > 0 && '' !== $values['summary'] ) {
+			$keep              = max( 0, self::length( $values['summary'] ) - $over - 1 );
+			$values['summary'] = rtrim( self::cut( $values['summary'], $keep ) ) . '…';
+			$text              = self::fill( $template, $values );
+		}
+
+		if ( self::length( $text ) > $limit ) {
+			// Still too long, which only an enormous headline does. The words
+			// are cut and the link is put back after them.
+			$tail           = '' !== $values['link'] ? "\n\n" . $values['link'] : '';
+			$values['link'] = '';
+			$body           = self::fill( $template, $values );
+			$text           = rtrim( self::cut( $body, $limit - self::length( $tail ) - 1 ) ) . '…' . $tail;
+		}
+
+		return '' === $text ? self::compose( $values['title'], $values['link'] ) : $text;
+	}
+
+	/**
+	 * Substitute the placeholders and tidy what empty ones leave behind.
+	 *
+	 * @param string $template Template.
+	 * @param array  $values   Placeholder values.
+	 * @return string
+	 */
+	private static function fill( $template, $values ) {
+		foreach ( $values as $key => $value ) {
+			$template = str_replace( '{' . $key . '}', (string) $value, $template );
+		}
+
+		$lines = array_map( 'rtrim', preg_split( '/\r\n|\r|\n/', $template ) );
+		$text  = preg_replace( "/\n{3,}/", "\n\n", implode( "\n", $lines ) );
+
+		return trim( (string) $text );
+	}
+
+	/**
+	 * Length in characters, not bytes: a Persian letter is two bytes.
+	 *
+	 * @param string $text Text.
+	 * @return int
+	 */
+	private static function length( $text ) {
+		return function_exists( 'mb_strlen' ) ? mb_strlen( (string) $text, 'UTF-8' ) : strlen( (string) $text );
+	}
+
+	/**
+	 * The first characters of a text, without splitting a letter in two.
+	 *
+	 * @param string $text   Text.
+	 * @param int    $length Characters to keep.
+	 * @return string
+	 */
+	private static function cut( $text, $length ) {
+		$length = max( 0, (int) $length );
+
+		return function_exists( 'mb_substr' ) ? mb_substr( (string) $text, 0, $length, 'UTF-8' ) : substr( (string) $text, 0, $length );
+	}
+
+	/**
 	 * Build the URL for one bot API call.
 	 *
 	 * @param string $slug   Channel slug.
@@ -90,10 +237,72 @@ class WPNC_Messenger {
 	 * @param string $link  Link to include.
 	 * @return true|WP_Error
 	 */
-	public function send( $slug, $title, $link = '' ) {
+	public function send( $slug, $title, $link = '', $context = array() ) {
 		$credentials = WPNC_Channels::credentials( $slug );
 
 		if ( '' === $credentials['token'] || '' === $credentials['chat_id'] ) {
+			return new WP_Error(
+				'wpnc_channel_not_configured',
+				sprintf(
+					/* translators: %s: channel name */
+					wpnc__( '%s has no bot token or chat id set.', 'برای %s توکن ربات یا شناسه گفتگو تنظیم نشده است.' ),
+					self::label( $slug )
+				)
+			);
+		}
+
+		$context  = array_merge( (array) $context, array( 'title' => $title, 'link' => $link ) );
+		$template = (string) get_option( WPNC_Channels::option( $slug, 'caption' ), '' );
+		$image    = isset( $context['image'] ) ? trim( (string) $context['image'] ) : '';
+		$photo_on = '0' !== (string) get_option( WPNC_Channels::option( $slug, 'photo' ), '1' );
+
+		if ( $photo_on && '' !== $image ) {
+			$sent = $this->call(
+				$slug,
+				'sendPhoto',
+				array(
+					'chat_id' => $credentials['chat_id'],
+					'photo'   => $image,
+					'caption' => self::render_caption( $template, $context, self::PHOTO_CAPTION_LIMIT ),
+				)
+			);
+
+			if ( true === $sent ) {
+				return true;
+			}
+
+			// The service fetches the picture itself, and a host it cannot
+			// reach should not cost the reader the news: the same words go out
+			// as a text message instead.
+		}
+
+		return $this->call(
+			$slug,
+			'sendMessage',
+			array(
+				'chat_id'                  => $credentials['chat_id'],
+				'text'                     => self::render_caption( $template, $context, self::TEXT_LIMIT ),
+				'disable_web_page_preview' => false,
+			)
+		);
+	}
+
+	/**
+	 * Send plain text to a chat other than the channel's own.
+	 *
+	 * Used for alerts, which go to the administrator rather than to readers,
+	 * through the same bot.
+	 *
+	 * @param string $slug    Channel slug.
+	 * @param string $text    Message.
+	 * @param string $chat_id Chat to send to.
+	 * @return true|WP_Error
+	 */
+	public function send_text( $slug, $text, $chat_id ) {
+		$credentials = WPNC_Channels::credentials( $slug );
+		$chat_id     = trim( (string) $chat_id );
+
+		if ( '' === $credentials['token'] || '' === $chat_id ) {
 			return new WP_Error(
 				'wpnc_channel_not_configured',
 				sprintf(
@@ -108,9 +317,8 @@ class WPNC_Messenger {
 			$slug,
 			'sendMessage',
 			array(
-				'chat_id'                  => $credentials['chat_id'],
-				'text'                     => self::compose( $title, $link ),
-				'disable_web_page_preview' => false,
+				'chat_id' => $chat_id,
+				'text'    => self::cut( trim( (string) $text ), self::TEXT_LIMIT ),
 			)
 		);
 	}

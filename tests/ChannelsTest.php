@@ -234,4 +234,101 @@ class ChannelsTest extends TestCase {
 
 		$this->assertSame( 'no token here', WPNC_Messenger::redact( 'no token here', '' ) );
 	}
+
+	/* ----------------------------------------------------------------
+	   Channel posts
+	   ---------------------------------------------------------------- */
+
+	public function test_a_two_word_tag_becomes_one_hashtag() {
+		// Posted as-is, a hashtag ends at the space and links only "خبر".
+		$this->assertSame( '#خبر_فوری #اقتصاد_ایران', WPNC_Messenger::hashtags( 'خبر فوری, اقتصاد ایران' ) );
+	}
+
+	public function test_a_persian_comma_separates_tags_too() {
+		$this->assertSame( '#بورس #نفت', WPNC_Messenger::hashtags( 'بورس،نفت' ) );
+	}
+
+	public function test_a_zero_width_non_joiner_does_not_break_a_hashtag() {
+		$this->assertSame( '#می_خواهم', WPNC_Messenger::hashtags( "می\u{200C}خواهم" ) );
+	}
+
+	public function test_punctuation_bare_numbers_and_repeats_are_left_out() {
+		$this->assertSame( '#Iran #Nodejs', WPNC_Messenger::hashtags( 'Iran, iran, 2026, Node.js, !!!' ) );
+		$this->assertSame( '', WPNC_Messenger::hashtags( '' ) );
+	}
+
+	public function test_a_caption_fills_the_template_and_closes_the_gap_an_empty_value_leaves() {
+		$caption = WPNC_Messenger::render_caption(
+			"{title}\n\n{summary}\n\n{link}\n\n{hashtags}",
+			array(
+				'title'   => 'Headline',
+				'summary' => '',
+				'link'    => 'https://example.com/p',
+				'tags'    => 'one',
+			)
+		);
+
+		$this->assertSame( "Headline\n\nhttps://example.com/p\n\n#one", $caption );
+	}
+
+	public function test_an_empty_template_uses_the_default_layout() {
+		$context = array(
+			'title' => 'T',
+			'link'  => 'https://example.com/p',
+		);
+
+		$this->assertSame(
+			WPNC_Messenger::render_caption( WPNC_Messenger::DEFAULT_CAPTION, $context ),
+			WPNC_Messenger::render_caption( '', $context )
+		);
+	}
+
+	public function test_a_long_caption_shortens_the_summary_and_keeps_the_link() {
+		$caption = WPNC_Messenger::render_caption(
+			"{title}\n\n{summary}\n\n{link}",
+			array(
+				'title'   => 'Headline',
+				'summary' => str_repeat( 'word ', 400 ),
+				'link'    => 'https://example.com/p',
+			),
+			200
+		);
+
+		$this->assertLessThanOrEqual( 200, mb_strlen( $caption ) );
+		$this->assertStringStartsWith( 'Headline', $caption );
+		$this->assertStringEndsWith( 'https://example.com/p', $caption, 'a trimmed link sends every reader nowhere' );
+	}
+
+	public function test_even_an_enormous_headline_cannot_push_the_link_out() {
+		$caption = WPNC_Messenger::render_caption(
+			"{title}\n\n{link}",
+			array(
+				'title' => str_repeat( 'خبر ', 300 ),
+				'link'  => 'https://example.com/p',
+			),
+			120
+		);
+
+		$this->assertLessThanOrEqual( 120, mb_strlen( $caption ) );
+		$this->assertStringEndsWith( 'https://example.com/p', $caption );
+	}
+
+	public function test_a_photo_caption_respects_the_shorter_limit() {
+		$caption = WPNC_Messenger::render_caption(
+			'',
+			array(
+				'title'   => 'Headline',
+				'summary' => str_repeat( 'متن خبر ', 500 ),
+				'link'    => 'https://example.com/p',
+			),
+			WPNC_Messenger::PHOTO_CAPTION_LIMIT
+		);
+
+		$this->assertLessThanOrEqual( WPNC_Messenger::PHOTO_CAPTION_LIMIT, mb_strlen( $caption ) );
+	}
+
+	public function test_per_channel_settings_have_their_own_names() {
+		$this->assertSame( 'wpnc_telegram_caption', WPNC_Channels::option( 'telegram', 'caption' ) );
+		$this->assertNotSame( WPNC_Channels::option( 'telegram', 'photo' ), WPNC_Channels::option( 'bale', 'photo' ) );
+	}
 }

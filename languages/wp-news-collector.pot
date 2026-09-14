@@ -7,15 +7,15 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:583
+#: wp-news-collector.php:591
 msgid "Boz News"
 msgstr ""
 
-#: wp-news-collector.php:585
+#: wp-news-collector.php:593
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr ""
 
-#: wp-news-collector.php:98
+#: wp-news-collector.php:102
 msgid "Could not load more news. Please try again."
 msgstr ""
 
@@ -27,20 +27,20 @@ msgstr ""
 msgid "Every 3 Hours"
 msgstr ""
 
-#: wp-news-collector.php:96
+#: wp-news-collector.php:100
 #: includes/class-shortcode.php:75
 msgid "Load More News"
 msgstr ""
 
-#: wp-news-collector.php:95
+#: wp-news-collector.php:99
 msgid "Loading..."
 msgstr ""
 
-#: wp-news-collector.php:97
+#: wp-news-collector.php:101
 msgid "No more news"
 msgstr ""
 
-#: includes/class-ajax.php:1337
+#: includes/class-ajax.php:1394
 msgid "No more posts available."
 msgstr ""
 

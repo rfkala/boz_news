@@ -197,6 +197,10 @@ function add_query_arg( $key, $value, $url ) {
 	return $url . $glue . $key . '=' . $value;
 }
 
+function do_action( $hook, ...$args ) {
+	WPNC_Test_Options::$values['__actions'][] = array( $hook, $args );
+}
+
 function apply_filters( $hook, $value ) {
 	return $value;
 }
@@ -237,6 +241,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-ai-rewriter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';

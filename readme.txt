@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.22.0
+Stable tag: 1.23.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -261,6 +261,21 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.23.0 =
+* Added: Telegram and Bale posts carry the featured image with a caption, laid
+  out by a template per channel using {title} {summary} {link} {hashtags} and
+  {source}. If the service cannot fetch the picture, the same words go out as
+  a text message. Captions are cut to fit - the summary first - and never lose
+  the link.
+* Added: tags become hashtags that can be tapped. A two-word Persian tag, the
+  zero-width non-joiner inside a word and the Persian comma all used to break
+  them.
+* Added: Write caption, in the editor's assistant. It fills a caption field
+  under the tags for you to read and change; nothing is sent unread.
+* Added: alerts to your own chat when a source stops responding or comes back,
+  and when every AI key has run out. The same alert repeats at most every six
+  hours, and a chat your readers follow is refused as the destination.
 
 = 1.22.0 =
 * Changed: the preview appears as you type. Typing in the article body never

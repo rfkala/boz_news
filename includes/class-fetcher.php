@@ -589,6 +589,10 @@ class WPNC_Fetcher {
 		$health = $this->get_source_health();
 		$now    = WPNC_Time::timestamp();
 
+		// It had been paused, so whoever was told it went down should hear that
+		// it came back rather than go on wondering.
+		$was_down = isset( $health[ $source_id ]['fails'] ) && absint( $health[ $source_id ]['fails'] ) >= self::FAIL_THRESHOLD;
+
 		$health[ $source_id ] = array(
 			'url'        => isset( $source['url'] ) ? $source['url'] : '',
 			'fails'      => 0,
@@ -599,6 +603,10 @@ class WPNC_Fetcher {
 		);
 
 		update_option( self::HEALTH_OPTION, $health, false );
+
+		if ( $was_down ) {
+			WPNC_Alerts::source_up( $source_id, isset( $source['url'] ) ? $source['url'] : '' );
+		}
 	}
 
 	/**
@@ -622,6 +630,12 @@ class WPNC_Fetcher {
 		);
 
 		update_option( self::HEALTH_OPTION, $health, false );
+
+		// Exactly at the threshold: the run on which the source is paused. Later
+		// failures are the same outage, already reported.
+		if ( self::FAIL_THRESHOLD === $health[ $source_id ]['fails'] ) {
+			WPNC_Alerts::source_down( $source_id, isset( $source['url'] ) ? $source['url'] : '', sanitize_text_field( $error ) );
+		}
 	}
 
 	/**

@@ -285,4 +285,13 @@ class AiRewriterTest extends TestCase {
 		$this->assertArrayHasKey( 'format', WPNC_AI_Rewriter::actions() );
 		$this->assertSame( 'body', WPNC_AI_Rewriter::action_kind( 'format' ), 'it rewrites the article, so it replaces the body' );
 	}
+
+	public function test_a_caption_is_offered_and_never_replaces_the_article() {
+		$this->assertArrayHasKey( 'caption', WPNC_AI_Rewriter::actions() );
+		$this->assertSame(
+			'caption',
+			WPNC_AI_Rewriter::action_kind( 'caption' ),
+			'treated as a body, two sentences of caption would replace the whole article'
+		);
+	}
 }

@@ -49,6 +49,13 @@ $options = array(
 	'wpnc_bale_token',
 	'wpnc_bale_chat_id',
 	'wpnc_channel_verified',
+	'wpnc_telegram_caption',
+	'wpnc_telegram_photo',
+	'wpnc_bale_caption',
+	'wpnc_bale_photo',
+	'wpnc_alert_channel',
+	'wpnc_alert_chat_id',
+	'wpnc_alert_state',
 
 	// Runtime state.
 	'wpnc_last_run',

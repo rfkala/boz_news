@@ -49,6 +49,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
 		add_action( 'wp_ajax_wpnc_preview_item', array( $this, 'preview_item' ) );
 		add_action( 'wp_ajax_wpnc_test_channel', array( $this, 'test_channel' ) );
+		add_action( 'wp_ajax_wpnc_test_alert', array( $this, 'test_alert' ) );
 		add_action( 'wp_ajax_wpnc_get_dashboard', array( $this, 'get_dashboard' ) );
 		add_action( 'wp_ajax_wpnc_get_stats', array( $this, 'get_stats' ) );
 		add_action( 'wp_ajax_wpnc_get_logs', array( $this, 'get_logs' ) );
@@ -156,7 +157,14 @@ class WPNC_Ajax {
 
 		// Without a post there is no permalink, so readers get the original.
 		// A scheduled post holds its messages until it is public.
-		$sent     = $this->publisher->deliver_or_defer( $post_id, $channels, $item->title, $item->source_key, $item->main_link );
+		$sent     = $this->publisher->deliver_or_defer(
+			$post_id,
+			$channels,
+			$item->title,
+			$item->source_key,
+			$item->main_link,
+			WPNC_Publisher::message_context( $post_id, $item )
+		);
 		$deferred = null === $sent;
 		$failed   = $deferred ? array() : array_keys( array_filter( $sent, 'is_string' ) );
 
@@ -293,6 +301,33 @@ class WPNC_Ajax {
 			array(
 				'message'  => wpnc__( 'Connected. This destination is ready to use.', 'اتصال برقرار شد. این مقصد آماده استفاده است.' ),
 				'channels' => WPNC_Channels::status(),
+			)
+		);
+	}
+
+	/**
+	 * Send a test alert to the administrator's chat.
+	 *
+	 * Sends a real message rather than only checking the chat exists: the
+	 * question an administrator is asking is "will I see these", and only a
+	 * message arriving answers that.
+	 */
+	public function test_alert() {
+		$this->check_admin_request();
+
+		$result = WPNC_Alerts::send(
+			'test',
+			wpnc__( 'Test alert from Boz News. Alerts will reach you here.', 'هشدار آزمایشی از بُز نیوز. هشدارها به همین‌جا می‌رسند.' ),
+			true
+		);
+
+		if ( is_wp_error( $result ) ) {
+			$this->fail( $result->get_error_message(), 'wpnc_alert_failed' );
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => wpnc__( 'Sent. Check the chat you entered.', 'ارسال شد. گفتگویی را که وارد کردید بررسی کنید.' ),
 			)
 		);
 	}
@@ -443,7 +478,14 @@ class WPNC_Ajax {
 			$this->queue->mark_approved( $id, $post_id );
 			$success_count++;
 
-			$this->publisher->deliver_or_defer( $post_id, $channels, $item->title, $item->source_key, $item->main_link );
+			$this->publisher->deliver_or_defer(
+				$post_id,
+				$channels,
+				$item->title,
+				$item->source_key,
+				$item->main_link,
+				WPNC_Publisher::message_context( $post_id, $item )
+			);
 		}
 
 		$message = sprintf(
@@ -937,6 +979,21 @@ class WPNC_Ajax {
 					'kind'        => 'titles',
 					'suggestions' => array_map( 'sanitize_text_field', $result['suggestions'] ),
 					'message'     => wpnc__( 'Pick a headline below.', 'یکی از عنوان‌های زیر را انتخاب کنید.' ),
+				)
+			);
+		}
+
+		// Before the body fall-through below, which would read a content key a
+		// caption does not have and hand the editor an empty article.
+		if ( 'caption' === $kind ) {
+			wp_send_json_success(
+				array(
+					'kind'    => 'caption',
+					'caption' => WPNC_Publish_Options::clean_caption( isset( $result['caption'] ) ? $result['caption'] : '' ),
+					'message' => wpnc__(
+						'Caption written under the tags. Read it before sending - it goes out as written.',
+						'کپشن زیر برچسب‌ها نوشته شد. پیش از ارسال آن را بخوانید؛ همان‌طور که نوشته شده ارسال می‌شود.'
+					),
 				)
 			);
 		}

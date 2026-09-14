@@ -183,4 +183,26 @@ class PublishOptionsTest extends TestCase {
 		$this->assertSame( '', WPNC_Publish_Options::publish_at( array() ) );
 		$this->assertSame( '2026-09-20 11:00:00', WPNC_Publish_Options::publish_at( array( 'publish_at' => '2026-09-20 11:00:00' ) ) );
 	}
+
+	public function test_a_caption_is_kept_as_plain_text_with_its_line_breaks() {
+		$clean = WPNC_Publish_Options::sanitize( array( 'caption' => "<b>Line one</b>  \r\n\r\n\r\n\r\nLine two" ) );
+
+		$this->assertSame( "Line one\n\nLine two", $clean['caption'] );
+	}
+
+	public function test_an_empty_caption_is_no_opinion() {
+		$this->assertArrayNotHasKey( 'caption', WPNC_Publish_Options::sanitize( array( 'caption' => "  \n " ) ) );
+	}
+
+	public function test_a_caption_is_held_under_the_photo_limit() {
+		$clean = WPNC_Publish_Options::sanitize( array( 'caption' => str_repeat( 'خبر ', 1000 ) ) );
+
+		$this->assertLessThanOrEqual( WPNC_Publish_Options::CAPTION_LIMIT, mb_strlen( $clean['caption'] ) );
+	}
+
+	public function test_a_caption_survives_the_round_trip() {
+		$json = WPNC_Publish_Options::encode( array( 'caption' => "First\n\nSecond" ) );
+
+		$this->assertSame( "First\n\nSecond", WPNC_Publish_Options::decode( $json )['caption'] );
+	}
 }

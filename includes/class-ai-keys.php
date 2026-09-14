@@ -182,6 +182,43 @@ class WPNC_AI_Keys {
 		$state[ $slug ]['reasons'][ (string) $id ] = sanitize_text_field( substr( (string) $reason, 0, 200 ) );
 
 		update_option( self::STATE, $state, false );
+
+		// The moment the last key goes down is the moment the assistant stops
+		// working, and nothing on screen would say so until someone tried it.
+		if ( self::all_resting( $slug ) ) {
+			do_action( 'wpnc_ai_pool_exhausted', $slug );
+		}
+	}
+
+	/**
+	 * Whether every key a provider has is currently resting.
+	 *
+	 * @param string $slug Provider slug.
+	 * @param int    $now  Timestamp, for tests.
+	 * @return bool False for an empty pool: nothing has run out.
+	 */
+	public static function all_resting( $slug, $now = 0 ) {
+		$keys = self::for_provider( $slug );
+
+		if ( empty( $keys ) ) {
+			return false;
+		}
+
+		$now     = $now ? absint( $now ) : WPNC_Time::timestamp();
+		$state   = self::state();
+		$resting = isset( $state[ $slug ]['resting'] ) && is_array( $state[ $slug ]['resting'] )
+			? $state[ $slug ]['resting']
+			: array();
+
+		foreach ( array_keys( $keys ) as $id ) {
+			$until = isset( $resting[ $id ] ) ? absint( $resting[ $id ] ) : 0;
+
+			if ( $until <= $now ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
