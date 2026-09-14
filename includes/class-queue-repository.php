@@ -946,6 +946,27 @@ class WPNC_Queue_Repository {
 	}
 
 	/**
+	 * Overrides as the editor needs them.
+	 *
+	 * The stored time is UTC; the field that edits it speaks site time, and
+	 * the card wants something readable. Both are derived here so that
+	 * neither the script nor the card has to know the offset.
+	 *
+	 * @param mixed $stored Stored column value.
+	 * @return array
+	 */
+	public static function options_for_response( $stored ) {
+		$options = WPNC_Publish_Options::decode( $stored );
+
+		if ( ! empty( $options['publish_at'] ) ) {
+			$options['publish_at_local']   = WPNC_Time::utc_to_local_input( $options['publish_at'] );
+			$options['publish_at_display'] = WPNC_Time::for_display( $options['publish_at'] );
+		}
+
+		return $options;
+	}
+
+	/**
 	 * Format DB row for AJAX response.
 	 *
 	 * @param object $item DB row.
@@ -967,7 +988,7 @@ class WPNC_Queue_Repository {
 			'status'           => (string) $item->status,
 			'category_id'      => (int) $item->category_id,
 			'tags'             => (string) $item->tags,
-			'publish_options'  => WPNC_Publish_Options::decode( isset( $item->publish_options ) ? $item->publish_options : '' ),
+			'publish_options'  => self::options_for_response( isset( $item->publish_options ) ? $item->publish_options : '' ),
 			'post_id'          => isset( $item->post_id ) ? (int) $item->post_id : 0,
 			'error_message'    => isset( $item->error_message ) ? (string) $item->error_message : '',
 		);

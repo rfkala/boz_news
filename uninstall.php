@@ -73,7 +73,7 @@ foreach ( $options as $option ) {
 }
 
 // Post meta written by the publisher.
-foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '_wpnc_source_image', '_wpnc_original_date', 'wpnc_source_image' ) as $meta_key ) {
+foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '_wpnc_source_image', '_wpnc_original_date', '_wpnc_deferred_channels', 'wpnc_source_image' ) as $meta_key ) {
 	delete_post_meta_by_key( $meta_key );
 }
 

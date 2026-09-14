@@ -103,7 +103,57 @@ class WPNC_Publish_Options {
 			$clean['category_id'] = $category;
 		}
 
+		$publish_at = self::read_publish_at( $raw );
+		if ( '' !== $publish_at ) {
+			$clean['publish_at'] = $publish_at;
+		}
+
 		return $clean;
+	}
+
+	/**
+	 * The publication time an item asks for, in UTC.
+	 *
+	 * Accepts the editor's datetime-local value, which is site time, or an
+	 * already stored UTC value - and never converts the stored one again.
+	 * sanitize() runs on the way in and again on every read, so converting its
+	 * own output would move the time by the site offset each time the item
+	 * was opened: a story set for 14:30 drifting later with every edit.
+	 *
+	 * The field being present but empty clears the time, which is how an
+	 * editor takes a scheduled item back to "publish on approval".
+	 *
+	 * @param array $raw Raw values.
+	 * @return string UTC MySQL datetime, or empty.
+	 */
+	private static function read_publish_at( $raw ) {
+		if ( isset( $raw['publish_at_local'] ) ) {
+			return WPNC_Time::local_input_to_utc( $raw['publish_at_local'] );
+		}
+
+		$stored = isset( $raw['publish_at'] ) ? trim( (string) $raw['publish_at'] ) : '';
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/', $stored, $m ) ) {
+			return '';
+		}
+
+		return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $stored : '';
+	}
+
+	/**
+	 * When an item has been told to go out, if it has.
+	 *
+	 * Kept out of merge(): the four fields there each have a settings default,
+	 * and a time has none. Folding it in would change the shape every caller
+	 * of merge() receives.
+	 *
+	 * @param array $overrides Item overrides.
+	 * @return string UTC MySQL datetime, or empty for "on approval".
+	 */
+	public static function publish_at( $overrides ) {
+		$clean = self::sanitize( $overrides );
+
+		return isset( $clean['publish_at'] ) ? $clean['publish_at'] : '';
 	}
 
 	/**

@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.21.0
+Stable tag: 1.22.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -261,6 +261,23 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.22.0 =
+* Changed: the preview appears as you type. Typing in the article body never
+  asked for a preview at all, so the pane kept showing the text as it was when
+  the editor opened; and every refresh waited for a round trip through
+  admin-ajax behind a 700ms delay. It is now drawn in the browser from the
+  same template and allowlist the server uses, then confirmed by the server
+  once typing pauses.
+* Added: keyboard moderation. J and K move between items; E edits, A approves
+  to the site, R rejects, X selects, / searches and ? lists them. A sends to
+  the site only - a post can be undone, a message in Telegram or Bale cannot.
+* Added: a publication time per item, under Advanced in the editor. Leave it
+  empty to publish on approval.
+* Fixed: Telegram and Bale were sent links to posts that were not live yet. A
+  post scheduled for later - by pacing, or now by a chosen time - answers "not
+  found" until then. Its messages are now held and sent when it publishes.
+
 
 = 1.21.0 =
 * Added: Check addresses, under Logs & Tools. It asks every AI address the

@@ -10,6 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WPNC_Publisher {
 
 	/**
+	 * Post meta holding the messages to send once a scheduled post is public.
+	 */
+	const DEFERRED_META = '_wpnc_deferred_channels';
+
+	/**
 	 * @var WPNC_Image_Service
 	 */
 	private $image_service;
@@ -90,7 +95,11 @@ class WPNC_Publisher {
 			)
 		);
 
-		$schedule = $this->schedule_for( $pub_date, $options['post_status'] );
+		$schedule = $this->schedule_for(
+			$pub_date,
+			$options['post_status'],
+			WPNC_Publish_Options::publish_at( WPNC_Publish_Options::decode( $item['publish_options'] ?? '' ) )
+		);
 
 		// Built as a draft and made public last. Inserting straight into
 		// "publish" fired every publish hook - page caches, sitemaps, social
@@ -188,7 +197,7 @@ class WPNC_Publisher {
 			$channels = self::configured_bots();
 		}
 
-		$this->deliver( $channels, $title, get_permalink( $post_id ), $item['source_key'] ?? '' );
+		$this->deliver_or_defer( $post_id, $channels, $title, $item['source_key'] ?? '' );
 
 		return $post_id;
 	}
@@ -266,6 +275,78 @@ class WPNC_Publisher {
 	}
 
 	/**
+	 * Send now, or hold the messages until the post is actually public.
+	 *
+	 * A post scheduled for later - by pacing, or by a time chosen in the
+	 * editor - has a permalink that answers "not found" until then. Sending it
+	 * to a channel straight away handed every reader a dead link, and a
+	 * message in a channel cannot be taken back. So the channels are kept
+	 * with the post and sent when WordPress publishes it.
+	 *
+	 * @param int    $post_id    Post id, 0 when the site is not a destination.
+	 * @param array  $channels   Channel slugs.
+	 * @param string $title      Headline.
+	 * @param string $source_key Source key, for the log.
+	 * @param string $fallback   Link to use when there is no post.
+	 * @return array|null Delivery results, or null when held back.
+	 */
+	public function deliver_or_defer( $post_id, $channels, $title, $source_key = '', $fallback = '' ) {
+		$bots = array_values( array_diff( (array) $channels, array( 'site' ) ) );
+
+		if ( empty( $bots ) ) {
+			return array();
+		}
+
+		$post = $post_id ? get_post( $post_id ) : null;
+
+		if ( $post && 'future' === $post->post_status ) {
+			update_post_meta(
+				$post_id,
+				self::DEFERRED_META,
+				array(
+					'channels'   => $bots,
+					'source_key' => sanitize_key( $source_key ),
+				)
+			);
+
+			return null;
+		}
+
+		return $this->deliver( $bots, $title, $post ? get_permalink( $post ) : $fallback, $source_key );
+	}
+
+	/**
+	 * Send whatever was held back for a post that has just gone public.
+	 *
+	 * Hooked to future_to_publish, which WordPress fires from its own cron
+	 * when a scheduled post's time arrives.
+	 *
+	 * @param WP_Post $post Post that moved from future to publish.
+	 */
+	public static function deliver_deferred( $post ) {
+		if ( ! $post || empty( $post->ID ) ) {
+			return;
+		}
+
+		$held = get_post_meta( $post->ID, self::DEFERRED_META, true );
+
+		if ( ! is_array( $held ) || empty( $held['channels'] ) ) {
+			return;
+		}
+
+		// Removed before sending, so a second publish event cannot repeat it.
+		delete_post_meta( $post->ID, self::DEFERRED_META );
+
+		$publisher = new self();
+		$publisher->deliver(
+			(array) $held['channels'],
+			get_the_title( $post ),
+			get_permalink( $post ),
+			isset( $held['source_key'] ) ? (string) $held['source_key'] : ''
+		);
+	}
+
+	/**
 	 * Assemble the post body for one item.
 	 *
 	 * Public because the preview endpoint renders through this. A preview
@@ -340,8 +421,24 @@ class WPNC_Publisher {
 	 * @param string $status   Resolved post status.
 	 * @return array { status, date_gmt }
 	 */
-	private function schedule_for( $pub_date, $status = '' ) {
+	private function schedule_for( $pub_date, $status = '', $publish_at = '' ) {
 		$status = '' !== $status ? $status : $this->get_post_status();
+
+		// A time chosen for this item outranks both pacing and the feed's
+		// date: it is an editor saying when, which neither of those is.
+		if ( '' !== $publish_at ) {
+			$when = strtotime( $publish_at . ' UTC' );
+
+			if ( false !== $when ) {
+				// WordPress itself treats anything under a minute away as now.
+				$later = ( $when - WPNC_Time::timestamp() ) >= MINUTE_IN_SECONDS;
+
+				return array(
+					'status'   => ( 'publish' === $status && $later ) ? 'future' : $status,
+					'date_gmt' => $publish_at,
+				);
+			}
+		}
 
 		if ( 'publish' !== $status || ! WPNC_Scheduler::is_enabled() ) {
 			return array(

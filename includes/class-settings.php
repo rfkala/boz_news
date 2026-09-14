@@ -775,4 +775,49 @@ class WPNC_Time {
 	public static function offset_seconds() {
 		return (int) round( (float) get_option( 'gmt_offset', 0 ) * HOUR_IN_SECONDS );
 	}
+
+	/**
+	 * Read a datetime-local field value, typed in site time, as UTC.
+	 *
+	 * The field carries no timezone - an editor types the hour they mean on
+	 * their own clock - so the site offset is what turns it into the UTC that
+	 * every datetime this plugin stores is kept in.
+	 *
+	 * @param string $value e.g. 2026-09-20T14:30.
+	 * @return string UTC MySQL datetime, or empty when the value is not one.
+	 */
+	public static function local_input_to_utc( $value ) {
+		$value = trim( (string) $value );
+
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/', $value, $m ) ) {
+			return '';
+		}
+
+		if ( ! checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) || (int) $m[4] > 23 || (int) $m[5] > 59 ) {
+			return '';
+		}
+
+		$seconds = ( isset( $m[6] ) && '' !== $m[6] ) ? (int) $m[6] : 0;
+		$local   = gmmktime( (int) $m[4], (int) $m[5], $seconds, (int) $m[2], (int) $m[3], (int) $m[1] );
+
+		return gmdate( 'Y-m-d H:i:s', $local - self::offset_seconds() );
+	}
+
+	/**
+	 * A stored UTC datetime as the value a datetime-local field expects.
+	 *
+	 * @param string $utc UTC MySQL datetime.
+	 * @return string e.g. 2026-09-20T14:30, or empty.
+	 */
+	public static function utc_to_local_input( $utc ) {
+		$utc = trim( (string) $utc );
+
+		if ( '' === $utc ) {
+			return '';
+		}
+
+		$timestamp = strtotime( $utc . ' UTC' );
+
+		return false === $timestamp ? '' : gmdate( 'Y-m-d\TH:i', $timestamp + self::offset_seconds() );
+	}
 }

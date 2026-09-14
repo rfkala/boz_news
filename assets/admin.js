@@ -342,6 +342,14 @@ jQuery(function($) {
             })
             .appendTo($toolbar);
 
+        $('<button>').attr('type', 'button')
+            .addClass('button-link wpnc-shortcuts-hint')
+            .text(t('shortcuts_hint', 'Keyboard shortcuts (?)'))
+            .on('click', function() {
+                toggleShortcutHelp();
+            })
+            .appendTo($toolbar);
+
         var terminal = queueState.status === 'approved' || queueState.status === 'rejected';
 
         if (!terminal) {
@@ -433,6 +441,13 @@ jQuery(function($) {
 
         if (item.tags) {
             $('<p>').addClass('wpnc-tags').attr('dir', 'auto').text(t('tags', 'Tags') + ': ' + item.tags).appendTo($content);
+        }
+
+        var scheduled = item.publish_options && item.publish_options.publish_at_display;
+        if (scheduled) {
+            $('<p>').addClass('wpnc-scheduled').attr('dir', 'auto')
+                .text(t('scheduled_for', 'Scheduled for') + ' ' + scheduled)
+                .appendTo($content);
         }
         if (item.error_message) {
             $('<p>').addClass('wpnc-error-message').attr('dir', 'auto').text(item.error_message).appendTo($content);
@@ -755,6 +770,13 @@ jQuery(function($) {
             overrideSelect('wpnc-edit-post-author', config.authors, '', config.defaults.post_author));
         labelledField($grid, 'wpnc-edit-category', t('field_category', 'Category'),
             overrideSelect('wpnc-edit-category', config.categories, '', config.defaults.category_id));
+
+        // Typed in the site's own time; the server converts it to UTC.
+        var $when = labelledField($grid, 'wpnc-edit-publish-at', t('field_publish_at', 'Publish at'),
+            $('<input>').attr({ type: 'datetime-local' }).addClass('wpnc-override'));
+        $('<span>').addClass('wpnc-field-hint').attr('dir', 'auto')
+            .text(t('publish_at_hint', 'Leave empty to publish on approval. Telegram and Bale wait until the post is live.'))
+            .insertAfter($when);
     }
 
     function publishOptions() {
@@ -762,7 +784,10 @@ jQuery(function($) {
             post_type: $('#wpnc-edit-post-type').val() || '',
             post_status: $('#wpnc-edit-post-status').val() || '',
             post_author: $('#wpnc-edit-post-author').val() || '',
-            category_id: $('#wpnc-edit-category').val() || ''
+            category_id: $('#wpnc-edit-category').val() || '',
+            // Always sent, even empty: an emptied field is how an editor takes
+            // a scheduled item back to "publish on approval".
+            publish_at_local: $('#wpnc-edit-publish-at').val() || ''
         };
     }
 
@@ -868,39 +893,339 @@ jQuery(function($) {
         );
     }
 
-    function refreshPreview() {
+    /* ==========================================================
+       Preview
+
+       Drawn in the browser on the next frame, then confirmed by the server.
+       It used to wait for a round trip through admin-ajax - which boots all
+       of WordPress - behind a 700ms debounce, and typing in the article
+       itself never asked for one at all, so the pane kept showing the text
+       as it was when the editor opened. The server's copy still arrives and
+       replaces the local one: that is the publisher's exact output, and the
+       local one is a close copy of it built from the same template and the
+       same allowlist.
+       ========================================================== */
+
+    var previewSeq = 0;
+    var previewFrame = null;
+    var previewContext = {};
+    var lastServerSnapshot = '';
+    var lastLocalHtml = '';
+    var shownFeatured = null;
+
+    // Kept out of the article entirely: none of it is text anyone wrote.
+    var PREVIEW_DROP = ['script', 'style', 'iframe', 'object', 'embed', 'noscript', 'template', 'svg', 'math', 'form', 'input', 'button', 'select', 'textarea'];
+
+    // Allowed on top of the article's own list, because the template in
+    // Settings is written by an administrator and may use them.
+    var PREVIEW_EXTRA = ['div', 'span', 'section', 'small'];
+
+    function previewConfig() {
+        return wpnc_ajax.preview || { template: '{content}', source_label: '', allowed: {} };
+    }
+
+    function previewEscape(text) {
+        return String(text == null ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function previewSafeUrl(url) {
+        url = $.trim(String(url || ''));
+        return (/^(https?:)?\/\//i.test(url) || /^[\/#?]/.test(url) || /^mailto:/i.test(url)) ? url : '';
+    }
+
+    /* A document that is never attached to the page: nothing parsed into it
+       runs, and no image in it is fetched. */
+    function inertRoot(html) {
+        var doc = document.implementation.createHTMLDocument('');
+        var root = doc.createElement('div');
+        root.innerHTML = String(html || '');
+        return root;
+    }
+
+    function previewClean(node, allowed) {
+        Array.prototype.slice.call(node.childNodes).forEach(function(child) {
+            if (child.nodeType === 8) {
+                node.removeChild(child);
+                return;
+            }
+
+            if (child.nodeType !== 1) {
+                return;
+            }
+
+            var tag = child.nodeName.toLowerCase();
+
+            if (PREVIEW_DROP.indexOf(tag) !== -1) {
+                node.removeChild(child);
+                return;
+            }
+
+            previewClean(child, allowed);
+
+            var permitted = allowed[tag] || (PREVIEW_EXTRA.indexOf(tag) !== -1 ? [] : null);
+
+            if (!permitted) {
+                // Unwrapped rather than deleted, the way wp_kses keeps the text
+                // of a tag it strips.
+                while (child.firstChild) {
+                    node.insertBefore(child.firstChild, child);
+                }
+                node.removeChild(child);
+                return;
+            }
+
+            Array.prototype.slice.call(child.attributes).forEach(function(attribute) {
+                var name = attribute.name.toLowerCase();
+                var keep = permitted.indexOf(name) !== -1 || name === 'class' || name === 'dir';
+
+                if (keep && (name === 'href' || name === 'src' || name === 'cite')) {
+                    keep = previewSafeUrl(attribute.value) !== '';
+                }
+
+                if (!keep) {
+                    child.removeAttribute(attribute.name);
+                }
+            });
+        });
+    }
+
+    function previewSanitize(html) {
+        var root = inertRoot(html);
+        previewClean(root, previewConfig().allowed || {});
+        return root.innerHTML;
+    }
+
+    function previewDecode(value) {
+        try {
+            return decodeURIComponent(value);
+        } catch (e) {
+            return value;
+        }
+    }
+
+    /* Mirrors WPNC_Image_Picker::identity(): one picture served at several
+       sizes, or under www and without it, is still one picture. */
+    function imageIdentity(url) {
+        var parsed;
+
+        try {
+            parsed = new URL(String(url || ''), previewContext.main_link || window.location.href);
+        } catch (e) {
+            return '';
+        }
+
+        if (!/^https?:$/.test(parsed.protocol) || !parsed.hostname) {
+            return '';
+        }
+
+        var path = previewDecode(parsed.pathname)
+            .replace(/-\d{2,5}x\d{2,5}(\.[A-Za-z0-9]{2,5})$/, '$1')
+            .replace(/-scaled(\.[A-Za-z0-9]{2,5})$/, '$1');
+
+        return parsed.hostname.toLowerCase().replace(/^www\./, '') + path.toLowerCase();
+    }
+
+    function holdsOnly(parent, child) {
+        return Array.prototype.every.call(parent.childNodes, function(node) {
+            if (node === child || node.nodeType === 8) {
+                return true;
+            }
+            if (node.nodeType === 3) {
+                return $.trim(node.nodeValue.replace(/\u00a0/g, ' ')) === '';
+            }
+            return node.nodeType === 1 && ['figcaption', 'source', 'br'].indexOf(node.nodeName.toLowerCase()) !== -1;
+        });
+    }
+
+    /* Mirrors WPNC_Image_Picker::strip_duplicate(): the featured image is shown
+       above the title, so the same picture inside the text is dropped. */
+    function stripFeaturedFromBody(root, featured) {
+        var target = imageIdentity(featured);
+
+        if (!target) {
+            return;
+        }
+
+        Array.prototype.slice.call(root.getElementsByTagName('img')).forEach(function(img) {
+            if (imageIdentity(img.getAttribute('src')) !== target) {
+                return;
+            }
+
+            var node = img;
+            while (node.parentNode && node.parentNode !== root &&
+                ['a', 'figure', 'p', 'picture', 'span', 'div'].indexOf(node.parentNode.nodeName.toLowerCase()) !== -1 &&
+                holdsOnly(node.parentNode, node)) {
+                node = node.parentNode;
+            }
+
+            if (node.parentNode) {
+                node.parentNode.removeChild(node);
+            }
+        });
+    }
+
+    /* Mirrors WPNC_Template::tidy(). */
+    function tidyHtml(html) {
+        return $.trim(String(html)
+            .replace(/<(p|figure|figcaption)[^>]*>\s*(?:&nbsp;|\u00a0|\s)*<\/\1>/gi, '')
+            .replace(/<a[^>]*href=(["'])\s*\1[^>]*>([\s\S]*?)<\/a>/gi, '$2')
+            .replace(/(?:[ \t]*\r?\n){3,}/g, '\n\n'));
+    }
+
+    /* Mirrors WPNC_Template::render(), including the order the placeholders
+       are replaced in, which decides what happens when one value contains
+       another placeholder. */
+    function renderTemplate(template, values) {
+        var out = $.trim(String(template || '')) ? String(template) : '{content}';
+
+        Object.keys(values).forEach(function(key) {
+            out = out.split('{' + key + '}').join(values[key]);
+        });
+
+        return tidyHtml(out);
+    }
+
+    function previewText(html) {
+        return $.trim((inertRoot(html).textContent || '').replace(/\s+/g, ' '));
+    }
+
+    function previewExcerpt(html) {
+        var words = previewText(html).split(' ').filter(Boolean);
+        return words.slice(0, 55).join(' ') + (words.length > 55 ? '…' : '');
+    }
+
+    function previewCounts(html) {
+        var text = previewText(html);
+        var words = text ? text.split(' ').length : 0;
+        return { words: words, minutes: words ? Math.max(1, Math.ceil(words / 200)) : 0 };
+    }
+
+    function showPreviewFeatured(url) {
+        if (url === shownFeatured) {
+            return;
+        }
+        shownFeatured = url;
+        renderPreviewFeatured(url);
+    }
+
+    function renderLocalPreview() {
         var $pane = $('#wpnc-preview-body');
         if (!$pane.length || !$('#wpnc-edit-modal').is(':visible')) {
             return;
         }
 
-        request('wpnc_preview_item', {
+        var config = previewConfig();
+        var title = $('#wpnc-edit-title').val() || '';
+        var featured = featuredUrl();
+        var link = previewSafeUrl(previewContext.main_link);
+
+        var body = inertRoot(editorGet());
+        previewClean(body, config.allowed || {});
+        stripFeaturedFromBody(body, featured);
+        var content = body.innerHTML;
+
+        var html = renderTemplate(config.template, {
+            content: content,
+            title: previewEscape(title),
+            excerpt: previewEscape(previewExcerpt(content)),
+            source_name: previewEscape(previewContext.source_name),
+            source_url: previewEscape(link),
+            source_label: previewEscape(config.source_label),
+            source_link: '<a href="' + previewEscape(link) + '" target="_blank" rel="nofollow noopener">' +
+                previewEscape(previewContext.source_name || link) + '</a>',
+            date: previewEscape(previewContext.date),
+            image: previewSafeUrl(featured)
+                ? '<figure class="wpnc-source-image"><img src="' + previewEscape(featured) + '" alt="' + previewEscape(title) + '" /></figure>'
+                : '',
+            tags: previewEscape($('#wpnc-edit-tags').val() || '')
+        });
+
+        showPreviewFeatured(featured);
+        $('#wpnc-preview-title').text(title);
+
+        // Sanitised again as a whole, because the template comes from Settings
+        // and nothing else holds it to an allowlist. Skipped when nothing
+        // changed, so moving the cursor does not reload the pictures.
+        html = previewSanitize(html);
+        if (html !== lastLocalHtml) {
+            lastLocalHtml = html;
+            $pane.html(html);
+        }
+
+        updateCounts(previewCounts(content));
+    }
+
+    function confirmPreview() {
+        var $pane = $('#wpnc-preview-body');
+        if (!$pane.length || !$('#wpnc-edit-modal').is(':visible')) {
+            return;
+        }
+
+        var payload = {
             id: $('#wpnc-edit-id').val(),
             title: $('#wpnc-edit-title').val(),
             content: editorGet(),
             tags: $('#wpnc-edit-tags').val(),
             image_url: featuredUrl()
-        })
+        };
+        var snapshot = JSON.stringify(payload);
+
+        if (snapshot === lastServerSnapshot) {
+            return;
+        }
+
+        var seq = ++previewSeq;
+
+        request('wpnc_preview_item', payload)
             .done(function(data) {
-                renderPreviewFeatured(data.featured || '');
+                // An answer about an older version of the text must not
+                // replace what has been typed since it was asked.
+                if (seq !== previewSeq) {
+                    return;
+                }
+
+                lastServerSnapshot = snapshot;
+                lastLocalHtml = '';
+                $('#wpnc-preview-sync').text('');
+                showPreviewFeatured(data.featured || '');
                 $('#wpnc-preview-title').text(data.title || '');
-                // Server-rendered through the same template the publisher
-                // uses, and already passed through wp_kses there.
+                // Rendered through the publisher's own template and already
+                // passed through wp_kses there.
                 $pane.html(data.html || '');
                 updateCounts(data.stats);
             })
-            .fail(function(error) {
-                $pane.empty().append(
-                    $('<p>').addClass('wpnc-preview-error').attr('dir', 'auto').text(error.message)
-                );
+            .fail(function() {
+                if (seq !== previewSeq) {
+                    return;
+                }
+                // The local copy stays; only the confirmation is missing.
+                $('#wpnc-preview-sync').text(t('preview_unconfirmed', 'Could not confirm with the server'));
             });
     }
 
-    /* Debounced: the preview is a server round trip, so it follows typing
-       rather than racing it. */
-    function schedulePreview() {
+    /* Everything that changes the article comes through here: drawn on the
+       next frame, confirmed once typing pauses. */
+    function refreshPreview() {
+        if (previewFrame) {
+            window.cancelAnimationFrame(previewFrame);
+        }
+
+        previewFrame = window.requestAnimationFrame(function() {
+            previewFrame = null;
+            renderLocalPreview();
+        });
+
         window.clearTimeout(previewTimer);
-        previewTimer = window.setTimeout(refreshPreview, 700);
+        previewTimer = window.setTimeout(confirmPreview, 600);
+    }
+
+    function schedulePreview() {
+        refreshPreview();
     }
 
     /**
@@ -1080,6 +1405,7 @@ jQuery(function($) {
 
         $('<div>').addClass('wpnc-preview-head')
             .append($('<span>').addClass('wpnc-preview-label').text(t('preview', 'Preview')))
+            .append($('<span>').attr('id', 'wpnc-preview-sync').addClass('wpnc-preview-sync'))
             .append($('<span>').attr('id', 'wpnc-editor-counts').addClass('wpnc-preview-counts'))
             .appendTo($right);
 
@@ -1151,6 +1477,19 @@ jQuery(function($) {
     function openModal(item) {
         editorHistory = [];
 
+        // What the template needs that the editor does not show, and a clean
+        // slate so nothing from the previous item can land in this one.
+        previewContext = {
+            main_link: item.main_link || '',
+            source_name: item.source_name || '',
+            date: item.pub_date_display || ''
+        };
+        previewSeq++;
+        lastServerSnapshot = '';
+        lastLocalHtml = '';
+        shownFeatured = null;
+        $('#wpnc-preview-sync').text('');
+
         $('#wpnc-edit-id').val(item.id);
         $('#wpnc-edit-title').val(item.title || '');
         $('#wpnc-edit-tags').val(item.tags || '');
@@ -1161,6 +1500,7 @@ jQuery(function($) {
         $('#wpnc-edit-post-type').val(overrides.post_type || '');
         $('#wpnc-edit-post-status').val(overrides.post_status || '');
         $('#wpnc-edit-post-author').val(overrides.post_author ? String(overrides.post_author) : '');
+        $('#wpnc-edit-publish-at').val(overrides.publish_at_local || '');
 
         // Seeded from the row's own column, not just from the overrides: a
         // category can arrive from the source's mapping at fetch time, and
@@ -1190,7 +1530,19 @@ jQuery(function($) {
                 tinymce: {
                     wpautop: true,
                     toolbar1: 'formatselect,bold,italic,bullist,numlist,blockquote,link,unlink,removeformat,undo,redo',
-                    directionality: (wpnc_ajax.lang === 'fa') ? 'rtl' : 'ltr'
+                    directionality: (wpnc_ajax.lang === 'fa') ? 'rtl' : 'ltr',
+                    setup: function(editor) {
+                        // The article body never asked for a preview before,
+                        // so typing in it changed nothing on the right.
+                        editor.on('input keyup change undo redo SetContent ExecCommand', refreshPreview);
+
+                        // Baseline once TinyMCE has normalised the markup, so
+                        // opening and closing is never counted as an edit.
+                        editor.on('init', function() {
+                            editorBaseline = editorSnapshot();
+                            refreshPreview();
+                        });
+                    }
                 },
                 quicktags: true,
                 mediaButtons: true
@@ -1201,14 +1553,22 @@ jQuery(function($) {
 
         $('#wpnc-edit-title').trigger('focus');
 
-        // Baseline after the editor is populated, so simply opening and
-        // closing is never treated as a change.
+        // Drawn at once from the text as stored, before TinyMCE has even
+        // loaded: an empty pane for the first moments reads as broken.
+        refreshPreview();
+
+        // Fallback baseline when the rich editor is unavailable or slow to
+        // start; the init handler above replaces it once TinyMCE is ready.
         window.setTimeout(function() {
-            editorBaseline = editorSnapshot();
-            refreshPreview();
+            if (editorBaseline === null) {
+                editorBaseline = editorSnapshot();
+            }
         }, 250);
 
         $('#wpnc-edit-title, #wpnc-edit-tags').off('input.wpncpreview').on('input.wpncpreview', schedulePreview);
+
+        // The plain-text tab of the editor is a textarea, not TinyMCE.
+        $('#' + EDITOR_ID).off('input.wpncpreview').on('input.wpncpreview', refreshPreview);
 
         // Debounced so typing an address does not request a picture per key.
         $('#wpnc-edit-image').off('input.wpncpreview').on('input.wpncpreview', function() {
@@ -1233,6 +1593,12 @@ jQuery(function($) {
         }
 
         window.clearTimeout(previewTimer);
+        if (previewFrame) {
+            window.cancelAnimationFrame(previewFrame);
+            previewFrame = null;
+        }
+        // Any answer still on its way belongs to an editor that is closing.
+        previewSeq++;
         if (editorAvailable()) {
             wp.editor.remove(EDITOR_ID);
         }
@@ -1284,7 +1650,195 @@ jQuery(function($) {
        Queue actions
        ========================================================== */
 
+    /* ==========================================================
+       Keyboard moderation
+
+       J and K move between cards and the other keys act on the one in focus.
+       Approving by key sends to the site only: a post can be undone from the
+       queue, a message in a channel cannot, so the messengers stay a click.
+       ========================================================== */
+
+    var queueFocus = -1;
+
+    function queueCards() {
+        return $('#wpnc-moderation-app .wpnc-card');
+    }
+
+    function focusCard(index) {
+        var $cards = queueCards();
+
+        if (!$cards.length) {
+            queueFocus = -1;
+            return;
+        }
+
+        queueFocus = Math.max(0, Math.min(index, $cards.length - 1));
+        $cards.removeClass('is-focused').removeAttr('aria-current');
+
+        var $card = $cards.eq(queueFocus).addClass('is-focused').attr('aria-current', 'true');
+        var element = $card.get(0);
+
+        if (element && element.scrollIntoView) {
+            element.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    function focusedCard() {
+        return queueFocus >= 0 ? queueCards().eq(queueFocus) : $();
+    }
+
+    function typingInField(target) {
+        var tag = ((target && target.nodeName) || '').toLowerCase();
+        return tag === 'input' || tag === 'textarea' || tag === 'select' || !!(target && target.isContentEditable);
+    }
+
+    function toggleShortcutHelp(show) {
+        var $help = $('#wpnc-shortcuts');
+
+        if (!$help.length) {
+            if (show === false) {
+                return;
+            }
+
+            $help = $('<div>')
+                .attr({ id: 'wpnc-shortcuts', role: 'dialog', 'aria-label': t('shortcuts_title', 'Keyboard shortcuts') })
+                .addClass('wpnc-shortcuts')
+                .hide();
+
+            $('<h3>').text(t('shortcuts_title', 'Keyboard shortcuts')).appendTo($help);
+
+            var $list = $('<dl>').appendTo($help);
+            [
+                ['J / K', t('shortcut_move', 'Next / previous item')],
+                ['E', t('shortcut_edit', 'Edit')],
+                ['A', t('shortcut_approve', 'Approve to the site')],
+                ['R', t('shortcut_reject', 'Reject')],
+                ['X', t('shortcut_select', 'Select for bulk actions')],
+                ['/', t('shortcut_search', 'Search')],
+                ['?', t('shortcut_help', 'Show or hide this list')]
+            ].forEach(function(row) {
+                $('<dt>').append($('<kbd>').text(row[0])).appendTo($list);
+                $('<dd>').text(row[1]).appendTo($list);
+            });
+
+            $('<p>').addClass('description').attr('dir', 'auto')
+                .text(t('shortcut_note', 'A sends to the site only. A message in Telegram or Bale cannot be taken back, so those stay a click.'))
+                .appendTo($help);
+
+            // Inside the panel wrapper, so it inherits the panel's direction
+            // and design tokens.
+            var $host = $('.wpnc-wrap').first();
+            $help.appendTo($host.length ? $host : 'body').on('click', function() {
+                toggleShortcutHelp(false);
+            });
+        }
+
+        $help.toggle(typeof show === 'boolean' ? show : !$help.is(':visible'));
+    }
+
+    function handleQueueKey(event) {
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
+
+        if ($('#wpnc-edit-modal').is(':visible') || !$('#wpnc-moderation-app').is(':visible')) {
+            return;
+        }
+
+        if (typingInField(event.target)) {
+            return;
+        }
+
+        var key = event.key || '';
+
+        if (key === '?') {
+            event.preventDefault();
+            toggleShortcutHelp();
+            return;
+        }
+
+        if (key === 'Escape') {
+            toggleShortcutHelp(false);
+            return;
+        }
+
+        if (key === '/') {
+            event.preventDefault();
+            $('#wpnc-queue-search').trigger('focus');
+            return;
+        }
+
+        var lower = key.toLowerCase();
+
+        if (lower === 'j') {
+            event.preventDefault();
+            focusCard(queueFocus + 1);
+            return;
+        }
+
+        if (lower === 'k') {
+            event.preventDefault();
+            focusCard(queueFocus < 0 ? 0 : queueFocus - 1);
+            return;
+        }
+
+        var $card = focusedCard();
+
+        if (!$card.length) {
+            return;
+        }
+
+        // Enter on a focused button belongs to that button.
+        if (key === 'Enter' && /^(button|a)$/i.test((event.target && event.target.nodeName) || '')) {
+            return;
+        }
+
+        if (lower === 'e' || key === 'Enter') {
+            var $edit = $card.find('.wpnc-edit');
+            if ($edit.length) {
+                event.preventDefault();
+                $edit.trigger('click');
+            }
+            return;
+        }
+
+        if (lower === 'a') {
+            var $site = $card.find('.wpnc-approve').filter(function() {
+                return $(this).data('channels') === 'site';
+            }).first();
+
+            if ($site.length) {
+                event.preventDefault();
+                $site.trigger('click');
+            }
+            return;
+        }
+
+        if (lower === 'r') {
+            // Through the button, so it asks for the same confirmation.
+            var $reject = $card.find('.wpnc-reject');
+            if ($reject.length) {
+                event.preventDefault();
+                $reject.trigger('click');
+            }
+            return;
+        }
+
+        if (lower === 'x') {
+            var $box = $card.find('.wpnc-item-checkbox');
+            if ($box.length) {
+                event.preventDefault();
+                $box.prop('checked', !$box.prop('checked')).trigger('change');
+            }
+        }
+    }
+
     function bindQueueEvents() {
+        // A re-rendered queue keeps the position the keyboard had reached.
+        if (queueFocus >= 0) {
+            focusCard(queueFocus);
+        }
+
         $('#wpnc-select-all').off('change').on('change', function() {
             $('.wpnc-item-checkbox').prop('checked', $(this).prop('checked'));
         });
@@ -1553,6 +2107,12 @@ jQuery(function($) {
                     $(this).remove();
                     if (!$('.wpnc-card').length) {
                         loadQueue();
+                        return;
+                    }
+                    // The next card slides into the place of the one just
+                    // handled, so keyboard focus lands on it without a key.
+                    if (queueFocus >= 0) {
+                        focusCard(queueFocus);
                     }
                 });
             })
@@ -2558,6 +3118,8 @@ jQuery(function($) {
             $('#wpnc-save-edit').trigger('click');
         }
     });
+
+    $(document).off('keydown.wpncqueue').on('keydown.wpncqueue', handleQueueKey);
 
     // Leaving the page mid-edit deserves the browser's own warning.
     $(window).on('beforeunload', function() {

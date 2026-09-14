@@ -155,14 +155,14 @@ class WPNC_Ajax {
 		$this->queue->mark_approved( $id, $post_id );
 
 		// Without a post there is no permalink, so readers get the original.
-		$link = $post_id ? get_permalink( $post_id ) : $item->main_link;
-
-		$sent   = $this->publisher->deliver( $channels, $item->title, $link, $item->source_key );
-		$failed = array_keys( array_filter( $sent, 'is_string' ) );
+		// A scheduled post holds its messages until it is public.
+		$sent     = $this->publisher->deliver_or_defer( $post_id, $channels, $item->title, $item->source_key, $item->main_link );
+		$deferred = null === $sent;
+		$failed   = $deferred ? array() : array_keys( array_filter( $sent, 'is_string' ) );
 
 		wp_send_json_success(
 			array(
-				'message'  => $this->describe_delivery( $channels, $failed, $post_id ),
+				'message'  => $this->describe_delivery( $channels, $failed, $post_id, $deferred ),
 				'post_id'  => $post_id,
 				'channels' => $channels,
 				'failed'   => $failed,
@@ -205,7 +205,32 @@ class WPNC_Ajax {
 	 * @param int   $post_id  Post id, 0 when the site was not a destination.
 	 * @return string
 	 */
-	private function describe_delivery( $channels, $failed, $post_id ) {
+	private function describe_delivery( $channels, $failed, $post_id, $deferred = false ) {
+		$post = $post_id ? get_post( $post_id ) : null;
+
+		// A post set to go out later has not been sent anywhere yet, and
+		// saying otherwise would have an editor looking for it on the site.
+		if ( $post && 'future' === $post->post_status ) {
+			$when = WPNC_Time::for_display( $post->post_date_gmt );
+
+			if ( $deferred ) {
+				return sprintf(
+					/* translators: %s: publication date and time */
+					wpnc__(
+						'Approved and scheduled for %s. Telegram and Bale will be sent when it goes live.',
+						'تأیید و برای %s زمان‌بندی شد. تلگرام و بله هنگام انتشار ارسال می‌شوند.'
+					),
+					$when
+				);
+			}
+
+			return sprintf(
+				/* translators: %s: publication date and time */
+				wpnc__( 'Approved and scheduled for %s.', 'تأیید و برای %s زمان‌بندی شد.' ),
+				$when
+			);
+		}
+
 		$delivered = array_values( array_diff( $channels, $failed ) );
 		$names     = array();
 
@@ -418,12 +443,7 @@ class WPNC_Ajax {
 			$this->queue->mark_approved( $id, $post_id );
 			$success_count++;
 
-			$this->publisher->deliver(
-				$channels,
-				$item->title,
-				$post_id ? get_permalink( $post_id ) : $item->main_link,
-				$item->source_key
-			);
+			$this->publisher->deliver_or_defer( $post_id, $channels, $item->title, $item->source_key, $item->main_link );
 		}
 
 		$message = sprintf(

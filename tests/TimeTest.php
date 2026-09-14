@@ -89,4 +89,35 @@ class TimeTest extends TestCase {
 		$this->assertSame( '', WPNC_Time::for_display( '0000-00-00 00:00:00' ) );
 		$this->assertSame( '', WPNC_Time::for_display( '' ) );
 	}
+
+	public function test_a_typed_local_time_is_stored_as_utc() {
+		WPNC_Test_Options::reset();
+		update_option( 'gmt_offset', 3.5 );
+
+		$this->assertSame( '2026-09-20 11:00:00', WPNC_Time::local_input_to_utc( '2026-09-20T14:30' ) );
+	}
+
+	public function test_a_stored_utc_time_is_shown_back_in_site_time() {
+		WPNC_Test_Options::reset();
+		update_option( 'gmt_offset', 3.5 );
+
+		$this->assertSame( '2026-09-20T14:30', WPNC_Time::utc_to_local_input( '2026-09-20 11:00:00' ) );
+	}
+
+	public function test_the_round_trip_does_not_drift_across_a_day_boundary() {
+		WPNC_Test_Options::reset();
+		update_option( 'gmt_offset', -5 );
+
+		$typed = '2026-01-31T23:45';
+
+		$this->assertSame( $typed, WPNC_Time::utc_to_local_input( WPNC_Time::local_input_to_utc( $typed ) ) );
+	}
+
+	public function test_nonsense_is_not_a_time() {
+		WPNC_Test_Options::reset();
+
+		foreach ( array( '', 'tomorrow', '2026-13-01T10:00', '2026-02-30T10:00', '2026-09-20T25:00', '2026-09-20 14:30' ) as $value ) {
+			$this->assertSame( '', WPNC_Time::local_input_to_utc( $value ), 'should be rejected: ' . $value );
+		}
+	}
 }

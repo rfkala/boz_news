@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.21.0
+ * Version: 1.22.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.21.0' );
+define( 'WPNC_VERSION', '1.22.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -41,6 +41,10 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-ajax.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-shortcode.php';
+
+// Messages for a post that was scheduled are sent when it goes live, not when
+// it was approved - its link does not work until then.
+add_action( 'future_to_publish', array( 'WPNC_Publisher', 'deliver_deferred' ) );
 
 if ( is_admin() ) {
 	require_once WPNC_PLUGIN_DIR . 'includes/class-admin.php';
@@ -224,6 +228,16 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				// So an item without a picture can say what it will get instead.
 				'default_image' => esc_url_raw( (string) get_option( 'wpnc_default_image', '' ) ),
 			),
+			// What the preview needs to draw a post the moment a key is
+			// pressed, rather than after a round trip through admin-ajax. The
+			// allowlist is the server's own, so the two cannot drift apart.
+			'preview'        => array(
+				'template'     => '' !== trim( (string) get_option( 'wpnc_content_template', '' ) )
+					? (string) get_option( 'wpnc_content_template', '' )
+					: WPNC_Template::DEFAULT_TEMPLATE,
+				'source_label' => wpnc__( 'Source:', 'منبع:' ),
+				'allowed'      => array_map( 'array_keys', WPNC_AI_Rewriter::allowed_html() ),
+			),
 			'i18n'           => array(
 				'loading'                => 'Loading...',
 				'processing'             => 'Processing...',
@@ -373,6 +387,20 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'diagnose_php_limit' => 'PHP time limit',
 				'diagnose_none' => 'none',
 				'probe_running' => 'Asking each address whether it answers. This can take a minute.',
+				'shortcuts_title' => 'Keyboard shortcuts',
+				'shortcuts_hint' => 'Keyboard shortcuts (?)',
+				'shortcut_move' => 'Next / previous item',
+				'shortcut_edit' => 'Edit',
+				'shortcut_approve' => 'Approve to the site',
+				'shortcut_reject' => 'Reject',
+				'shortcut_select' => 'Select for bulk actions',
+				'shortcut_search' => 'Search',
+				'shortcut_help' => 'Show or hide this list',
+				'shortcut_note' => 'A sends to the site only. A message in Telegram or Bale cannot be taken back, so those stay a click.',
+				'field_publish_at' => 'Publish at',
+				'publish_at_hint' => 'Leave empty to publish on approval. Telegram and Bale wait until the post is live.',
+				'scheduled_for' => 'Scheduled for',
+				'preview_unconfirmed' => 'Could not confirm with the server',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -523,6 +551,20 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'diagnose_php_limit' => 'محدودیت زمانی PHP',
 				'diagnose_none' => 'ندارد',
 				'probe_running' => 'در حال پرسیدن از هر آدرس که پاسخ می‌دهد یا نه. ممکن است یک دقیقه طول بکشد.',
+				'shortcuts_title' => 'میانبرهای صفحه‌کلید',
+				'shortcuts_hint' => 'میانبرهای صفحه‌کلید (?)',
+				'shortcut_move' => 'خبر بعدی / قبلی',
+				'shortcut_edit' => 'ویرایش',
+				'shortcut_approve' => 'تأیید و انتشار در سایت',
+				'shortcut_reject' => 'رد کردن',
+				'shortcut_select' => 'انتخاب برای کار گروهی',
+				'shortcut_search' => 'جست‌وجو',
+				'shortcut_help' => 'نمایش یا پنهان کردن این فهرست',
+				'shortcut_note' => 'کلید A فقط در سایت منتشر می‌کند. پیام تلگرام یا بله قابل بازگشت نیست، پس ارسال به آن‌ها با کلیک می‌ماند.',
+				'field_publish_at' => 'زمان انتشار',
+				'publish_at_hint' => 'خالی بگذارید تا هنگام تأیید منتشر شود. تلگرام و بله تا منتشر شدن پست صبر می‌کنند.',
+				'scheduled_for' => 'زمان‌بندی‌شده برای',
+				'preview_unconfirmed' => 'تأیید با سرور ممکن نشد',
 			),
 		)
 	);

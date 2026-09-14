@@ -132,4 +132,55 @@ class PublishOptionsTest extends TestCase {
 
 		$this->assertSame( 'publish', WPNC_Publish_Options::defaults()['post_status'] );
 	}
+
+	public function test_a_publish_time_typed_in_site_time_is_kept_in_utc() {
+		update_option( 'gmt_offset', 3.5 );
+
+		$clean = WPNC_Publish_Options::sanitize( array( 'publish_at_local' => '2026-09-20T14:30' ) );
+
+		$this->assertSame( '2026-09-20 11:00:00', $clean['publish_at'] );
+	}
+
+	public function test_a_stored_publish_time_is_not_shifted_again_on_every_read() {
+		// sanitize() runs on the way in and on every decode. Converting its own
+		// output would move the time by the site offset each time the item was
+		// opened.
+		update_option( 'gmt_offset', 3.5 );
+
+		$json  = WPNC_Publish_Options::encode( array( 'publish_at_local' => '2026-09-20T14:30' ) );
+		$once  = WPNC_Publish_Options::decode( $json );
+		$twice = WPNC_Publish_Options::decode( WPNC_Publish_Options::encode( $once ) );
+
+		$this->assertSame( '2026-09-20 11:00:00', $once['publish_at'] );
+		$this->assertSame( $once, $twice );
+	}
+
+	public function test_clearing_the_field_clears_the_time() {
+		$clean = WPNC_Publish_Options::sanitize(
+			array(
+				'publish_at_local' => '',
+				'publish_at'       => '2026-09-20 11:00:00',
+			)
+		);
+
+		$this->assertArrayNotHasKey( 'publish_at', $clean, 'an emptied field means publish on approval again' );
+	}
+
+	public function test_an_impossible_publish_time_is_dropped() {
+		$this->assertArrayNotHasKey( 'publish_at', WPNC_Publish_Options::sanitize( array( 'publish_at_local' => '2026-02-30T10:00' ) ) );
+		$this->assertArrayNotHasKey( 'publish_at', WPNC_Publish_Options::sanitize( array( 'publish_at' => 'next tuesday' ) ) );
+	}
+
+	public function test_a_publish_time_does_not_leak_into_the_merged_defaults() {
+		// merge() resolves the four fields that have a settings default. A time
+		// has none, and adding it there would change every caller's shape.
+		$merged = WPNC_Publish_Options::merge( array( 'publish_at_local' => '2026-09-20T14:30' ), $this->defaults() );
+
+		$this->assertSame( $this->defaults(), $merged );
+	}
+
+	public function test_publish_at_reads_back_the_utc_time_or_nothing() {
+		$this->assertSame( '', WPNC_Publish_Options::publish_at( array() ) );
+		$this->assertSame( '2026-09-20 11:00:00', WPNC_Publish_Options::publish_at( array( 'publish_at' => '2026-09-20 11:00:00' ) ) );
+	}
 }
