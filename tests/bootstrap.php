@@ -197,11 +197,37 @@ function add_query_arg( $key, $value, $url ) {
 	return $url . $glue . $key . '=' . $value;
 }
 
+function apply_filters( $hook, $value ) {
+	return $value;
+}
+
+function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+	return true;
+}
+
+function remove_filter( $hook, $callback, $priority = 10 ) {
+	return true;
+}
+
+/**
+ * The schedules WordPress ships plus the two the fetcher registers.
+ */
+function wp_get_schedules() {
+	return array(
+		'15min'      => array( 'interval' => 900 ),
+		'hourly'     => array( 'interval' => 3600 ),
+		'3hours'     => array( 'interval' => 10800 ),
+		'twicedaily' => array( 'interval' => 43200 ),
+		'daily'      => array( 'interval' => 86400 ),
+	);
+}
+
 function wp_json_encode( $data ) {
 	return json_encode( $data );
 }
 
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-link.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';

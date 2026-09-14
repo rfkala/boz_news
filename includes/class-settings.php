@@ -602,6 +602,46 @@ class WPNC_Settings {
 	 * @param int $extra Seconds to add for slower endpoints such as OpenAI.
 	 * @return int
 	 */
+	/**
+	 * How long a request may keep working before it must answer.
+	 *
+	 * Reads the limit actually in force rather than assuming one, because the
+	 * work here is unbounded by nature - a fetch run or a bulk approve grows
+	 * with the number of sources and items - and being killed partway is how
+	 * posts ended up published with their queue rows never marked.
+	 *
+	 * @param int $reserve Seconds kept back for finishing the response.
+	 * @return int Seconds of work this request may attempt.
+	 */
+	public static function time_budget( $reserve = 10 ) {
+		$limit = (int) ini_get( 'max_execution_time' );
+
+		// 0 means no limit, which cron and the CLI often have. Unbounded work
+		// is still worth bounding: a run that never ends holds the fetch lock
+		// and starves every source it has not reached.
+		if ( $limit <= 0 ) {
+			return (int) apply_filters( 'wpnc_time_budget_unlimited', 300 );
+		}
+
+		return max( 15, $limit - max( 0, absint( $reserve ) ) );
+	}
+
+	/**
+	 * How often scheduled fetching actually runs, in seconds.
+	 *
+	 * @return int
+	 */
+	public static function interval_seconds() {
+		$name      = self::sanitize_interval( get_option( 'wpnc_interval', 'hourly' ) );
+		$schedules = function_exists( 'wp_get_schedules' ) ? wp_get_schedules() : array();
+
+		if ( isset( $schedules[ $name ]['interval'] ) ) {
+			return max( 60, (int) $schedules[ $name ]['interval'] );
+		}
+
+		return HOUR_IN_SECONDS;
+	}
+
 	public static function get_timeout( $extra = 0 ) {
 		$timeout = self::sanitize_timeout( get_option( 'wpnc_request_timeout', self::DEFAULT_TIMEOUT ) );
 

@@ -121,6 +121,18 @@ class WPNC_Ajax {
 			);
 		}
 
+		// Reading the status and then acting on it is not the same as taking
+		// it: two requests could both read "pending" and both publish. This
+		// is the one operation that only one caller can win.
+		if ( ! $this->queue->claim( $id ) ) {
+			$this->fail(
+				wpnc__( 'This item was already processed.', 'این آیتم قبلاً پردازش شده است.' ),
+				'wpnc_already_processed',
+				array( 'status' => (string) $item->status ),
+				409
+			);
+		}
+
 		$post_id = 0;
 
 		if ( in_array( 'site', $channels, true ) ) {
@@ -134,13 +146,17 @@ class WPNC_Ajax {
 			}
 		}
 
+		// Recorded before anything is sent. Delivery talks to two services
+		// that may each take half a minute, and a request killed in there
+		// used to leave the row pending with the post already live - so the
+		// next click published the same story a second time.
+		$this->queue->mark_approved( $id, $post_id );
+
 		// Without a post there is no permalink, so readers get the original.
 		$link = $post_id ? get_permalink( $post_id ) : $item->main_link;
 
 		$sent   = $this->publisher->deliver( $channels, $item->title, $link, $item->source_key );
 		$failed = array_keys( array_filter( $sent, 'is_string' ) );
-
-		$this->queue->mark_approved( $id, $post_id );
 
 		wp_send_json_success(
 			array(
@@ -354,15 +370,32 @@ class WPNC_Ajax {
 	public function bulk_approve() {
 		$this->check_admin_request();
 
+		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		@set_time_limit( 120 );
+
 		$ids           = $this->get_posted_ids();
 		$channels      = $this->get_posted_channels();
 		$success_count = 0;
 		$error_count   = 0;
 		$skipped_count = 0;
+		$remaining     = 0;
 
-		foreach ( $ids as $id ) {
+		// Each item can mean an image download and two messenger calls, so a
+		// bulk of twenty will not finish inside any shared host's limit. The
+		// loop stops while it can still answer, and says what is left; being
+		// killed here used to publish posts whose rows never got marked, and
+		// pressing the button again republished them.
+		$deadline = microtime( true ) + WPNC_Settings::time_budget();
+
+		foreach ( $ids as $index => $id ) {
+			if ( microtime( true ) >= $deadline ) {
+				$remaining = count( $ids ) - $index;
+				break;
+			}
+
 			$item = $this->queue->get( $id );
-			if ( ! $this->queue->is_actionable( $item ) ) {
+
+			if ( ! $this->queue->is_actionable( $item ) || ! $this->queue->claim( $id ) ) {
 				$skipped_count++;
 				continue;
 			}
@@ -379,29 +412,44 @@ class WPNC_Ajax {
 				}
 			}
 
+			// Before delivery, for the same reason as the single approve.
+			$this->queue->mark_approved( $id, $post_id );
+			$success_count++;
+
 			$this->publisher->deliver(
 				$channels,
 				$item->title,
 				$post_id ? get_permalink( $post_id ) : $item->main_link,
 				$item->source_key
 			);
+		}
 
-			$this->queue->mark_approved( $id, $post_id );
-			$success_count++;
+		$message = sprintf(
+			/* translators: 1: success count, 2: error count, 3: skipped count */
+			wpnc__( '%1$d items approved. %2$d failed. %3$d skipped.', '%1$d آیتم تأیید شد. %2$d ناموفق. %3$d رد شده.' ),
+			$success_count,
+			$error_count,
+			$skipped_count
+		);
+
+		if ( $remaining > 0 ) {
+			$message .= ' ' . sprintf(
+				/* translators: %d: how many items were not reached */
+				wpnc__(
+					'%d were not reached before this request ran out of time - select them and approve again.',
+					'به %d آیتم پیش از پایان زمان این درخواست نرسید - آن‌ها را انتخاب کنید و دوباره تأیید بزنید.'
+				),
+				$remaining
+			);
 		}
 
 		wp_send_json_success(
 			array(
-				'message' => sprintf(
-					/* translators: 1: success count, 2: error count, 3: skipped count */
-					wpnc__( '%1$d items approved. %2$d failed. %3$d skipped.', '%1$d آیتم تأیید شد. %2$d ناموفق. %3$d رد شده.' ),
-					$success_count,
-					$error_count,
-					$skipped_count
-				),
-				'approved' => $success_count,
-				'failed'   => $error_count,
-				'skipped'  => $skipped_count,
+				'message'   => $message,
+				'remaining' => $remaining,
+				'approved'  => $success_count,
+				'failed'    => $error_count,
+				'skipped'   => $skipped_count,
 			)
 		);
 	}
@@ -582,7 +630,10 @@ class WPNC_Ajax {
 		}
 
 		$reader = new WPNC_Feed_Reader();
-		$result = $reader->fetch( $source, 5 );
+
+		// A test that reports on a cached copy proves nothing about whether
+		// the feed answers right now, which is the whole question.
+		$result = $reader->fetch( $source, 5, true );
 
 		if ( is_wp_error( $result ) ) {
 			$this->fail( $result->get_error_message(), 'wpnc_feed_error' );

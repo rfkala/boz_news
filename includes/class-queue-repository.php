@@ -14,10 +14,203 @@ class WPNC_Queue_Repository {
 	 *
 	 * @return string
 	 */
+	/**
+	 * How long a claimed row may stay claimed before it is offered again.
+	 *
+	 * Long enough that a slow publish is never interrupted, short enough that
+	 * a request killed mid-publish does not strand the row for a moderator.
+	 */
+	const CLAIM_TTL = 600;
+
+	/**
+	 * How long an imported link is remembered after its queue row is gone.
+	 */
+	const SEEN_RETENTION_DAYS = 180;
+
 	public function table_name() {
 		global $wpdb;
 
 		return $wpdb->prefix . 'news_queue';
+	}
+
+	/**
+	 * Table of links this site has already imported.
+	 *
+	 * @return string
+	 */
+	public function seen_table_name() {
+		global $wpdb;
+
+		return $wpdb->prefix . 'news_seen';
+	}
+
+	/**
+	 * Record that a link has been imported, whatever became of it.
+	 *
+	 * Written when a row enters the queue and again when retention removes
+	 * it, so the memory outlives the row. Silent when the address yields no
+	 * hash: storing an empty key would make every unusable address one
+	 * article and drop the rest as duplicates.
+	 *
+	 * @param string $main_link  Article URL.
+	 * @param string $guid       Feed guid.
+	 * @param string $source_key Source key, for tracing only.
+	 * @param string $outcome    Status the row ended at, when known.
+	 * @return bool
+	 */
+	public function remember( $main_link, $guid = '', $source_key = '', $outcome = '' ) {
+		global $wpdb;
+
+		$link_hash = WPNC_Link::hash( $main_link );
+
+		if ( '' === $link_hash ) {
+			return false;
+		}
+
+		$table = $this->seen_table_name();
+
+		// INSERT IGNORE so re-remembering is free and two concurrent runs
+		// cannot make this fail.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$written = $wpdb->query(
+			$wpdb->prepare(
+				"INSERT IGNORE INTO $table ( link_hash, guid_hash, source_key, outcome, seen_at )
+				VALUES ( %s, %s, %s, %s, %s )",
+				$link_hash,
+				WPNC_Link::guid_hash( $guid ),
+				sanitize_key( $source_key ),
+				sanitize_key( $outcome ),
+				WPNC_Time::now()
+			)
+		);
+
+		return false !== $written;
+	}
+
+	/**
+	 * Whether this link or guid has been imported before.
+	 *
+	 * @param string $main_link Article URL.
+	 * @param string $guid      Feed guid.
+	 * @return bool
+	 */
+	public function has_seen( $main_link, $guid = '' ) {
+		global $wpdb;
+
+		$table     = $this->seen_table_name();
+		$link_hash = WPNC_Link::hash( $main_link );
+
+		if ( '' !== $link_hash ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$found = $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM $table WHERE link_hash = %s LIMIT 1", $link_hash ) );
+
+			if ( $found ) {
+				return true;
+			}
+		}
+
+		$guid_hash = WPNC_Link::guid_hash( $guid );
+
+		if ( '' !== $guid_hash ) {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$found = $wpdb->get_var( $wpdb->prepare( "SELECT 1 FROM $table WHERE guid_hash = %s LIMIT 1", $guid_hash ) );
+
+			if ( $found ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Forget links older than the retention period.
+	 *
+	 * @param int $days Days to keep.
+	 * @return int|false
+	 */
+	public function forget_old( $days = self::SEEN_RETENTION_DAYS ) {
+		global $wpdb;
+
+		$table = $this->seen_table_name();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $wpdb->query(
+			$wpdb->prepare( "DELETE FROM $table WHERE seen_at < %s", WPNC_Time::days_ago( $days ) )
+		);
+	}
+
+	/**
+	 * Take exclusive ownership of a row before publishing it.
+	 *
+	 * The status check that used to guard this read the row and then acted on
+	 * it, which is not the same as claiming it: two requests could both read
+	 * "pending" and both publish. One conditional UPDATE settles it, because
+	 * only one of them can change the row from pending.
+	 *
+	 * @param int $id Item ID.
+	 * @return bool True when this caller now owns the row.
+	 */
+	public function claim( $id ) {
+		global $wpdb;
+
+		$table = $this->table_name();
+		$stale = gmdate( 'Y-m-d H:i:s', WPNC_Time::timestamp() - self::CLAIM_TTL );
+
+		// The stale clause is the recovery path: a request killed mid-publish
+		// leaves a claim nobody will ever release, and without this the row
+		// would be stuck out of reach of every moderator.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$claimed = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE $table
+				SET status = 'processing', updated_at = %s
+				WHERE id = %d
+					AND ( status IN ( 'pending', 'error' ) OR ( status = 'processing' AND updated_at < %s ) )",
+				WPNC_Time::now(),
+				absint( $id ),
+				$stale
+			)
+		);
+
+		return 1 === (int) $claimed;
+	}
+
+	/**
+	 * Forget that a link was ever imported.
+	 *
+	 * The counterpart to remember(), and the difference between the two kinds
+	 * of removal: retention takes the row away on its own schedule and must
+	 * not invite the story back, while an administrator deleting a row is
+	 * saying something about this record, not about the story - and has
+	 * always been able to re-import it afterwards.
+	 *
+	 * @param array $links Article URLs.
+	 * @return int Rows forgotten.
+	 */
+	public function forget( $links ) {
+		global $wpdb;
+
+		$hashes = array();
+
+		foreach ( (array) $links as $link ) {
+			$hash = WPNC_Link::hash( $link );
+
+			if ( '' !== $hash ) {
+				$hashes[ $hash ] = true;
+			}
+		}
+
+		if ( empty( $hashes ) ) {
+			return 0;
+		}
+
+		$hashes       = array_keys( $hashes );
+		$table        = $this->seen_table_name();
+		$placeholders = implode( ', ', array_fill( 0, count( $hashes ), '%s' ) );
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->query( $wpdb->prepare( "DELETE FROM $table WHERE link_hash IN ( $placeholders )", $hashes ) );
 	}
 
 	/**
@@ -41,8 +234,18 @@ class WPNC_Queue_Repository {
 		$offset   = ( $page - 1 ) * $limit;
 		$status   = $this->normalize_status( $args['status'] );
 		$search   = sanitize_text_field( $args['search'] );
-		$where    = array( 'status = %s' );
-		$params   = array( $status );
+
+		// A row being published is still a pending row as far as a moderator
+		// is concerned. Without this it would vanish from the only view that
+		// lists it for as long as the publish takes - and for good if the
+		// request died partway.
+		if ( 'pending' === $status ) {
+			$where  = array( 'status IN ( %s, %s )' );
+			$params = array( 'pending', 'processing' );
+		} else {
+			$where  = array( 'status = %s' );
+			$params = array( $status );
+		}
 
 		if ( '' !== $search ) {
 			$like    = '%' . $wpdb->esc_like( $search ) . '%';
@@ -127,7 +330,15 @@ class WPNC_Queue_Repository {
 			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s' )
 		);
 
-		return $inserted ? (int) $wpdb->insert_id : false;
+		if ( ! $inserted ) {
+			return false;
+		}
+
+		// Remembered on the way in, so the record survives whatever happens to
+		// the row afterwards.
+		$this->remember( $data['main_link'], $data['guid'], $data['source_key'] );
+
+		return (int) $wpdb->insert_id;
 	}
 
 	/**
@@ -270,13 +481,39 @@ class WPNC_Queue_Repository {
 	}
 
 	/**
+	 * Whether a claim has been held long enough to be considered abandoned.
+	 *
+	 * @param object $item Queue row.
+	 * @return bool
+	 */
+	private function claim_expired( $item ) {
+		if ( empty( $item->updated_at ) ) {
+			return true;
+		}
+
+		$held = strtotime( $item->updated_at . ' UTC' );
+
+		return false === $held || ( $held + self::CLAIM_TTL ) < WPNC_Time::timestamp();
+	}
+
+	/**
 	 * Whether a queue row can still be approved or rejected.
 	 *
 	 * @param object|null $item Queue row.
 	 * @return bool
 	 */
 	public function is_actionable( $item ) {
-		return $item && in_array( (string) $item->status, self::actionable_statuses(), true );
+		if ( ! $item ) {
+			return false;
+		}
+
+		if ( in_array( (string) $item->status, self::actionable_statuses(), true ) ) {
+			return true;
+		}
+
+		// A row left mid-publish by a request that died is actionable again
+		// once its claim has expired; claim() enforces the same rule in SQL.
+		return 'processing' === (string) $item->status && $this->claim_expired( $item );
 	}
 
 	/**
@@ -292,7 +529,16 @@ class WPNC_Queue_Repository {
 	public function delete( $id ) {
 		global $wpdb;
 
-		return (bool) $wpdb->delete( $this->table_name(), array( 'id' => absint( $id ) ), array( '%d' ) );
+		$item = $this->get( $id );
+
+		$deleted = (bool) $wpdb->delete( $this->table_name(), array( 'id' => absint( $id ) ), array( '%d' ) );
+
+		if ( $deleted && $item ) {
+			// Deliberate removal, so the story may arrive again.
+			$this->forget( array( $item->main_link ) );
+		}
+
+		return $deleted;
 	}
 
 	/**
@@ -312,8 +558,16 @@ class WPNC_Queue_Repository {
 		$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
 		$table        = $this->table_name();
 
+		// Read the links before the rows go, so they can be forgotten after.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$links = $wpdb->get_col( $wpdb->prepare( "SELECT main_link FROM $table WHERE id IN ( $placeholders )", $ids ) );
+
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM $table WHERE id IN ( $placeholders )", $ids ) );
+
+		if ( $deleted ) {
+			$this->forget( (array) $links );
+		}
 
 		return (int) $deleted;
 	}
@@ -512,7 +766,7 @@ class WPNC_Queue_Repository {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$row = $wpdb->get_row(
 			"SELECT COUNT(*) AS total,
-				SUM( CASE WHEN status = 'pending' THEN 1 ELSE 0 END ) AS pending,
+				SUM( CASE WHEN status IN ( 'pending', 'processing' ) THEN 1 ELSE 0 END ) AS pending,
 				SUM( CASE WHEN status = 'approved' THEN 1 ELSE 0 END ) AS approved,
 				SUM( CASE WHEN status = 'rejected' THEN 1 ELSE 0 END ) AS rejected,
 				SUM( CASE WHEN status = 'error' THEN 1 ELSE 0 END ) AS errors
@@ -563,6 +817,14 @@ class WPNC_Queue_Repository {
 
 		$table = $this->table_name();
 
+		// Checked first: one indexed lookup on a fixed-width key, and it is
+		// the only check that still answers once retention has removed the
+		// row. It also catches the same article arriving under a different
+		// campaign parameter or scheme.
+		if ( $this->has_seen( $main_link, $guid ) ) {
+			return true;
+		}
+
 		if ( $main_link ) {
 			$queue_id = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM $table WHERE main_link = %s LIMIT 1", $main_link ) );
 			if ( $queue_id ) {
@@ -601,9 +863,10 @@ class WPNC_Queue_Repository {
 
 		$table = $this->table_name();
 
+		// A row mid-publish counts as pending, matching the list it appears in.
 		return array(
 			'approved' => (int) $wpdb->get_var( "SELECT COUNT(id) FROM $table WHERE status = 'approved'" ),
-			'pending'  => (int) $wpdb->get_var( "SELECT COUNT(id) FROM $table WHERE status = 'pending'" ),
+			'pending'  => (int) $wpdb->get_var( "SELECT COUNT(id) FROM $table WHERE status IN ( 'pending', 'processing' )" ),
 			'rejected' => (int) $wpdb->get_var( "SELECT COUNT(id) FROM $table WHERE status = 'rejected'" ),
 			'error'    => (int) $wpdb->get_var( "SELECT COUNT(id) FROM $table WHERE status = 'error'" ),
 		);
@@ -620,13 +883,54 @@ class WPNC_Queue_Repository {
 
 		$threshold = WPNC_Time::days_ago( $days );
 		$table     = $this->table_name();
+		$removed   = 0;
 
-		return $wpdb->query(
-			$wpdb->prepare(
-				"DELETE FROM $table WHERE status IN ('approved', 'rejected') AND updated_at < %s",
-				$threshold
-			)
-		);
+		// Remember each link before its row goes. Deleting the row used to
+		// delete the only evidence that a story had been seen, so a rejected
+		// item still carried by its feed came back as new - and with
+		// auto-publish on, went straight to the site the second time.
+		do {
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$batch = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT id, main_link, guid, source_key, status
+					FROM $table
+					WHERE status IN ( 'approved', 'rejected' ) AND updated_at < %s
+					LIMIT 200",
+					$threshold
+				)
+			);
+
+			$batch = (array) $batch;
+
+			if ( empty( $batch ) ) {
+				break;
+			}
+
+			$ids = array();
+
+			foreach ( $batch as $row ) {
+				$this->remember( $row->main_link, $row->guid, $row->source_key, $row->status );
+				$ids[] = absint( $row->id );
+			}
+
+			$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+
+			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$deleted = $wpdb->query( $wpdb->prepare( "DELETE FROM $table WHERE id IN ( $placeholders )", $ids ) );
+
+			if ( false === $deleted || 0 === (int) $deleted ) {
+				// Nothing was removed, so the same batch would be selected
+				// again on the next pass. Stop rather than spin.
+				break;
+			}
+
+			$removed += (int) $deleted;
+		} while ( count( $batch ) === 200 );
+
+		$this->forget_old();
+
+		return $removed;
 	}
 
 	/**
@@ -666,6 +970,6 @@ class WPNC_Queue_Repository {
 	private function normalize_status( $status ) {
 		$status = sanitize_key( $status );
 
-		return in_array( $status, array( 'pending', 'approved', 'rejected', 'error' ), true ) ? $status : 'pending';
+		return in_array( $status, array( 'pending', 'processing', 'approved', 'rejected', 'error' ), true ) ? $status : 'pending';
 	}
 }

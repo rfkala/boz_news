@@ -109,20 +109,65 @@ class WPNC_Feed_Reader {
 	}
 
 	/**
+	 * Cache lifetime for the feed currently being fetched.
+	 *
+	 * @var int
+	 */
+	private $cache_seconds = 0;
+
+	/**
+	 * How long a fetched feed may be reused.
+	 *
+	 * Half the update interval: short enough that every scheduled run sees
+	 * what the source published since the last one, long enough that a manual
+	 * run started moments after a scheduled one does not re-download every
+	 * feed. Capped so a daily schedule does not serve a twelve-hour-old copy
+	 * to someone who just pressed Fetch Now.
+	 *
+	 * @return int Seconds.
+	 */
+	public function cache_lifetime() {
+		$half = (int) floor( WPNC_Settings::interval_seconds() / 2 );
+
+		return (int) apply_filters( 'wpnc_feed_cache_lifetime', min( max( 60, $half ), 30 * MINUTE_IN_SECONDS ) );
+	}
+
+	/**
+	 * Supply that lifetime to fetch_feed(), for our call only.
+	 *
+	 * @param int $seconds WordPress default.
+	 * @return int
+	 */
+	public function filter_cache_lifetime( $seconds ) {
+		return $this->cache_seconds;
+	}
+
+	/**
 	 * Fetch and normalize a feed.
 	 *
 	 * @param array $source Source definition.
 	 * @param int   $max_items Max items.
 	 * @return array|WP_Error
 	 */
-	public function fetch( $source, $max_items = 20 ) {
+	public function fetch( $source, $max_items = 20, $fresh = false ) {
 		if ( empty( $source['valid'] ) || ! $this->is_safe_url( $source['url'] ?? '' ) ) {
 			return new WP_Error( 'wpnc_invalid_feed_url', wpnc__( 'Invalid or unsafe feed URL.', 'آدرس فید نامعتبر یا ناامن است.' ) );
 		}
 
 		require_once ABSPATH . WPINC . '/feed.php';
 
+		// fetch_feed() caches every feed for twelve hours by default, which
+		// quietly made the update interval meaningless: a schedule set to
+		// fifteen minutes re-read the same stored copy all day, and so did
+		// Fetch Now. The filter is added and removed around this one call so
+		// that feeds belonging to the theme or other plugins keep their own
+		// lifetime.
+		$this->cache_seconds = $fresh ? 0 : $this->cache_lifetime();
+
+		add_filter( 'wp_feed_cache_transient_lifetime', array( $this, 'filter_cache_lifetime' ), 99 );
 		$feed = fetch_feed( $source['url'] );
+		remove_filter( 'wp_feed_cache_transient_lifetime', array( $this, 'filter_cache_lifetime' ), 99 );
+
 		if ( is_wp_error( $feed ) ) {
 			return $feed;
 		}

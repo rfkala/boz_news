@@ -24,6 +24,9 @@ $options = array(
 	'wpnc_default_category',
 	'wpnc_post_author',
 	'wpnc_post_status',
+	'wpnc_content_template',
+	'wpnc_stagger_enabled',
+	'wpnc_stagger_minutes',
 	'wpnc_auto_publish',
 	'wpnc_default_image',
 	'wpnc_extract_full_text',
@@ -51,6 +54,8 @@ $options = array(
 	'wpnc_last_count',
 	'wpnc_last_summary',
 	'wpnc_source_health',
+	'wpnc_fetch_cursor',
+	'wpnc_fetch_lock',
 	'wpnc_schema_version',
 	'wpnc_schema_error',
 
@@ -66,9 +71,10 @@ foreach ( $options as $option ) {
 }
 
 // Post meta written by the publisher.
-foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '_wpnc_source_image', 'wpnc_source_image' ) as $meta_key ) {
+foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '_wpnc_source_image', '_wpnc_original_date', 'wpnc_source_image' ) as $meta_key ) {
 	delete_post_meta_by_key( $meta_key );
 }
 
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_queue" );
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_collector_logs" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_seen" );

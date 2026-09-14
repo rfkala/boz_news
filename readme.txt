@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.17.0
+Stable tag: 1.18.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -237,6 +237,37 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.18.0 =
+* Fixed: new stories arrived at most twice a day whatever the update interval
+  was set to. WordPress stores every fetched feed for twelve hours by default
+  and the plugin never said otherwise, so a fifteen-minute schedule re-read
+  the same stored copy all day - and so did Fetch Now. Feeds are now reused
+  for at most half the update interval, and never at all for Fetch Now or for
+  Test.
+* Fixed: approving could publish the same story twice. The queue row was only
+  marked after the post had been created and both messengers had been given
+  up to half a minute each, so a request killed in between left the post live
+  and the row still pending, and the next click published it again. The row is
+  now claimed before the work starts and marked as soon as the post exists.
+* Fixed: two runs could hold the fetch lock at once. Taking it read the lock
+  and then wrote it, which is not one step; it is now a single atomic write,
+  so a manual fetch can no longer run beside a scheduled one.
+* Fixed: sources late in the list could go unfetched forever. Every run walked
+  them from the top, so on a host that cut the request short the same early
+  feeds were fetched every time. A run now stops cleanly inside the server's
+  time limit, says how far it got, and the next one starts where it left off.
+* Fixed: rejected stories came back. Retention deletes processed rows, and
+  that deleted the only record the story had ever been seen, so a feed still
+  carrying it delivered it again as new - and with auto-publish on, straight
+  to the site. Imported links are now remembered for six months in their own
+  table, independently of the queue row.
+* Changed: two addresses that differ only by https, a www prefix, a trailing
+  slash or a campaign parameter are recognised as one article.
+* Changed: bulk approve stops inside the server's time limit and reports how
+  many were not reached, rather than being killed partway through.
+* Fixed: uninstall left three settings and one post meta key behind.
+
 
 = 1.17.0 =
 * Fixed: the featured image attached for some sources and never for others.

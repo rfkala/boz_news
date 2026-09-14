@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.4.0';
+	const SCHEMA_VERSION = '1.5.0';
 
 	/**
 	 * Columns the queue table must have for the plugin to write to it.
@@ -78,6 +78,11 @@ class WPNC_DB {
 	public function deactivate() {
 		wp_clear_scheduled_hook( 'wpnc_fetch_news_event' );
 		wp_clear_scheduled_hook( 'wpnc_cleanup_news_event' );
+
+		// The lock is an option now, so that taking it is atomic. Deactivating
+		// mid-run must clear both it and the transient older builds used, or
+		// the next activation starts out locked.
+		delete_option( WPNC_Fetcher::LOCK_KEY );
 		delete_transient( WPNC_Fetcher::LOCK_KEY );
 		flush_rewrite_rules();
 	}
@@ -240,6 +245,7 @@ class WPNC_DB {
 		$charset_collate = $wpdb->get_charset_collate();
 		$queue_table     = $wpdb->prefix . 'news_queue';
 		$logs_table      = $wpdb->prefix . 'news_collector_logs';
+		$seen_table      = $wpdb->prefix . 'news_seen';
 
 		$queue_sql = "CREATE TABLE $queue_table (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -285,9 +291,29 @@ class WPNC_DB {
 			KEY level_created (level, created_at)
 		) $charset_collate;";
 
+		// What the plugin has already imported, kept after the queue row is
+		// gone. Retention deletes processed rows, and until this table existed
+		// that also deleted the only record that a rejected story had ever
+		// been seen - so a feed still carrying it delivered it again as new.
+		//
+		// Fixed-width hashes rather than the addresses themselves: a URL only
+		// ever fitted a truncated prefix index, and one Persian letter costs
+		// six characters of it once encoded.
+		$seen_sql = "CREATE TABLE $seen_table (
+			link_hash char(32) NOT NULL,
+			guid_hash char(32) DEFAULT '' NOT NULL,
+			source_key varchar(100) DEFAULT '' NOT NULL,
+			outcome varchar(20) DEFAULT '' NOT NULL,
+			seen_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+			PRIMARY KEY  (link_hash),
+			KEY guid_hash (guid_hash),
+			KEY seen_at (seen_at)
+		) $charset_collate;";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $queue_sql );
 		dbDelta( $logs_sql );
+		dbDelta( $seen_sql );
 
 		// dbDelta declines to add a column often enough - a table it cannot
 		// parse, a collation mismatch, an ALTER it decides against - and it
@@ -297,7 +323,7 @@ class WPNC_DB {
 
 		// dbDelta never reports failure, so verify instead of assuming.
 		$missing = array();
-		foreach ( array( $queue_table, $logs_table ) as $table ) {
+		foreach ( array( $queue_table, $logs_table, $seen_table ) as $table ) {
 			if ( ! $this->table_exists( $table ) ) {
 				$missing[] = $table;
 			}

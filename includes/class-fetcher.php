@@ -25,6 +25,11 @@ class WPNC_Fetcher {
 	const HEALTH_OPTION = 'wpnc_source_health';
 
 	/**
+	 * Which source the next run starts from.
+	 */
+	const CURSOR_OPTION = 'wpnc_fetch_cursor';
+
+	/**
 	 * Consecutive failures before a source starts being skipped.
 	 */
 	const FAIL_THRESHOLD = 3;
@@ -162,9 +167,44 @@ class WPNC_Fetcher {
 				return $summary;
 			}
 
-			foreach ( $sources as $source ) {
-				$this->process_source( $source, $summary );
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			@set_time_limit( 300 );
+
+			$total    = count( $sources );
+			$deadline = microtime( true ) + WPNC_Settings::time_budget();
+
+			// Where the previous run stopped. Sources were always walked from
+			// the top, so on a host that killed the request partway the same
+			// early feeds were fetched every time and the later ones never
+			// were. Starting where the last run left off gives every source
+			// its turn.
+			$start     = absint( get_option( self::CURSOR_OPTION, 0 ) );
+			$start     = $start < $total ? $start : 0;
+			$processed = 0;
+
+			for ( $offset = 0; $offset < $total; $offset++ ) {
+				// Always do at least one source, however small the budget.
+				if ( $processed > 0 && microtime( true ) >= $deadline ) {
+					$summary['messages'][] = sprintf(
+						/* translators: 1: sources done, 2: sources configured */
+						wpnc__(
+							'Stopped after %1$d of %2$d sources to stay inside this server time limit; the rest are first in line next run.',
+							'برای ماندن در محدودیت زمانی سرور، پس از %1$d منبع از %2$d منبع متوقف شد؛ بقیه در اجرای بعدی اول صف‌اند.'
+						),
+						$processed,
+						$total
+					);
+					break;
+				}
+
+				$this->process_source( $sources[ ( $start + $offset ) % $total ], $summary );
+				$processed++;
+
+				// A long run must not let its own lock expire underneath it.
+				$this->touch_lock();
 			}
+
+			update_option( self::CURSOR_OPTION, $total > 0 ? ( $start + $processed ) % $total : 0, false );
 
 			update_option( 'wpnc_last_run', WPNC_Time::now() );
 			update_option( 'wpnc_last_count', absint( $summary['fetched'] ) );
@@ -229,7 +269,9 @@ class WPNC_Fetcher {
 			'messages'  => array(),
 		);
 
-		$this->process_source( $sources[ $index ], $summary );
+		// Someone watching a progress bar asked for this now, so the stored
+		// copy of the feed is not an acceptable answer.
+		$this->process_source( $sources[ $index ], $summary, true );
 
 		return $summary;
 	}
@@ -273,7 +315,7 @@ class WPNC_Fetcher {
 	 * @param array $source  Source definition.
 	 * @param array $summary Summary reference.
 	 */
-	private function process_source( $source, &$summary ) {
+	private function process_source( $source, &$summary, $fresh = false ) {
 		$source_key = $source['source_key'] ?: wp_parse_url( $source['url'] ?? '', PHP_URL_HOST );
 		$source_id  = WPNC_Feed_Reader::source_id( $source );
 
@@ -312,7 +354,7 @@ class WPNC_Fetcher {
 			return;
 		}
 
-		$result = $this->feed_reader->fetch( $source, get_option( 'wpnc_max_items_per_feed', 20 ) );
+		$result = $this->feed_reader->fetch( $source, get_option( 'wpnc_max_items_per_feed', 20 ), $fresh );
 		if ( is_wp_error( $result ) ) {
 			$message = sprintf(
 				/* translators: 1: feed URL, 2: error message */
@@ -571,20 +613,32 @@ class WPNC_Fetcher {
 	 * @return bool True when the lock was taken.
 	 */
 	public function acquire_lock( $manual = false ) {
-		if ( false !== get_transient( self::LOCK_KEY ) ) {
+		$now   = WPNC_Time::timestamp();
+		$value = array(
+			'manual' => (bool) $manual,
+			'time'   => $now,
+		);
+
+		// add_option() is the atomic primitive here: option_name is unique, so
+		// of two callers racing for the lock exactly one INSERT succeeds. The
+		// previous get_transient()/set_transient() pair let both through,
+		// which is how a cron run and a manual run could import the same item
+		// twice and pay the assistant twice for it.
+		if ( add_option( self::LOCK_KEY, $value, '', 'no' ) ) {
+			return true;
+		}
+
+		$held = $this->get_lock();
+
+		if ( is_array( $held ) && ( absint( isset( $held['time'] ) ? $held['time'] : 0 ) + self::LOCK_TTL ) > $now ) {
 			return false;
 		}
 
-		set_transient(
-			self::LOCK_KEY,
-			array(
-				'manual' => (bool) $manual,
-				'time'   => WPNC_Time::timestamp(),
-			),
-			self::LOCK_TTL
-		);
+		// Held past its lifetime, so the run that took it is gone. Delete and
+		// re-add rather than update: whoever wins the add owns it.
+		delete_option( self::LOCK_KEY );
 
-		return true;
+		return (bool) add_option( self::LOCK_KEY, $value, '', 'no' );
 	}
 
 	/**
@@ -604,8 +658,28 @@ class WPNC_Fetcher {
 			return false;
 		}
 
+		return $this->touch_lock();
+	}
+
+	/**
+	 * Push back the expiry of whichever lock is held.
+	 *
+	 * Used by the run that holds it. renew_lock() cannot serve here: it
+	 * refuses to touch a lock taken by cron, which is correct when a browser
+	 * is asking and exactly wrong when the cron run itself is asking - a long
+	 * run would let its own lock lapse and invite a second run in beside it.
+	 *
+	 * @return bool
+	 */
+	private function touch_lock() {
+		$lock = $this->get_lock();
+
+		if ( false === $lock ) {
+			return false;
+		}
+
 		$lock['time'] = WPNC_Time::timestamp();
-		set_transient( self::LOCK_KEY, $lock, self::LOCK_TTL );
+		update_option( self::LOCK_KEY, $lock, false );
 
 		return true;
 	}
@@ -616,7 +690,7 @@ class WPNC_Fetcher {
 	 * @return array|false
 	 */
 	public function get_lock() {
-		$lock = get_transient( self::LOCK_KEY );
+		$lock = get_option( self::LOCK_KEY, false );
 
 		return is_array( $lock ) ? $lock : false;
 	}
@@ -625,6 +699,10 @@ class WPNC_Fetcher {
 	 * Release the fetch lock.
 	 */
 	public function release_lock() {
+		delete_option( self::LOCK_KEY );
+
+		// Sites upgrading mid-run may still hold the transient this used to
+		// be; leaving it would block nothing, but Clear Lock should clear it.
 		delete_transient( self::LOCK_KEY );
 	}
 }
