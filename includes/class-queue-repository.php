@@ -27,6 +27,19 @@ class WPNC_Queue_Repository {
 	 */
 	const SEEN_RETENTION_DAYS = 180;
 
+	/**
+	 * How far back a new item looks for a story it belongs to.
+	 *
+	 * Coverage of one event arrives within hours. Looking further back mostly
+	 * finds a different event with the same names in it.
+	 */
+	const GROUP_WINDOW = 2 * DAY_IN_SECONDS;
+
+	/**
+	 * Most recent pending items a new one is compared against.
+	 */
+	const GROUP_CANDIDATES = 300;
+
 	public function table_name() {
 		global $wpdb;
 
@@ -328,10 +341,15 @@ class WPNC_Queue_Repository {
 		// address, which two long Persian URLs from one section could share.
 		$data['link_hash'] = WPNC_Link::storage_hash( $data['main_link'] );
 
+		// Filed with the story it belongs to, if another source already
+		// brought it in, so the moderator sees one story with several sources
+		// rather than the same story several times.
+		$data['group_id'] = $this->find_group( $data['title'] );
+
 		$inserted = $wpdb->insert(
 			$this->table_name(),
 			$data,
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%d' )
 		);
 
 		if ( ! $inserted ) {
@@ -343,6 +361,50 @@ class WPNC_Queue_Repository {
 		$this->remember( $data['main_link'], $data['guid'], $data['source_key'] );
 
 		return (int) $wpdb->insert_id;
+	}
+
+	/**
+	 * The story a new headline belongs to, among items still waiting.
+	 *
+	 * The group is named after its first item. An item joining a group that
+	 * already has members joins under that same name, so a story reported by
+	 * five sources is one group rather than a chain of pairs.
+	 *
+	 * @param string $title Headline.
+	 * @return int Group id, or 0 when this is a new story.
+	 */
+	public function find_group( $title ) {
+		global $wpdb;
+
+		$table = $this->table_name();
+
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT id, group_id, title FROM $table
+				WHERE status IN ( 'pending', 'processing', 'error' ) AND created_at >= %s
+				ORDER BY id DESC
+				LIMIT %d",
+				gmdate( 'Y-m-d H:i:s', WPNC_Time::timestamp() - self::GROUP_WINDOW ),
+				self::GROUP_CANDIDATES
+			)
+		);
+
+		$candidates = array();
+		$groups     = array();
+
+		foreach ( (array) $rows as $row ) {
+			$candidates[ (int) $row->id ] = (string) $row->title;
+			$groups[ (int) $row->id ]     = absint( $row->group_id );
+		}
+
+		$match = WPNC_Similarity::best_match( $title, $candidates );
+
+		if ( ! $match ) {
+			return 0;
+		}
+
+		return $groups[ $match ] ? $groups[ $match ] : $match;
 	}
 
 	/**
@@ -990,6 +1052,8 @@ class WPNC_Queue_Repository {
 			'tags'             => (string) $item->tags,
 			'publish_options'  => self::options_for_response( isset( $item->publish_options ) ? $item->publish_options : '' ),
 			'post_id'          => isset( $item->post_id ) ? (int) $item->post_id : 0,
+			// The id a story's items share: the first item's own id.
+			'group_key'        => ( isset( $item->group_id ) && (int) $item->group_id ) ? (int) $item->group_id : (int) $item->id,
 			'error_message'    => isset( $item->error_message ) ? (string) $item->error_message : '',
 		);
 	}

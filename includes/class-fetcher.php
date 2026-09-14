@@ -407,6 +407,26 @@ class WPNC_Fetcher {
 			return 'skipped';
 		}
 
+		// This source's own rules, where it has them; the settings otherwise.
+		$policy = WPNC_Source_Policy::resolve(
+			WPNC_Source_Policy::for_source(
+				WPNC_Feed_Reader::source_id(
+					array(
+						'source_key' => $item['source_key'],
+						'url'        => $item['feed_url'],
+					)
+				)
+			),
+			(bool) get_option( 'wpnc_auto_publish', 0 ),
+			(bool) get_option( 'wpnc_auto_rewrite', 0 )
+		);
+
+		// A messenger chosen for this source but since emptied of credentials
+		// is left out rather than failing every import.
+		if ( is_array( $policy['channels'] ) ) {
+			$policy['channels'] = array_values( array_filter( $policy['channels'], array( 'WPNC_Channels', 'is_configured' ) ) );
+		}
+
 		$item['image_url'] = $this->image_service->extract_image( $item['raw_item'], $item['main_link'] );
 
 		// An item without a picture is common and not an error, but "the page
@@ -449,7 +469,7 @@ class WPNC_Fetcher {
 
 		unset( $item['raw_item'] );
 
-		if ( get_option( 'wpnc_auto_rewrite', 0 ) ) {
+		if ( $policy['rewrite'] ) {
 			$rewrite = $this->ai_rewriter->rewrite( $item['title'], $item['description'] );
 			if ( is_wp_error( $rewrite ) ) {
 				$this->logger->log(
@@ -466,8 +486,8 @@ class WPNC_Fetcher {
 			}
 		}
 
-		if ( get_option( 'wpnc_auto_publish', 0 ) ) {
-			$post_id = $this->publisher->publish( $item );
+		if ( $policy['publish'] ) {
+			$post_id = $this->publisher->publish( $item, '', $policy['channels'] );
 			if ( is_wp_error( $post_id ) ) {
 				$this->logger->log(
 					WPNC_Logger::LEVEL_ERROR,

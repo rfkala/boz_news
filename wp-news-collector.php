@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.23.0
+ * Version: 1.24.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.23.0' );
+define( 'WPNC_VERSION', '1.24.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -23,6 +23,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-db.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-logger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-link.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-similarity.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-image-picker.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
@@ -37,6 +38,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
@@ -407,6 +409,14 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview_unconfirmed' => 'Could not confirm with the server',
 				'field_caption' => 'Channel caption',
 				'caption_hint' => 'Used for Telegram and Bale. Leave empty to use the opening of the article.',
+				'group_also' => 'Same story from',
+				'group_more' => 'more',
+				'group_show' => 'Show them',
+				'group_hide' => 'Hide them',
+				'group_reject' => 'Reject the others',
+				'group_confirm' => 'Reject the other copies of this story? The one shown stays in the queue.',
+				'list_sep' => ', ',
+				'confirm_policy_publish' => 'Items from this source will be published without anyone reading them first. Continue?',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -573,6 +583,14 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'preview_unconfirmed' => 'تأیید با سرور ممکن نشد',
 				'field_caption' => 'کپشن کانال',
 				'caption_hint' => 'برای تلگرام و بله. خالی بگذارید تا ابتدای متن خبر استفاده شود.',
+				'group_also' => 'همین خبر از',
+				'group_more' => 'منبع دیگر',
+				'group_show' => 'نمایش',
+				'group_hide' => 'پنهان کردن',
+				'group_reject' => 'رد کردن بقیه',
+				'group_confirm' => 'نسخه‌های دیگر این خبر رد شوند؟ نسخهٔ نمایش‌داده‌شده در صف می‌ماند.',
+				'list_sep' => '، ',
+				'confirm_policy_publish' => 'خبرهای این منبع بدون اینکه کسی آن‌ها را بخواند منتشر خواهند شد. ادامه می‌دهید؟',
 			),
 		)
 	);

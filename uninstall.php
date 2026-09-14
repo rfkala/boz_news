@@ -56,6 +56,7 @@ $options = array(
 	'wpnc_alert_channel',
 	'wpnc_alert_chat_id',
 	'wpnc_alert_state',
+	'wpnc_source_policies',
 
 	// Runtime state.
 	'wpnc_last_run',

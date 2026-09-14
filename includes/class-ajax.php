@@ -44,6 +44,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_test_source', array( $this, 'test_source' ) );
 		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
+		add_action( 'wp_ajax_wpnc_save_source_policy', array( $this, 'save_source_policy' ) );
 		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
 		add_action( 'wp_ajax_wpnc_detect_image', array( $this, 'detect_image' ) );
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
@@ -754,6 +755,38 @@ class WPNC_Ajax {
 					? wpnc__( 'Source resumed.', 'منبع دوباره فعال شد.' )
 					: wpnc__( 'Source paused.', 'منبع متوقف شد.' ),
 				'enabled' => (bool) $sources[ $index ]['enabled'],
+			)
+		);
+	}
+
+	/**
+	 * Store one source's rules.
+	 */
+	public function save_source_policy() {
+		$this->check_admin_request();
+
+		$source_id = isset( $_POST['source_id'] ) ? sanitize_text_field( wp_unslash( $_POST['source_id'] ) ) : '';
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$channels = isset( $_POST['channels'] ) ? (array) wp_unslash( $_POST['channels'] ) : array();
+
+		$saved = WPNC_Source_Policy::save(
+			$source_id,
+			array(
+				'mode'     => isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'inherit',
+				'rewrite'  => isset( $_POST['rewrite'] ) ? sanitize_key( wp_unslash( $_POST['rewrite'] ) ) : 'inherit',
+				'channels' => array_map( 'sanitize_key', $channels ),
+			)
+		);
+
+		if ( ! $saved ) {
+			$this->fail( wpnc__( 'Source not found.', 'منبع یافت نشد.' ), 'wpnc_not_found', array(), 404 );
+		}
+
+		wp_send_json_success(
+			array(
+				'message' => wpnc__( 'Rules saved for this source.', 'قوانین این منبع ذخیره شد.' ),
+				'summary' => WPNC_Source_Policy::describe( WPNC_Source_Policy::for_source( $source_id ) ),
 			)
 		);
 	}

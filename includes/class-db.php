@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.6.0';
+	const SCHEMA_VERSION = '1.7.0';
 
 	/**
 	 * Columns the queue table must have for the plugin to write to it.
@@ -33,6 +33,7 @@ class WPNC_DB {
 		'tags',
 		'publish_options',
 		'link_hash',
+		'group_id',
 		'post_id',
 		'error_message',
 		'created_at',
@@ -461,6 +462,7 @@ class WPNC_DB {
 			tags varchar(255) DEFAULT '' NOT NULL,
 			publish_options text NULL,
 			link_hash char(32) DEFAULT '' NOT NULL,
+			group_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			post_id bigint(20) unsigned DEFAULT 0 NOT NULL,
 			error_message text NULL,
 			created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
@@ -469,6 +471,7 @@ class WPNC_DB {
 			PRIMARY KEY  (id),
 			UNIQUE KEY link_hash (link_hash),
 			KEY main_link (main_link(191)),
+			KEY group_id (group_id),
 			KEY guid (guid(191)),
 			KEY status_pub_date (status, pub_date),
 			KEY post_id (post_id),
@@ -577,6 +580,7 @@ class WPNC_DB {
 		$added_later = array(
 			'publish_options' => 'text NULL',
 			'link_hash'       => "char(32) DEFAULT '' NOT NULL",
+			'group_id'        => 'bigint(20) unsigned DEFAULT 0 NOT NULL',
 		);
 
 		$missing = $this->missing_columns( $table, array_keys( $added_later ) );

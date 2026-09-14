@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.23.0
+Stable tag: 1.24.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -261,6 +261,17 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.24.0 =
+* Added: one story from several sources is shown once. A new item joins the
+  story it matches among items still waiting - after Arabic letter forms,
+  diacritics, Persian digits and the zero-width non-joiner are folded - and
+  the queue shows it with the other sources named, a link to see them, and a
+  button to reject the rest.
+* Added: rules per source, under Logs & Tools > Source Health. A source can
+  follow the settings, always wait for review, or publish without review to
+  messengers of its own choosing, and AI rewriting can be forced on or off for
+  it. Choosing to publish without review asks first.
 
 = 1.23.0 =
 * Added: Telegram and Bale posts carry the featured image with a caption, laid

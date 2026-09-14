@@ -232,6 +232,7 @@ function wp_json_encode( $data ) {
 
 require_once WPNC_PLUGIN_DIR . 'includes/class-settings.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-link.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-similarity.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-filter.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-feed-reader.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-queue-repository.php';
@@ -242,6 +243,7 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-diagnostics.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-channels.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-messenger.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-template.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-scheduler.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publish-options.php';

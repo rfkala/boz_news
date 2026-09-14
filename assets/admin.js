@@ -380,14 +380,106 @@ jQuery(function($) {
         }
 
         var $grid = $('<div>').addClass('wpnc-grid').appendTo($app);
+
+        // One story from several sources is shown once, newest first, with
+        // the other copies folded under it. Grouped only within this page: a
+        // story split across pages still shows on each, which is no worse
+        // than it was.
+        var groups = {};
+        var order = [];
+
         items.forEach(function(item) {
-            renderCard($grid, item, terminal);
+            var key = String(item.group_key || item.id);
+            if (!groups[key]) {
+                groups[key] = [];
+                order.push(key);
+            }
+            groups[key].push(item);
+        });
+
+        order.forEach(function(key) {
+            var members = groups[key];
+            var lead = members[0];
+
+            renderCard($grid, lead, terminal);
+
+            members.slice(1).forEach(function(member) {
+                renderCard($grid, member, terminal);
+                $('#wpnc-item-' + member.id).addClass('wpnc-card-member').attr('data-group', key).hide();
+            });
+
+            if (members.length > 1 && !terminal) {
+                renderGroupNote($('#wpnc-item-' + lead.id), key, members.slice(1));
+            }
         });
 
         renderEditModal($app);
         renderPagination($app, data);
         bindQueueEvents();
         syncExportLink();
+    }
+
+    /**
+     * "The same story from N other sources", on the card that stands for it.
+     *
+     * Rejecting the others is one click because that is what a moderator does
+     * with them nearly every time - and the reason this exists: judging the
+     * same event five times over was the work being wasted.
+     */
+    function renderGroupNote($card, key, others) {
+        var sources = [];
+
+        others.forEach(function(item) {
+            if (item.source_name && sources.indexOf(item.source_name) === -1) {
+                sources.push(item.source_name);
+            }
+        });
+
+        var $note = $('<div>').addClass('wpnc-group-note').attr('dir', 'auto');
+
+        $('<span>').addClass('wpnc-group-label')
+            .text(t('group_also', 'Same story from') + ' ' + others.length + ' ' + t('group_more', 'more') +
+                (sources.length ? ': ' + sources.join(t('list_sep', ', ')) : ''))
+            .appendTo($note);
+
+        var $toggle = $('<button>').attr({ type: 'button', 'aria-expanded': 'false' })
+            .addClass('button-link wpnc-group-toggle')
+            .text(t('group_show', 'Show them'))
+            .appendTo($note);
+
+        $toggle.on('click', function() {
+            var $members = $('.wpnc-card-member[data-group="' + key + '"]');
+            var opening = $toggle.attr('aria-expanded') !== 'true';
+
+            $members.toggle(opening);
+            $toggle.attr('aria-expanded', opening ? 'true' : 'false')
+                .text(opening ? t('group_hide', 'Hide them') : t('group_show', 'Show them'));
+        });
+
+        $('<button>').attr('type', 'button')
+            .addClass('button button-small wpnc-group-reject')
+            .text(t('group_reject', 'Reject the others'))
+            .on('click', function() {
+                var $button = $(this);
+
+                if (!window.confirm(t('group_confirm', 'Reject the other copies of this story? The one shown stays in the queue.'))) {
+                    return;
+                }
+
+                setBusy($button, true);
+                request('wpnc_bulk_reject', { ids: others.map(function(item) { return item.id; }) })
+                    .done(function(data) {
+                        flash((data && data.message) || t('done', 'Done.'), 'ok');
+                        loadQueue();
+                    })
+                    .fail(function(error) {
+                        flash(error.message, 'error');
+                        setBusy($button, false);
+                    });
+            })
+            .appendTo($note);
+
+        $note.insertBefore($card.find('.wpnc-actions'));
     }
 
     /* The export is a normal link so the browser handles the download; keep
@@ -1671,7 +1763,8 @@ jQuery(function($) {
     var queueFocus = -1;
 
     function queueCards() {
-        return $('#wpnc-moderation-app .wpnc-card');
+        // Folded copies of a story are not stops on the way down the queue.
+        return $('#wpnc-moderation-app .wpnc-card:visible');
     }
 
     function focusCard(index) {
@@ -3103,6 +3196,49 @@ jQuery(function($) {
                 })
                 .fail(function(error) {
                     report($cell, error.message, 'error');
+                })
+                .always(function() {
+                    setBusy($button, false);
+                });
+        });
+
+        $table.on('click', '.wpnc-policy-edit', function() {
+            var $button = $(this);
+            var $row = $button.closest('tr').next('.wpnc-policy-row');
+            var opening = $row.prop('hidden');
+
+            $row.prop('hidden', !opening);
+            $button.attr('aria-expanded', opening ? 'true' : 'false');
+        });
+
+        $table.on('click', '.wpnc-policy-save', function() {
+            var $button = $(this);
+            var $form = $button.closest('.wpnc-policy-form');
+            var $result = $form.find('.wpnc-policy-result');
+            var mode = $form.find('.wpnc-policy-mode').val();
+
+            // The one choice here that takes a person out of the loop.
+            if (mode === 'publish' && !window.confirm(t('confirm_policy_publish', 'Items from this source will be published without anyone reading them first. Continue?'))) {
+                return;
+            }
+
+            var channels = $form.find('.wpnc-policy-channels input:checked').map(function() {
+                return $(this).val();
+            }).get();
+
+            setBusy($button, true);
+            request('wpnc_save_source_policy', {
+                source_id: $form.data('source-id'),
+                mode: mode,
+                rewrite: $form.find('.wpnc-policy-rewrite').val(),
+                channels: channels
+            })
+                .done(function(data) {
+                    $result.removeClass('wpnc-health-bad').addClass('wpnc-health-ok').text(data.message);
+                    $form.closest('tr').prev('tr').find('.wpnc-policy-summary').text(data.summary || '');
+                })
+                .fail(function(error) {
+                    $result.removeClass('wpnc-health-ok').addClass('wpnc-health-bad').text(error.message);
                 })
                 .always(function() {
                     setBusy($button, false);

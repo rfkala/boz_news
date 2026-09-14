@@ -1287,6 +1287,7 @@ class WPNC_Admin {
 					$fails   = absint( isset( $record['fails'] ) ? $record['fails'] : 0 );
 					$last_ok = absint( isset( $record['last_ok'] ) ? $record['last_ok'] : 0 );
 					$cooling = $fetcher->cooldown_remaining( $id );
+					$policy  = WPNC_Source_Policy::for_source( $id );
 
 					if ( empty( $source['valid'] ) ) {
 						$state = wpnc__( 'Unsafe URL', 'آدرس ناامن' );
@@ -1328,7 +1329,10 @@ class WPNC_Admin {
 					}
 					?>
 					<tr>
-						<td dir="ltr" class="wpnc-health-url"><?php echo esc_html( $source['source_key'] ? $source['source_key'] . ' — ' . $source['url'] : $source['url'] ); ?></td>
+						<td class="wpnc-health-url">
+							<span dir="ltr"><?php echo esc_html( $source['source_key'] ? $source['source_key'] . ' — ' . $source['url'] : $source['url'] ); ?></span>
+							<span class="wpnc-policy-summary" dir="auto"><?php echo esc_html( WPNC_Source_Policy::describe( $policy ) ); ?></span>
+						</td>
 						<td><span class="wpnc-badge <?php echo esc_attr( $class ); ?>"><?php echo esc_html( $state ); ?></span></td>
 						<td><?php echo esc_html( $last_ok ? WPNC_Time::for_display( gmdate( 'Y-m-d H:i:s', $last_ok ) ) : '—' ); ?></td>
 						<td dir="auto"><?php echo esc_html( $result ); ?></td>
@@ -1343,7 +1347,49 @@ class WPNC_Admin {
 							<?php if ( $fails > 0 ) : ?>
 								<button type="button" class="button button-small wpnc-reset-health"><?php wpnc_e( 'Reset', 'پاک کردن خطا' ); ?></button>
 							<?php endif; ?>
+							<button type="button" class="button button-small wpnc-policy-edit" aria-expanded="false"><?php wpnc_e( 'Rules', 'قوانین' ); ?></button>
 							<span class="wpnc-health-result" dir="auto"></span>
+						</td>
+					</tr>
+					<tr class="wpnc-policy-row" hidden>
+						<td colspan="5">
+							<div class="wpnc-policy-form" data-source-id="<?php echo esc_attr( $id ); ?>">
+								<label class="wpnc-policy-field">
+									<span><?php wpnc_e( 'New items', 'خبرهای جدید' ); ?></span>
+									<select class="wpnc-policy-mode">
+										<option value="inherit" <?php selected( $policy['mode'], 'inherit' ); ?>><?php wpnc_e( 'Follow the settings', 'طبق تنظیمات' ); ?></option>
+										<option value="review" <?php selected( $policy['mode'], 'review' ); ?>><?php wpnc_e( 'Always wait for review', 'همیشه منتظر بازبینی' ); ?></option>
+										<option value="publish" <?php selected( $policy['mode'], 'publish' ); ?>><?php wpnc_e( 'Publish without review', 'انتشار بدون بازبینی' ); ?></option>
+									</select>
+								</label>
+								<label class="wpnc-policy-field">
+									<span><?php wpnc_e( 'AI rewrite on import', 'بازنویسی هوش مصنوعی هنگام ورود' ); ?></span>
+									<select class="wpnc-policy-rewrite">
+										<option value="inherit" <?php selected( $policy['rewrite'], 'inherit' ); ?>><?php wpnc_e( 'Follow the settings', 'طبق تنظیمات' ); ?></option>
+										<option value="on" <?php selected( $policy['rewrite'], 'on' ); ?>><?php wpnc_e( 'Always', 'همیشه' ); ?></option>
+										<option value="off" <?php selected( $policy['rewrite'], 'off' ); ?>><?php wpnc_e( 'Never', 'هرگز' ); ?></option>
+									</select>
+								</label>
+								<fieldset class="wpnc-policy-channels">
+									<legend><?php wpnc_e( 'When published without review, also send to', 'هنگام انتشار بدون بازبینی، ارسال به' ); ?></legend>
+									<?php foreach ( WPNC_Channels::all() as $bot_slug => $bot ) : ?>
+										<?php
+										if ( 'bot' !== $bot['kind'] ) {
+											continue;
+										}
+										?>
+										<label>
+											<input type="checkbox" value="<?php echo esc_attr( $bot_slug ); ?>" <?php checked( in_array( $bot_slug, $policy['channels'], true ) ); ?> />
+											<?php echo esc_html( $bot['label'] ); ?>
+										</label>
+									<?php endforeach; ?>
+									<p class="description"><?php wpnc_e( 'None ticked means every messenger that is set up.', 'اگر هیچ‌کدام تیک نخورد، یعنی همهٔ پیام‌رسان‌های تنظیم‌شده.' ); ?></p>
+								</fieldset>
+								<p class="wpnc-policy-actions">
+									<button type="button" class="button button-primary button-small wpnc-policy-save"><?php wpnc_e( 'Save rules', 'ذخیرهٔ قوانین' ); ?></button>
+									<span class="wpnc-policy-result" dir="auto" aria-live="polite"></span>
+								</p>
+							</div>
 						</td>
 					</tr>
 				<?php endforeach; ?>
