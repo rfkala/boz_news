@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WPNC_DB {
 
-	const SCHEMA_VERSION = '1.7.0';
+	const SCHEMA_VERSION = '1.8.0';
 
 	/**
 	 * Columns the queue table must have for the plugin to write to it.
@@ -77,6 +77,7 @@ class WPNC_DB {
 	public function activate() {
 		$this->create_tables();
 		update_option( 'wpnc_schema_version', self::SCHEMA_VERSION );
+		WPNC_Roles::install();
 
 		if ( class_exists( 'WPNC_CPT' ) ) {
 			$cpt = new WPNC_CPT();
@@ -445,6 +446,7 @@ class WPNC_DB {
 		$queue_table     = $wpdb->prefix . 'news_queue';
 		$logs_table      = $wpdb->prefix . 'news_collector_logs';
 		$seen_table      = $wpdb->prefix . 'news_seen';
+		$history_table   = $wpdb->prefix . 'news_history';
 
 		$queue_sql = "CREATE TABLE $queue_table (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -513,10 +515,26 @@ class WPNC_DB {
 			KEY seen_at (seen_at)
 		) $charset_collate;";
 
+		// What happened to each item and who did it. Its own table rather than
+		// the log: the log records runs and errors, and nothing in it could be
+		// looked up by item.
+		$history_sql = "CREATE TABLE $history_table (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			item_id bigint(20) unsigned NOT NULL,
+			action varchar(40) DEFAULT '' NOT NULL,
+			user_id bigint(20) unsigned DEFAULT 0 NOT NULL,
+			detail text NULL,
+			created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+			PRIMARY KEY  (id),
+			KEY item_id (item_id),
+			KEY created_at (created_at)
+		) $charset_collate;";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $queue_sql );
 		dbDelta( $logs_sql );
 		dbDelta( $seen_sql );
+		dbDelta( $history_sql );
 
 		// dbDelta declines to add a column often enough - a table it cannot
 		// parse, a collation mismatch, an ALTER it decides against - and it
@@ -526,7 +544,7 @@ class WPNC_DB {
 
 		// dbDelta never reports failure, so verify instead of assuming.
 		$missing = array();
-		foreach ( array( $queue_table, $logs_table, $seen_table ) as $table ) {
+		foreach ( array( $queue_table, $logs_table, $seen_table, $history_table ) as $table ) {
 			if ( ! $this->table_exists( $table ) ) {
 				$missing[] = $table;
 			}

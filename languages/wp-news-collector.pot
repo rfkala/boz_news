@@ -7,27 +7,27 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:170
+#: wp-news-collector.php:180
 msgid "All categories"
 msgstr ""
 
-#: wp-news-collector.php:740
+#: wp-news-collector.php:758
 msgid "Boz News"
 msgstr ""
 
-#: wp-news-collector.php:742
+#: wp-news-collector.php:760
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr ""
 
-#: wp-news-collector.php:199
+#: wp-news-collector.php:209
 msgid "Bulletin settings"
 msgstr ""
 
-#: wp-news-collector.php:204
+#: wp-news-collector.php:214
 msgid "Category"
 msgstr ""
 
-#: wp-news-collector.php:229
+#: wp-news-collector.php:239
 msgid "Could not load more news. Please try again."
 msgstr ""
 
@@ -39,36 +39,36 @@ msgstr ""
 msgid "Every 3 Hours"
 msgstr ""
 
-#: wp-news-collector.php:203
+#: wp-news-collector.php:213
 msgid "Grid"
 msgstr ""
 
-#: wp-news-collector.php:201
+#: wp-news-collector.php:211
 msgid "Layout"
 msgstr ""
 
-#: wp-news-collector.php:202
+#: wp-news-collector.php:212
 msgid "List"
 msgstr ""
 
-#: wp-news-collector.php:227
+#: wp-news-collector.php:237
 #: includes/class-shortcode.php:94
 msgid "Load More News"
 msgstr ""
 
-#: wp-news-collector.php:226
+#: wp-news-collector.php:236
 msgid "Loading..."
 msgstr ""
 
-#: wp-news-collector.php:197
+#: wp-news-collector.php:207
 msgid "News bulletin"
 msgstr ""
 
-#: wp-news-collector.php:228
+#: wp-news-collector.php:238
 msgid "No more news"
 msgstr ""
 
-#: includes/class-ajax.php:1457
+#: includes/class-ajax.php:1501
 msgid "No more posts available."
 msgstr ""
 
@@ -76,22 +76,22 @@ msgstr ""
 msgid "No news found."
 msgstr ""
 
-#: wp-news-collector.php:200
+#: wp-news-collector.php:210
 msgid "Number of items"
 msgstr ""
 
-#: wp-news-collector.php:205
+#: wp-news-collector.php:215
 msgid "Show pictures"
 msgstr ""
 
-#: wp-news-collector.php:206
+#: wp-news-collector.php:216
 msgid "Show the source"
 msgstr ""
 
-#: wp-news-collector.php:207
+#: wp-news-collector.php:217
 msgid "Summary length (words)"
 msgstr ""
 
-#: wp-news-collector.php:198
+#: wp-news-collector.php:208
 msgid "The latest news this site published, with pictures."
 msgstr ""

@@ -26,7 +26,7 @@ class WPNC_Admin {
 		add_menu_page(
 			wpnc__( 'Boz News', 'بُز نیوز' ),
 			wpnc__( 'Boz News', 'بُز نیوز' ),
-			'manage_options',
+			WPNC_Roles::menu_capability(),
 			'boz-news',
 			array( $this, 'render_admin_page' ),
 			self::MENU_ICON,
@@ -39,7 +39,7 @@ class WPNC_Admin {
 			'boz-news',
 			wpnc__( 'Boz News', 'بُز نیوز' ),
 			wpnc__( 'Dashboard', 'داشبورد' ),
-			'manage_options',
+			WPNC_Roles::menu_capability(),
 			'boz-news',
 			array( $this, 'render_admin_page' )
 		);
@@ -116,7 +116,7 @@ class WPNC_Admin {
 	}
 
 	public function render_admin_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! WPNC_Roles::can_moderate() ) {
 			wp_die(
 				esc_html( wpnc__( 'You do not have permission to open Boz News.', 'شما اجازه دسترسی به بُز نیوز را ندارید.' ) ),
 				esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ),
@@ -127,7 +127,9 @@ class WPNC_Admin {
 		$is_rtl     = ( 'en' !== get_option( 'wpnc_admin_lang', 'fa' ) );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
-		$tabs       = $this->tabs();
+		// A moderator is offered the queue, never Settings or Logs & Tools; an
+		// address typed for one of those lands on the dashboard instead.
+		$tabs       = WPNC_Roles::visible_tabs( $this->tabs(), current_user_can( 'manage_options' ) );
 
 		if ( ! isset( $tabs[ $active_tab ] ) ) {
 			$active_tab = 'dashboard';
@@ -1023,9 +1025,12 @@ class WPNC_Admin {
 					<p class="wpnc-dash-sub" id="wpnc-dash-subtitle"></p>
 				</div>
 				<p class="wpnc-dash-actions">
-					<button type="button" class="button button-primary" id="wpnc-dash-fetch">
-						<?php wpnc_e( 'Fetch Now', 'دریافت فوری' ); ?>
-					</button>
+					<?php // Fetching runs through the Logs & Tools endpoints, which a moderator cannot call. ?>
+					<?php if ( current_user_can( 'manage_options' ) ) : ?>
+						<button type="button" class="button button-primary" id="wpnc-dash-fetch">
+							<?php wpnc_e( 'Fetch Now', 'دریافت فوری' ); ?>
+						</button>
+					<?php endif; ?>
 					<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'boz-news', 'tab' => 'moderation' ), admin_url( 'admin.php' ) ) ); ?>">
 						<?php wpnc_e( 'Open the queue', 'رفتن به صف تأیید' ); ?>
 					</a>
@@ -1080,7 +1085,7 @@ class WPNC_Admin {
 	 * was the retention job deleting it.
 	 */
 	public function export_queue() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! WPNC_Roles::can_moderate() ) {
 			wp_die(
 				esc_html( wpnc__( 'You do not have permission to export the queue.', 'شما اجازه گرفتن خروجی از صف را ندارید.' ) ),
 				esc_html( wpnc__( 'Boz News', 'بُز نیوز' ) ),

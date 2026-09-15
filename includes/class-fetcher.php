@@ -167,8 +167,13 @@ class WPNC_Fetcher {
 				return $summary;
 			}
 
-			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-			@set_time_limit( 300 );
+			// Only a limit already in force is raised. Under WP-CLI there is none,
+			// and setting one here would put a 300 second ceiling on a run that
+			// was deliberately given longer with --budget.
+			if ( (int) ini_get( 'max_execution_time' ) > 0 ) {
+				// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+				@set_time_limit( 300 );
+			}
 
 			$total    = count( $sources );
 			$deadline = microtime( true ) + WPNC_Settings::time_budget();
@@ -288,6 +293,8 @@ class WPNC_Fetcher {
 
 		$queue_rows = $this->queue->cleanup( $queue_days );
 		$log_rows   = $this->logger->cleanup( $log_days );
+
+		WPNC_History::cleanup( $log_days );
 
 		if ( $queue_rows ) {
 			$this->logger->log(
@@ -514,6 +521,8 @@ class WPNC_Fetcher {
 			);
 			return 'error';
 		}
+
+		WPNC_History::record( $inserted, 'imported', array( 'source' => $item['source_name'] ) );
 
 		return 'queued';
 	}

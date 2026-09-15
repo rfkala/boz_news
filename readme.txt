@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.26.0
+Stable tag: 1.27.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -208,6 +208,29 @@ Open Logs & Tools and look for "No featured image was found for this item" or
 Each item's featured image can also be checked and changed in the editor
 before sending, under Featured image.
 
+= Can someone moderate without being an administrator? =
+
+Yes. The queue needs the `wpnc_moderate_news` capability, which
+administrators and editors are given, and which the News moderator role gives
+to a user who should do nothing else. A moderator sees the dashboard and the
+queue - editing, the assistant, approving, rejecting and undoing an approval -
+but not Settings or Logs & Tools, and cannot permanently delete queue items.
+Every decision is recorded in the item's History, with who made it.
+
+= How do I fetch on a real schedule instead of WP-Cron? =
+
+WP-Cron only runs when someone visits the site, so a quiet site can go hours
+between fetches. With WP-CLI on the server, run the fetch from the system
+crontab instead - every fifteen minutes, for example:
+
+`*/15 * * * * wp --path=/path/to/site boz-news fetch --quiet`
+
+and add `define( 'DISABLE_WP_CRON', true );` to wp-config.php so the two do
+not both run. `wp boz-news status` shows the last run, the lock and each
+source's health; `wp boz-news unlock` releases a lock left by a run that died,
+and `wp boz-news cleanup` runs retention now. A fetch from the command line
+can be given longer than a web request with `--budget=<seconds>`.
+
 = Are API keys displayed in the admin? =
 
 No. Saved OpenAI and Telegram secrets are never rendered back into the form.
@@ -271,6 +294,17 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.27.0 =
+* Added: a News moderator role. Moderators and editors can open the
+  dashboard and the moderation queue, approve, reject and edit items, while
+  settings, sources, logs and deleting stay with administrators.
+* Added: a History for each queued item - when it was imported, edited,
+  rewritten, approved, rejected or unpublished, and by whom. History follows
+  the log retention setting.
+* Added: WP-CLI commands - `wp boz-news fetch`, `status`, `unlock` and
+  `cleanup` - so a server cron can fetch on a real schedule.
+* Fixed: a fetch no longer lowers a PHP time limit that was already unlimited.
 
 = 1.26.0 =
 * Added: the news list on the site shows each item's featured image, the

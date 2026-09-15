@@ -45,6 +45,7 @@ class WPNC_Ajax {
 		add_action( 'wp_ajax_wpnc_toggle_source', array( $this, 'toggle_source' ) );
 		add_action( 'wp_ajax_wpnc_reset_source_health', array( $this, 'reset_source_health' ) );
 		add_action( 'wp_ajax_wpnc_save_source_policy', array( $this, 'save_source_policy' ) );
+		add_action( 'wp_ajax_wpnc_item_history', array( $this, 'item_history' ) );
 		add_action( 'wp_ajax_wpnc_fetch_full_text', array( $this, 'fetch_full_text' ) );
 		add_action( 'wp_ajax_wpnc_detect_image', array( $this, 'detect_image' ) );
 		add_action( 'wp_ajax_wpnc_ai_transform', array( $this, 'ai_transform' ) );
@@ -68,7 +69,7 @@ class WPNC_Ajax {
 	 * Get queue items.
 	 */
 	public function get_queue() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$page   = isset( $_POST['page'] ) ? absint( wp_unslash( $_POST['page'] ) ) : 1;
 		$limit  = isset( $_POST['limit'] ) ? absint( wp_unslash( $_POST['limit'] ) ) : 20;
@@ -91,7 +92,7 @@ class WPNC_Ajax {
 	 * Approve one queue item.
 	 */
 	public function approve_item() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$id   = $this->get_posted_id();
 		$item = $this->queue->get( $id );
@@ -146,6 +147,7 @@ class WPNC_Ajax {
 
 			if ( is_wp_error( $post_id ) ) {
 				$this->queue->mark_error( $id, $post_id->get_error_message() );
+				WPNC_History::record( $id, 'failed', array( 'error' => $post_id->get_error_message() ) );
 				$this->fail( $post_id->get_error_message(), 'wpnc_publish_failed' );
 			}
 		}
@@ -155,6 +157,7 @@ class WPNC_Ajax {
 		// used to leave the row pending with the post already live - so the
 		// next click published the same story a second time.
 		$this->queue->mark_approved( $id, $post_id );
+		WPNC_History::record( $id, 'approved', $this->approval_detail( $channels, $post_id ) );
 
 		// Without a post there is no permalink, so readers get the original.
 		// A scheduled post holds its messages until it is public.
@@ -200,6 +203,23 @@ class WPNC_Ajax {
 		}
 
 		return WPNC_Channels::sanitize_selection( is_array( $raw ) ? $raw : explode( ',', (string) $raw ) );
+	}
+
+	/**
+	 * The facts an approval is recorded with.
+	 *
+	 * @param array $channels Destinations.
+	 * @param int   $post_id  Post id, 0 when the site was not one.
+	 * @return array
+	 */
+	private function approval_detail( $channels, $post_id ) {
+		$post = $post_id ? get_post( $post_id ) : null;
+
+		return array(
+			'channels'  => array_values( (array) $channels ),
+			'post_id'   => $post_id,
+			'scheduled' => ( $post && 'future' === $post->post_status ) ? WPNC_Time::for_display( $post->post_date_gmt ) : '',
+		);
 	}
 
 	/**
@@ -337,7 +357,7 @@ class WPNC_Ajax {
 	 * Reject one queue item.
 	 */
 	public function reject_item() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$id   = $this->get_posted_id();
 		$item = $this->queue->get( $id );
@@ -358,6 +378,7 @@ class WPNC_Ajax {
 		}
 
 		$this->queue->update_status( $id, 'rejected' );
+		WPNC_History::record( $id, 'rejected' );
 
 		wp_send_json_success( array( 'message' => wpnc__( 'Item rejected successfully.', 'آیتم رد شد.' ) ) );
 	}
@@ -366,7 +387,7 @@ class WPNC_Ajax {
 	 * Edit queue item.
 	 */
 	public function edit_item() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$id          = $this->get_posted_id();
 		$title       = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
@@ -424,6 +445,8 @@ class WPNC_Ajax {
 			);
 		}
 
+		WPNC_History::record( $id, 'edited' );
+
 		wp_send_json_success( array( 'message' => wpnc__( 'Item updated successfully.', 'تغییرات ذخیره شد.' ) ) );
 	}
 
@@ -431,7 +454,7 @@ class WPNC_Ajax {
 	 * Bulk approve.
 	 */
 	public function bulk_approve() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		@set_time_limit( 120 );
@@ -470,6 +493,7 @@ class WPNC_Ajax {
 
 				if ( is_wp_error( $post_id ) ) {
 					$this->queue->mark_error( $id, $post_id->get_error_message() );
+					WPNC_History::record( $id, 'failed', array( 'error' => $post_id->get_error_message() ) );
 					$error_count++;
 					continue;
 				}
@@ -477,6 +501,7 @@ class WPNC_Ajax {
 
 			// Before delivery, for the same reason as the single approve.
 			$this->queue->mark_approved( $id, $post_id );
+			WPNC_History::record( $id, 'approved', $this->approval_detail( $channels, $post_id ) );
 			$success_count++;
 
 			$this->publisher->deliver_or_defer(
@@ -523,7 +548,7 @@ class WPNC_Ajax {
 	 * Bulk reject.
 	 */
 	public function bulk_reject() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$ids           = $this->get_posted_ids();
 		$success_count = 0;
@@ -537,6 +562,7 @@ class WPNC_Ajax {
 			}
 
 			$this->queue->update_status( $id, 'rejected' );
+			WPNC_History::record( $id, 'rejected' );
 			$success_count++;
 		}
 
@@ -622,7 +648,7 @@ class WPNC_Ajax {
 	 * WordPress itself.
 	 */
 	public function unpublish_item() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$id   = $this->get_posted_id();
 		$item = $this->queue->get( $id );
@@ -649,6 +675,8 @@ class WPNC_Ajax {
 		if ( ! $this->queue->reopen( $id ) ) {
 			$this->fail( wpnc__( 'Could not reopen this item.', 'بازگرداندن این آیتم ممکن نبود.' ), 'wpnc_reopen_failed' );
 		}
+
+		WPNC_History::record( $id, 'unpublished', array( 'post_id' => $post_id ) );
 
 		$this->logger->log(
 			WPNC_Logger::LEVEL_WARNING,
@@ -760,6 +788,15 @@ class WPNC_Ajax {
 	}
 
 	/**
+	 * What happened to one item, and who did it.
+	 */
+	public function item_history() {
+		$this->check_admin_request( WPNC_Roles::MODERATE );
+
+		wp_send_json_success( array( 'entries' => WPNC_History::for_item( $this->get_posted_id() ) ) );
+	}
+
+	/**
 	 * Store one source's rules.
 	 */
 	public function save_source_policy() {
@@ -816,7 +853,7 @@ class WPNC_Ajax {
 	 * here - the text goes back to the editor and the editor decides.
 	 */
 	public function fetch_full_text() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		@set_time_limit( 120 );
@@ -869,7 +906,7 @@ class WPNC_Ajax {
 	 * made in the editor.
 	 */
 	public function detect_image() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 		@set_time_limit( 60 );
@@ -957,7 +994,7 @@ class WPNC_Ajax {
 	 * Run an AI action over the editor's current content.
 	 */
 	public function ai_transform() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		if ( ! WPNC_AI_Rewriter::is_configured() ) {
 			$this->fail(
@@ -1002,6 +1039,13 @@ class WPNC_Ajax {
 			);
 
 			$this->fail( $result->get_error_message(), 'wpnc_ai_failed' );
+		}
+
+		// Recorded even though nothing is saved yet: an assistant run is a
+		// decision about the item, and it can cost money.
+		$item_id = isset( $_POST['id'] ) ? absint( wp_unslash( $_POST['id'] ) ) : 0;
+		if ( $item_id ) {
+			WPNC_History::record( $item_id, 'ai', array( 'ai_action' => $action ) );
 		}
 
 		$kind = isset( $result['kind'] ) ? $result['kind'] : 'body';
@@ -1072,7 +1116,7 @@ class WPNC_Ajax {
 	 * the real ones rather than an approximation built in the browser.
 	 */
 	public function preview_item() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$id   = $this->get_posted_id();
 		$item = $this->queue->get( $id );
@@ -1123,7 +1167,7 @@ class WPNC_Ajax {
 	 * Everything the dashboard draws, in one request.
 	 */
 	public function get_dashboard() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		$fetcher = new WPNC_Fetcher();
 		$sources = $fetcher->get_sources();
@@ -1209,7 +1253,7 @@ class WPNC_Ajax {
 	 * Get queue stats.
 	 */
 	public function get_stats() {
-		$this->check_admin_request();
+		$this->check_admin_request( WPNC_Roles::MODERATE );
 
 		wp_send_json_success( $this->queue->get_stats() );
 	}
@@ -1498,10 +1542,17 @@ class WPNC_Ajax {
 	/**
 	 * Check admin AJAX nonce and capability.
 	 */
-	private function check_admin_request() {
+	private function check_admin_request( $capability = 'manage_options' ) {
 		check_ajax_referer( 'wpnc_admin_nonce', 'nonce' );
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		// Administrator-only unless an endpoint names the moderation
+		// capability: anything not deliberately opened to moderators stays
+		// closed to them.
+		$allowed = WPNC_Roles::MODERATE === $capability
+			? WPNC_Roles::can_moderate()
+			: current_user_can( $capability );
+
+		if ( ! $allowed ) {
 			$this->fail( wpnc__( 'Unauthorized access.', 'دسترسی غیرمجاز.' ), 'wpnc_forbidden', array(), 403 );
 		}
 	}

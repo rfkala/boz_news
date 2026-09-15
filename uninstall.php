@@ -57,6 +57,7 @@ $options = array(
 	'wpnc_alert_chat_id',
 	'wpnc_alert_state',
 	'wpnc_source_policies',
+	'wpnc_roles_version',
 
 	// Runtime state.
 	'wpnc_last_run',
@@ -88,3 +89,11 @@ foreach ( array( '_wpnc_source_url', '_wpnc_source_name', '_wpnc_source_guid', '
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_queue" );
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_collector_logs" );
 $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_seen" );
+$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}news_history" );
+
+// The capability and the role. Plugin classes are not loaded during uninstall,
+// so the names are spelled out here.
+foreach ( wp_roles()->role_objects as $wpnc_role ) {
+	$wpnc_role->remove_cap( 'wpnc_moderate_news' );
+}
+remove_role( 'wpnc_news_moderator' );

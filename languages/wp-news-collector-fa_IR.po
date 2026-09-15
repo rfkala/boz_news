@@ -8,27 +8,27 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 "X-Generator: tools/make_translations.py\n"
 
-#: wp-news-collector.php:170
+#: wp-news-collector.php:180
 msgid "All categories"
 msgstr "همهٔ دسته‌بندی‌ها"
 
-#: wp-news-collector.php:740
+#: wp-news-collector.php:758
 msgid "Boz News"
 msgstr "بُز نیوز"
 
-#: wp-news-collector.php:742
+#: wp-news-collector.php:760
 msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
 msgstr "بُز نیوز آیتم‌های فید RSS را در یک صف تأیید ذخیره می‌کند و در صورت فعال بودن این یکپارچگی‌ها، ممکن است متن مقاله را برای بازنویسی به OpenAI و لینک پست‌های منتشرشده را به تلگرام ارسال کند. فیدها و کلیدهای API تنظیم‌شده را بررسی کنید تا با سیاست حریم خصوصی سایت شما هم‌خوان باشند."
 
-#: wp-news-collector.php:199
+#: wp-news-collector.php:209
 msgid "Bulletin settings"
 msgstr "تنظیمات خبرنامه"
 
-#: wp-news-collector.php:204
+#: wp-news-collector.php:214
 msgid "Category"
 msgstr "دسته‌بندی"
 
-#: wp-news-collector.php:229
+#: wp-news-collector.php:239
 msgid "Could not load more news. Please try again."
 msgstr "دریافت اخبار بیشتر ممکن نشد. لطفاً دوباره تلاش کنید."
 
@@ -40,36 +40,36 @@ msgstr "هر ۱۵ دقیقه"
 msgid "Every 3 Hours"
 msgstr "هر ۳ ساعت"
 
-#: wp-news-collector.php:203
+#: wp-news-collector.php:213
 msgid "Grid"
 msgstr "شبکه‌ای"
 
-#: wp-news-collector.php:201
+#: wp-news-collector.php:211
 msgid "Layout"
 msgstr "چیدمان"
 
-#: wp-news-collector.php:202
+#: wp-news-collector.php:212
 msgid "List"
 msgstr "فهرست"
 
-#: wp-news-collector.php:227
+#: wp-news-collector.php:237
 #: includes/class-shortcode.php:94
 msgid "Load More News"
 msgstr "اخبار بیشتر"
 
-#: wp-news-collector.php:226
+#: wp-news-collector.php:236
 msgid "Loading..."
 msgstr "در حال بارگذاری..."
 
-#: wp-news-collector.php:197
+#: wp-news-collector.php:207
 msgid "News bulletin"
 msgstr "خبرنامه"
 
-#: wp-news-collector.php:228
+#: wp-news-collector.php:238
 msgid "No more news"
 msgstr "خبر دیگری نیست"
 
-#: includes/class-ajax.php:1457
+#: includes/class-ajax.php:1501
 msgid "No more posts available."
 msgstr "پست دیگری موجود نیست."
 
@@ -77,22 +77,22 @@ msgstr "پست دیگری موجود نیست."
 msgid "No news found."
 msgstr "خبری یافت نشد."
 
-#: wp-news-collector.php:200
+#: wp-news-collector.php:210
 msgid "Number of items"
 msgstr "تعداد خبر"
 
-#: wp-news-collector.php:205
+#: wp-news-collector.php:215
 msgid "Show pictures"
 msgstr "نمایش تصویر"
 
-#: wp-news-collector.php:206
+#: wp-news-collector.php:216
 msgid "Show the source"
 msgstr "نمایش منبع"
 
-#: wp-news-collector.php:207
+#: wp-news-collector.php:217
 msgid "Summary length (words)"
 msgstr "طول خلاصه (کلمه)"
 
-#: wp-news-collector.php:198
+#: wp-news-collector.php:208
 msgid "The latest news this site published, with pictures."
 msgstr "آخرین خبرهای منتشرشده در این سایت، همراه تصویر."

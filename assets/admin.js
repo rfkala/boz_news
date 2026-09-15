@@ -292,7 +292,8 @@ jQuery(function($) {
             };
         }
 
-        if (status === 'pending') {
+        // Sources and Fetch Now live on screens a moderator is not shown.
+        if (status === 'pending' && canAdmin()) {
             return {
                 hint: t('empty_pending_hint', 'Add RSS sources under Settings, then run Fetch Now from Logs & Tools.'),
                 action: { label: t('go_to_tools', 'Fetch now'), href: panelUrl('logs') }
@@ -361,14 +362,18 @@ jQuery(function($) {
             $('<button>').attr('type', 'button').addClass('button button-primary').attr('id', 'wpnc-bulk-approve').text(t('approve_selected', 'Approve Selected')).appendTo($bulk);
             renderBulkDestination($bulk);
             $('<button>').attr('type', 'button').addClass('button').attr('id', 'wpnc-bulk-reject').text(t('reject_selected', 'Reject Selected')).appendTo($bulk);
-            $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($bulk);
+            if (canAdmin()) {
+                $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($bulk);
+            }
         } else {
             var $terminalBulk = $('<div>').addClass('wpnc-bulk-actions').appendTo($app);
             $('<label>')
                 .append($('<input>').attr({ type: 'checkbox', id: 'wpnc-select-all' }))
                 .append(document.createTextNode(' ' + t('select_all', 'Select All')))
                 .appendTo($terminalBulk);
-            $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($terminalBulk);
+            if (canAdmin()) {
+                $('<button>').attr('type', 'button').addClass('button button-link-delete').attr('id', 'wpnc-bulk-delete').text(t('delete_selected', 'Delete Selected')).appendTo($terminalBulk);
+            }
         }
 
         if (!items.length) {
@@ -563,15 +568,26 @@ jQuery(function($) {
                     .data('id', item.id).text(t('undo_approve', 'Undo approve')).appendTo($actions);
             }
 
-            $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete')
-                .data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
+            $('<button>').attr('type', 'button').addClass('button wpnc-history-open')
+                .data('id', item.id).text(t('history', 'History')).appendTo($actions);
+
+            if (canAdmin()) {
+                $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete')
+                    .data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
+            }
             return;
         }
 
         renderSendButtons($actions, item.id);
         $('<button>').attr('type', 'button').addClass('button wpnc-edit').data('item', item).text(t('edit', 'Edit')).appendTo($actions);
         $('<button>').attr('type', 'button').addClass('button wpnc-reject').data('id', item.id).text(t('reject', 'Reject')).appendTo($actions);
-        $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete').data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
+        $('<button>').attr('type', 'button').addClass('button wpnc-history-open').data('id', item.id).text(t('history', 'History')).appendTo($actions);
+
+        // Permanent deletion is left to administrators; rejecting is the
+        // moderator's way of saying no.
+        if (canAdmin()) {
+            $('<button>').attr('type', 'button').addClass('button button-link-delete wpnc-delete').data('id', item.id).text(t('delete', 'Delete')).appendTo($actions);
+        }
     }
 
     /**
@@ -601,6 +617,74 @@ jQuery(function($) {
         $select.on('change', function() {
             $('#wpnc-bulk-approve').data('channels', $(this).val());
         }).trigger('change');
+    }
+
+    /* Whether this user administers the site. A moderator is not shown the
+       controls the server would refuse them. */
+    function canAdmin() {
+        return !!wpnc_ajax.can_admin;
+    }
+
+    /**
+     * What happened to an item, and who did it.
+     */
+    function showHistory(id) {
+        var $dialog = $('#wpnc-history');
+
+        if (!$dialog.length) {
+            $dialog = $('<div>')
+                .attr({ id: 'wpnc-history', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'wpnc-history-title' })
+                .addClass('wpnc-history')
+                .hide();
+
+            var $box = $('<div>').addClass('wpnc-history-box').appendTo($dialog);
+
+            $('<div>').addClass('wpnc-history-head')
+                .append($('<h3>').attr('id', 'wpnc-history-title').text(t('history_title', 'History')))
+                .append($('<button>').attr({ type: 'button', 'aria-label': t('dismiss', 'Dismiss') })
+                    .addClass('wpnc-history-close').text('×'))
+                .appendTo($box);
+
+            $('<ol>').addClass('wpnc-history-list').appendTo($box);
+
+            $dialog.on('click', function(event) {
+                if (event.target === this || $(event.target).is('.wpnc-history-close')) {
+                    $dialog.hide();
+                }
+            });
+
+            var $host = $('.wpnc-wrap').first();
+            $dialog.appendTo($host.length ? $host : 'body');
+        }
+
+        var $list = $dialog.find('.wpnc-history-list').empty();
+        $('<li>').addClass('wpnc-history-empty').text(t('loading', 'Loading...')).appendTo($list);
+        $dialog.show();
+        $dialog.find('.wpnc-history-close').trigger('focus');
+
+        request('wpnc_item_history', { id: id })
+            .done(function(data) {
+                var entries = (data && data.entries) || [];
+                $list.empty();
+
+                if (!entries.length) {
+                    $('<li>').addClass('wpnc-history-empty')
+                        .text(t('history_empty', 'Nothing has been recorded for this item yet.'))
+                        .appendTo($list);
+                    return;
+                }
+
+                entries.forEach(function(entry) {
+                    $('<li>').attr('dir', 'auto')
+                        .append($('<span>').addClass('wpnc-history-text').text(entry.text || ''))
+                        .append($('<span>').addClass('wpnc-history-meta')
+                            .text((entry.when || '') + (entry.user ? '  ·  ' + entry.user : '')))
+                        .appendTo($list);
+                });
+            })
+            .fail(function(error) {
+                $list.empty().append($('<li>').addClass('wpnc-history-empty').attr('dir', 'auto').text(error.message));
+            });
     }
 
     /**
@@ -1873,6 +1957,15 @@ jQuery(function($) {
             return;
         }
 
+        // While the history is open, keys belong to it: only Escape does
+        // anything, and it closes the dialog rather than moving the queue.
+        if ($('#wpnc-history').is(':visible')) {
+            if (event.key === 'Escape') {
+                $('#wpnc-history').hide();
+            }
+            return;
+        }
+
         if ($('#wpnc-edit-modal').is(':visible') || !$('#wpnc-moderation-app').is(':visible')) {
             return;
         }
@@ -1970,6 +2063,10 @@ jQuery(function($) {
         if (queueFocus >= 0) {
             focusCard(queueFocus);
         }
+
+        $('.wpnc-history-open').off('click').on('click', function() {
+            showHistory($(this).data('id'));
+        });
 
         $('#wpnc-select-all').off('change').on('change', function() {
             $('.wpnc-item-checkbox').prop('checked', $(this).prop('checked'));

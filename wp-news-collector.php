@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.26.0
+ * Version: 1.27.0
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.26.0' );
+define( 'WPNC_VERSION', '1.27.0' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -41,6 +41,8 @@ require_once WPNC_PLUGIN_DIR . 'includes/class-alerts.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-source-policy.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-seo.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-bulletin.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-roles.php';
+require_once WPNC_PLUGIN_DIR . 'includes/class-history.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-publisher.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-cpt.php';
 require_once WPNC_PLUGIN_DIR . 'includes/class-fetcher.php';
@@ -55,6 +57,14 @@ add_action( 'future_to_publish', array( 'WPNC_Publisher', 'deliver_deferred' ) )
 add_action( 'wpnc_ai_pool_exhausted', array( 'WPNC_Alerts', 'pool_exhausted' ) );
 
 WPNC_SEO::boot();
+
+// Before admin_menu and before any AJAX capability check on the same request.
+add_action( 'admin_init', array( 'WPNC_Roles', 'maybe_install' ) );
+
+if ( defined( 'WP_CLI' ) && WP_CLI ) {
+	require_once WPNC_PLUGIN_DIR . 'includes/class-cli.php';
+	WP_CLI::add_command( 'boz-news', 'WPNC_CLI' );
+}
 
 if ( is_admin() ) {
 	require_once WPNC_PLUGIN_DIR . 'includes/class-admin.php';
@@ -345,6 +355,8 @@ function wpnc_enqueue_admin_assets( $hook ) {
 			// than only naming it.
 			'panel_url'      => admin_url( 'admin.php?page=boz-news&tab=' ),
 			'ai_enabled'     => WPNC_AI_Rewriter::is_configured(),
+			// A moderator is not shown what the server would refuse them.
+			'can_admin'      => current_user_can( 'manage_options' ),
 			'ai_actions'     => WPNC_AI_Rewriter::actions(),
 			// Which destinations may be offered as a button, and why.
 			'channels'       => WPNC_Channels::status(),
@@ -545,6 +557,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'field_seo_description' => 'Meta description',
 				'field_seo_keyword' => 'Focus keyword',
 				'seo_hint' => 'For search engines. Leave the description empty to use the opening of the article. Yoast or Rank Math receive both when installed.',
+				'history' => 'History',
+				'history_title' => 'History',
+				'history_empty' => 'Nothing has been recorded for this item yet.',
 			),
 			'i18n_fa'        => array(
 				'loading'                => 'در حال بارگذاری...',
@@ -722,6 +737,9 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'field_seo_description' => 'توضیحات متا',
 				'field_seo_keyword' => 'کلمهٔ کلیدی',
 				'seo_hint' => 'برای موتورهای جست‌وجو. توضیحات را خالی بگذارید تا ابتدای متن خبر استفاده شود. اگر Yoast یا Rank Math نصب باشد، هر دو به آن داده می‌شوند.',
+				'history' => 'سابقه',
+				'history_title' => 'سابقهٔ خبر',
+				'history_empty' => 'هنوز چیزی برای این خبر ثبت نشده است.',
 			),
 		)
 	);
