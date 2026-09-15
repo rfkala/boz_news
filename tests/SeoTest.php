@@ -96,4 +96,11 @@ class SeoTest extends TestCase {
 	public function test_a_keyword_is_one_clean_line() {
 		$this->assertSame( 'interest rates', WPNC_SEO::clean_keyword( "  <i>interest</i>\n rates  " ) );
 	}
+
+	public function test_without_an_seo_plugin_the_page_output_is_ours() {
+		// No Yoast, Rank Math, All in One SEO, SEOPress or The SEO Framework
+		// constant is defined here, so nobody else prints a description and
+		// this plugin must.
+		$this->assertSame( '', WPNC_SEO::active_plugin() );
+	}
 }

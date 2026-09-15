@@ -76,16 +76,44 @@ class WPNC_Ajax {
 		$search = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		$status = isset( $_POST['status'] ) ? sanitize_key( wp_unslash( $_POST['status'] ) ) : 'pending';
 
-		wp_send_json_success(
-			$this->queue->get_items(
-				array(
-					'page'   => $page,
-					'limit'  => $limit,
-					'search' => $search,
-					'status' => $status,
-				)
+		$result = $this->queue->get_items(
+			array(
+				'page'   => $page,
+				'limit'  => $limit,
+				'search' => $search,
+				'status' => $status,
 			)
 		);
+
+		if ( isset( $result['items'] ) && is_array( $result['items'] ) ) {
+			foreach ( $result['items'] as $index => $item ) {
+				$result['items'][ $index ]['post_url'] = $this->post_url( isset( $item['post_id'] ) ? $item['post_id'] : 0 );
+			}
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Where "View post" should go for this user.
+	 *
+	 * The editor for whoever may edit the post. A moderator may not edit a
+	 * published post written under another author's name, and sending them to
+	 * the editor only showed WordPress refusing them, so they get the post.
+	 *
+	 * @param int $post_id Post id.
+	 * @return string Empty when there is no post to go to.
+	 */
+	private function post_url( $post_id ) {
+		$post_id = absint( $post_id );
+
+		if ( ! $post_id || ! get_post( $post_id ) ) {
+			return '';
+		}
+
+		$edit = current_user_can( 'edit_post', $post_id ) ? (string) get_edit_post_link( $post_id, 'raw' ) : '';
+
+		return '' !== $edit ? $edit : (string) get_permalink( $post_id );
 	}
 
 	/**

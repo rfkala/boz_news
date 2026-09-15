@@ -329,12 +329,15 @@ class WPNC_Admin {
 	private function next_fetch_chip() {
 		$label = wpnc__( 'Next fetch', 'دریافت بعدی' );
 
+		// Logs & Tools is not a moderator's screen; for them the chip only informs.
+		$logs_href = current_user_can( 'manage_options' ) ? $this->tab_url( 'logs' ) : '';
+
 		if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
 			return array(
 				'tone'  => 'warn',
 				'label' => $label,
 				'value' => wpnc__( 'cron off', 'کران خاموش' ),
-				'href'  => $this->tab_url( 'logs' ),
+				'href'  => $logs_href,
 			);
 		}
 
@@ -345,7 +348,7 @@ class WPNC_Admin {
 				'tone'  => 'warn',
 				'label' => $label,
 				'value' => wpnc__( 'not scheduled', 'زمان‌بندی نشده' ),
-				'href'  => $this->tab_url( 'logs' ),
+				'href'  => $logs_href,
 			);
 		}
 
@@ -354,7 +357,7 @@ class WPNC_Admin {
 				'tone'  => 'muted',
 				'label' => $label,
 				'value' => wpnc__( 'due now', 'همین حالا' ),
-				'href'  => $this->tab_url( 'logs' ),
+				'href'  => $logs_href,
 			);
 		}
 
@@ -362,7 +365,7 @@ class WPNC_Admin {
 			'tone'  => 'muted',
 			'label' => $label,
 			'value' => human_time_diff( time(), $next ),
-			'href'  => $this->tab_url( 'logs' ),
+			'href'  => $logs_href,
 		);
 	}
 

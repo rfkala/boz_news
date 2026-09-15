@@ -73,7 +73,7 @@ msgstr "خبرنامه"
 msgid "No more news"
 msgstr "خبر دیگری نیست"
 
-#: includes/class-ajax.php:1501
+#: includes/class-ajax.php:1529
 msgid "No more posts available."
 msgstr "پست دیگری موجود نیست."
 

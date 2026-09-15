@@ -10,7 +10,8 @@
  *
  * Where Yoast or Rank Math is installed, this writes into their fields and
  * leaves the page output to them: two descriptions or two schema blocks are
- * worse than one. Without either, it prints its own.
+ * worse than one. Other SEO plugins are left the page output as well. Without
+ * any, it prints its own.
  *
  * The text handling and the schema shape are pure, so they are testable.
  */
@@ -230,18 +231,26 @@ class WPNC_SEO {
 	/**
 	 * Which SEO plugin, if any, owns the page output.
 	 *
-	 * @return string yoast, rankmath or empty.
+	 * Yoast and Rank Math also get the description and keyword written into
+	 * their own fields. Any other SEO plugin prints a description and schema
+	 * of its own, and a second copy beside it only confuses search engines,
+	 * so for those this prints nothing. The wpnc_seo_plugin filter names one
+	 * this does not recognise.
+	 *
+	 * @return string yoast, rankmath, other or empty.
 	 */
 	public static function active_plugin() {
 		if ( defined( 'WPSEO_VERSION' ) ) {
-			return 'yoast';
+			$plugin = 'yoast';
+		} elseif ( defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' ) ) {
+			$plugin = 'rankmath';
+		} elseif ( defined( 'AIOSEO_VERSION' ) || defined( 'SEOPRESS_VERSION' ) || defined( 'THE_SEO_FRAMEWORK_VERSION' ) ) {
+			$plugin = 'other';
+		} else {
+			$plugin = '';
 		}
 
-		if ( defined( 'RANK_MATH_VERSION' ) || class_exists( 'RankMath' ) ) {
-			return 'rankmath';
-		}
-
-		return '';
+		return (string) apply_filters( 'wpnc_seo_plugin', $plugin );
 	}
 
 	/**

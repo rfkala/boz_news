@@ -555,10 +555,12 @@ jQuery(function($) {
         if (terminal) {
             $('<span>').addClass('wpnc-badge wpnc-badge-' + item.status).text(statusLabel(item.status)).appendTo($actions);
 
-            if (item.post_id) {
+            // The editor for whoever may edit the post, the post itself for a
+            // moderator, and no button once the post no longer exists.
+            if (item.post_id && item.post_url) {
                 $('<a>')
                     .addClass('button')
-                    .attr({ href: wpnc_ajax.post_edit_base + item.post_id, target: '_blank', rel: 'noopener' })
+                    .attr({ href: item.post_url, target: '_blank', rel: 'noopener' })
                     .text(t('view_post', 'View post'))
                     .appendTo($actions);
             }

@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.27.1
+Stable tag: 1.27.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -296,6 +296,17 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.27.2 =
+* Fixed: for a News moderator, View post on an approved item opened an editor
+  WordPress would not let them use. It now opens the post itself, and still
+  opens the editor for anyone allowed to edit the post.
+* Fixed: the Next fetch chip no longer links a moderator to Logs & Tools,
+  a screen they cannot open.
+* Fixed: with All in One SEO, SEOPress or The SEO Framework active, published
+  items no longer print a second meta description and NewsArticle block
+  beside theirs. The `wpnc_seo_plugin` filter covers SEO plugins not
+  recognised.
 
 = 1.27.1 =
 * Fixed: the assistant's "not set up" message asked for an OpenAI key even
