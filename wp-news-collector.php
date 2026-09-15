@@ -3,7 +3,7 @@
  * Plugin Name: Boz News
  * Plugin URI: https://example.com
  * Description: Fetch, moderate, rewrite, and publish news from RSS/Atom sources.
- * Version: 1.27.0
+ * Version: 1.27.1
  * Author: Arash
  * Text Domain: wp-news-collector
  * Domain Path: /languages
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WPNC_VERSION', '1.27.0' );
+define( 'WPNC_VERSION', '1.27.1' );
 define( 'WPNC_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WPNC_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'WPNC_PLUGIN_FILE', __FILE__ );
@@ -480,7 +480,7 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'ai_need_instruction'    => 'Tell the assistant what to change.',
 				'ai_instruction_label'   => 'What should the assistant change?',
 				'ai_placeholder'         => 'e.g. add a short intro paragraph explaining the background',
-				'ai_disabled'            => 'Add an OpenAI API key under Settings to use the assistant.',
+				'ai_disabled'            => 'The assistant needs an API key for the chosen AI provider. An administrator adds it under Settings.',
 				'remove'                 => 'Remove',
 				'key_placeholder'        => 'Paste a new key',
 				'confirm_remove_key'     => 'Remove this key?',
@@ -660,7 +660,7 @@ function wpnc_enqueue_admin_assets( $hook ) {
 				'ai_need_instruction'    => 'به دستیار بگویید چه تغییری می‌خواهید.',
 				'ai_instruction_label'   => 'دستیار چه تغییری بدهد؟',
 				'ai_placeholder'         => 'مثلاً: یک پاراگراف مقدمه کوتاه دربارهٔ پیشینه اضافه کن',
-				'ai_disabled'            => 'برای استفاده از دستیار، کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید.',
+				'ai_disabled'            => 'دستیار به کلید API ارائه‌دهندهٔ هوش مصنوعی انتخاب‌شده نیاز دارد. مدیر سایت آن را در تنظیمات وارد می‌کند.',
 				'remove'                 => 'حذف',
 				'key_placeholder'        => 'کلید جدید را اینجا بچسبانید',
 				'confirm_remove_key'     => 'این کلید حذف شود؟',
@@ -748,17 +748,28 @@ add_action( 'admin_enqueue_scripts', 'wpnc_enqueue_admin_assets' );
 
 /**
  * Add privacy policy content.
+ *
+ * Suggested text for the site's privacy policy page. It names every service
+ * the plugin can send data to, so it has to change whenever one is added.
  */
 function wpnc_add_privacy_policy_content() {
 	if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 		return;
 	}
 
-	wp_add_privacy_policy_content(
-		__( 'Boz News', 'wp-news-collector' ),
-		wp_kses_post(
-			__( 'Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy.', 'wp-news-collector' )
-		)
+	$paragraphs = array(
+		__( 'Boz News imports items from the RSS and Atom feeds an administrator sets up and keeps them in a moderation queue. It may also download the full article page and its images from the source site.', 'wp-news-collector' ),
+		__( 'When the AI assistant or automatic rewriting is turned on, the title and text of an article are sent to the AI provider chosen in the settings: OpenAI, Groq, Google Gemini, Anthropic Claude, GapGPT, or an address an administrator enters.', 'wp-news-collector' ),
+		__( 'When Telegram or Bale channels are turned on, the title, summary, tags, link and featured image of each published item are sent to those services. Alerts about problems, such as a source that stopped answering, go to a chat an administrator chooses.', 'wp-news-collector' ),
+		__( 'For each queued item, Boz News records which logged-in user edited it, rewrote it with the assistant, approved, rejected or unpublished it, and when. This history is deleted after the log retention period set in the settings.', 'wp-news-collector' ),
+		__( 'The news list shown to visitors does not collect information about them.', 'wp-news-collector' ),
 	);
+
+	$content = '';
+	foreach ( $paragraphs as $paragraph ) {
+		$content .= '<p>' . esc_html( $paragraph ) . '</p>';
+	}
+
+	wp_add_privacy_policy_content( __( 'Boz News', 'wp-news-collector' ), wp_kses_post( $content ) );
 }
 add_action( 'admin_init', 'wpnc_add_privacy_policy_content' );

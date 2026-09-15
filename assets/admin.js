@@ -1530,7 +1530,7 @@ jQuery(function($) {
 
         if (!wpnc_ajax.ai_enabled) {
             $('<p>').addClass('wpnc-ai-off').attr('dir', 'auto')
-                .text(t('ai_disabled', 'Add an OpenAI API key under Settings to use the assistant.'))
+                .text(t('ai_disabled', 'The assistant needs an API key for the chosen AI provider. An administrator adds it under Settings.'))
                 .appendTo($strip);
             return;
         }

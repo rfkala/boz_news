@@ -3,7 +3,7 @@ Contributors: arash
 Tags: rss, atom, news, aggregator, ai, moderation, persian, rtl
 Requires at least: 5.8
 Tested up to: 6.4
-Stable tag: 1.27.0
+Stable tag: 1.27.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -233,9 +233,11 @@ can be given longer than a web request with `--budget=<seconds>`.
 
 = Are API keys displayed in the admin? =
 
-No. Saved OpenAI and Telegram secrets are never rendered back into the form.
-Leave the field blank to keep the saved value, or enter `__delete__` to remove
-it.
+No. Saved AI provider keys and Telegram and Bale bot tokens are never rendered
+back into the form. Each saved AI key shows at most its first and last four
+characters, so keys can be told apart; leave its field blank to keep it, or
+use Remove to take it out. For a bot token, leave the field blank to keep the
+saved value, or enter `__delete__` to remove it.
 
 = What happens to old queue items? =
 
@@ -294,6 +296,14 @@ A timeout no longer retries the remaining keys. Every key would wait exactly
 as long, so trying them only multiplied the delay and then blamed the keys.
 
 == Changelog ==
+
+= 1.27.1 =
+* Fixed: the assistant's "not set up" message asked for an OpenAI key even
+  when another provider was chosen. It now asks for the chosen provider's
+  key, and tells a moderator that an administrator adds it.
+* Fixed: the suggested privacy policy text named only OpenAI and Telegram.
+  It now names every AI provider, Bale, the alerts, the pages and images
+  downloaded from sources, and the moderation history kept about users.
 
 = 1.27.0 =
 * Added: a News moderator role. Moderators and editors can open the

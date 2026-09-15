@@ -11,12 +11,12 @@ msgstr ""
 msgid "All categories"
 msgstr ""
 
-#: wp-news-collector.php:758
+#: wp-news-collector.php:773
 msgid "Boz News"
 msgstr ""
 
-#: wp-news-collector.php:760
-msgid "Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy."
+#: wp-news-collector.php:761
+msgid "Boz News imports items from the RSS and Atom feeds an administrator sets up and keeps them in a moderation queue. It may also download the full article page and its images from the source site."
 msgstr ""
 
 #: wp-news-collector.php:209
@@ -37,6 +37,10 @@ msgstr ""
 
 #: includes/class-fetcher.php:98
 msgid "Every 3 Hours"
+msgstr ""
+
+#: wp-news-collector.php:764
+msgid "For each queued item, Boz News records which logged-in user edited it, rewrote it with the assistant, approved, rejected or unpublished it, and when. This history is deleted after the log retention period set in the settings."
 msgstr ""
 
 #: wp-news-collector.php:213
@@ -94,4 +98,16 @@ msgstr ""
 
 #: wp-news-collector.php:208
 msgid "The latest news this site published, with pictures."
+msgstr ""
+
+#: wp-news-collector.php:765
+msgid "The news list shown to visitors does not collect information about them."
+msgstr ""
+
+#: wp-news-collector.php:763
+msgid "When Telegram or Bale channels are turned on, the title, summary, tags, link and featured image of each published item are sent to those services. Alerts about problems, such as a source that stopped answering, go to a chat an administrator chooses."
+msgstr ""
+
+#: wp-news-collector.php:762
+msgid "When the AI assistant or automatic rewriting is turned on, the title and text of an article are sent to the AI provider chosen in the settings: OpenAI, Groq, Google Gemini, Anthropic Claude, GapGPT, or an address an administrator enters."
 msgstr ""

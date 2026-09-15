@@ -54,8 +54,16 @@ TRANSLATIONS = {
 
     # Privacy policy text.
     'Boz News': 'بُز نیوز',
-    'Boz News stores RSS feed items in a moderation queue and may send article text to OpenAI for rewriting and published post links to Telegram when those integrations are enabled. Review your configured feeds and API keys to ensure they match your site privacy policy.':
-        'بُز نیوز آیتم‌های فید RSS را در یک صف تأیید ذخیره می‌کند و در صورت فعال بودن این یکپارچگی‌ها، ممکن است متن مقاله را برای بازنویسی به OpenAI و لینک پست‌های منتشرشده را به تلگرام ارسال کند. فیدها و کلیدهای API تنظیم‌شده را بررسی کنید تا با سیاست حریم خصوصی سایت شما هم‌خوان باشند.',
+    'Boz News imports items from the RSS and Atom feeds an administrator sets up and keeps them in a moderation queue. It may also download the full article page and its images from the source site.':
+        'بُز نیوز آیتم‌ها را از فیدهای RSS و Atom که مدیر تنظیم کرده دریافت می‌کند و در یک صف تأیید نگه می‌دارد. ممکن است صفحهٔ کامل مقاله و تصاویر آن را هم از سایت منبع دریافت کند.',
+    'When the AI assistant or automatic rewriting is turned on, the title and text of an article are sent to the AI provider chosen in the settings: OpenAI, Groq, Google Gemini, Anthropic Claude, GapGPT, or an address an administrator enters.':
+        'وقتی دستیار هوش مصنوعی یا بازنویسی خودکار روشن باشد، عنوان و متن مقاله به ارائه‌دهندهٔ هوش مصنوعی انتخاب‌شده در تنظیمات فرستاده می‌شود: OpenAI، Groq، Google Gemini، Anthropic Claude، GapGPT یا آدرسی که مدیر وارد می‌کند.',
+    'When Telegram or Bale channels are turned on, the title, summary, tags, link and featured image of each published item are sent to those services. Alerts about problems, such as a source that stopped answering, go to a chat an administrator chooses.':
+        'وقتی کانال‌های تلگرام یا بله روشن باشند، عنوان، خلاصه، برچسب‌ها، لینک و تصویر شاخص هر خبر منتشرشده به این سرویس‌ها فرستاده می‌شود. هشدار مشکلات، مثلاً منبعی که دیگر پاسخ نمی‌دهد، به گفتگویی که مدیر انتخاب کرده فرستاده می‌شود.',
+    'For each queued item, Boz News records which logged-in user edited it, rewrote it with the assistant, approved, rejected or unpublished it, and when. This history is deleted after the log retention period set in the settings.':
+        'بُز نیوز برای هر آیتم صف ثبت می‌کند که کدام کاربر واردشده و چه زمانی آن را ویرایش کرده، با دستیار بازنویسی کرده، تأیید یا رد کرده یا انتشارش را لغو کرده است. این تاریخچه پس از دورهٔ نگهداری لاگ که در تنظیمات تعیین شده پاک می‌شود.',
+    'The news list shown to visitors does not collect information about them.':
+        'فهرست خبرهایی که به بازدیدکنندگان نشان داده می‌شود اطلاعاتی دربارهٔ آن‌ها جمع نمی‌کند.',
 }
 
 STRING = re.compile(

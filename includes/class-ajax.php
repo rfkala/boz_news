@@ -999,8 +999,8 @@ class WPNC_Ajax {
 		if ( ! WPNC_AI_Rewriter::is_configured() ) {
 			$this->fail(
 				wpnc__(
-					'Add an OpenAI API key under Settings to use the assistant.',
-					'برای استفاده از دستیار، کلید API اوپن‌ای‌آی را در تنظیمات وارد کنید.'
+					'The assistant needs an API key for the chosen AI provider. An administrator adds it under Settings.',
+					'دستیار به کلید API ارائه‌دهندهٔ هوش مصنوعی انتخاب‌شده نیاز دارد. مدیر سایت آن را در تنظیمات وارد می‌کند.'
 				),
 				'wpnc_ai_not_configured',
 				array(),
